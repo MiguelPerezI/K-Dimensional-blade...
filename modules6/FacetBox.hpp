@@ -23,6 +23,7 @@ class FacetBox {
 		int getN() const;
 		void translate(const Vector3D& t);
 
+
 };
 
 

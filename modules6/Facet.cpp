@@ -17,6 +17,14 @@ Facet::Facet(const Quaternion& a, const Quaternion& b, const Quaternion& c) {
 	N = Quaternion(0, unit( (B.V()-A.V())) % (C.V()-A.V()) );
 }
 
+Facet::Facet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
+
+        A = Quaternion(0, a);
+        B = Quaternion(0, b);
+        C = Quaternion(0, c);
+        N = Quaternion(0, unit( (b - a)) % (c - a) );
+}
+
 Facet::Facet(const Facet& facet) {
 
         A = Quaternion(0, facet[0]);
@@ -35,6 +43,15 @@ Vector3D Facet::operator [] (int k) const {
 	if (k == 2) return C.V();
 	if (k == 3) return N.V();
    }
+}
+
+void Facet::updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
+
+	A = Quaternion( 0.0, a);
+	B = Quaternion( 0.0, b);
+	C = Quaternion( 0.0, c);
+	N = Quaternion( 0.0, unit( (b-a) % (c-a) ));
+
 }
 
 Vector3D Facet::getCenter() {

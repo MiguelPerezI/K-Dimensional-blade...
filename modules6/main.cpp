@@ -111,6 +111,14 @@ void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B) {
 	drawFacet2(plane[4], plane[5], plane[2], R, G, B);
 }
 
+void drawFacetBox(const FacetBox& box) {
+	
+	for (int i = 0; i < box.getN(); i++)
+		drawFacet(box[i], 0, 0, 255);
+
+	drawOctahedron(Octahedron(0.1 * abs(box.getCenter()-box[0][0]), box.getCenter()));
+}
+
 /*Funciones para dibujar sin pensar en OpenGL*/
 void Setup();
 void Draw();
@@ -137,15 +145,17 @@ Facet f = Facet(Quaternion(0.0, Vector3D(1, 0, 0)),
                           Quaternion(0.0, Vector3D(0, 1, 0)),
                           Quaternion(0.0, Vector3D(0, 0, 1)));
 
-FacetBox box = FacetBox(f);
-
 Octahedron octa = Octahedron(1.0, origen);
 PlaneQuaternion plane = PlaneQuaternion(0, K, origen);
+FacetBox box = FacetBox(octa[0]);
+
 ///////////////////     SETUP       ///////////////////////
 void Setup() {
 
   if (ciclo == 0) {
-	  	
+	
+	box.pushFacet(octa[1]);	  
+	box.pushFacet(octa[2][0], octa[2][1], octa[2][2]);
   }
 }
 
@@ -159,9 +169,11 @@ void updateProcessingProto() {
 
 	if (ciclo > 0) {
 	
-	plane = PlaneQuaternion(0, Vector3D(cos(angle), sin(angle), 1.0 * cos(2*angle)), origen);
-        cout << "\n" << (plane[0]-plane[1]) * (plane[2]-plane[1]);
-	/*For example here we are updating our matrix rotation system.*/
+		plane = PlaneQuaternion(0, Vector3D(cos(angle), sin(angle), 1.0 * cos(2*angle)), origen);
+        	cout << "\n" << (plane[0]-plane[1]) * (plane[2]-plane[1]);
+		/*For example here we are updating our matrix rotation system.*/
+
+
 	}
 }
 
@@ -173,10 +185,11 @@ void Draw() {
   if (ciclo > 0) {
     /*Draw Here*/
  	
-	drawFacet(box[0], 255, 0, 0);
-	drawOctahedron(Octahedron(0.1, box[0].getCenter()));
-  	drawPlaneQuaternion(plane, 255, 0, 255);
-  
+	//drawFacet(box[0], 255, 0, 0);
+	//drawFacet(box[1], 255, 255, 0);
+	//drawOctahedron(Octahedron(0.1, box.getCenter()));
+  //	drawPlaneQuaternion(plane, 255, 0, 255);
+ 	drawFacetBox(box); 
   }
 }
 

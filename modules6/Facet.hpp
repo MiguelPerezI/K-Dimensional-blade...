@@ -15,14 +15,9 @@ class Facet {
         	Vector3D  operator [] (int k) const;
         	Facet();
 		Facet(const Quaternion& a, const Quaternion& b, const Quaternion& c);
+		Facet(const Vector3D& a, const Vector3D& b, const Vector3D& c);
 		Facet(const Facet& facet);
-		void updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
-
-                        A = Quaternion( 0.0, a);
-                        B = Quaternion( 0.0, b);
-                        C = Quaternion( 0.0, c);
-                        N = Quaternion( 0.0, unit( (b-a) % (c-a) ));
-                }
+		void updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c);
 		Vector3D getCenter();	
 };
 
