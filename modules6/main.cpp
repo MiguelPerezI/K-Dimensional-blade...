@@ -10,6 +10,7 @@
 #include "Octahedron.cpp"
 #include "PlaneQuaternion.cpp"
 #include "FacetBox.cpp"
+#include "FacetGash.cpp"
 
 //////////////////////////////////////
 //                                  //
@@ -119,6 +120,11 @@ void drawFacetBox(const FacetBox& box) {
 	drawOctahedron(Octahedron(0.1 * abs(box.getCenter()-box[0][0]), box.getCenter()));
 }
 
+void drawFacetGash(const FacetGash& gash, int R, int G, int B) {
+	
+	drawPlaneQuaternion(gash.getBlade(), 255, 0, 255);
+}
+
 /*Funciones para dibujar sin pensar en OpenGL*/
 void Setup();
 void Draw();
@@ -146,16 +152,31 @@ Facet f = Facet(Quaternion(0.0, Vector3D(1, 0, 0)),
                           Quaternion(0.0, Vector3D(0, 0, 1)));
 
 Octahedron octa = Octahedron(1.0, origen);
-PlaneQuaternion plane = PlaneQuaternion(0, K, origen);
+PlaneQuaternion plane = PlaneQuaternion(0, Vector3D(1, 1, 1), origen);
 FacetBox box = FacetBox(octa[0]);
+
+FacetBox pila = FacetBox(octa[0]);
+FacetBox pila1 = FacetBox(octa[1]);
+
+double phii = 0.75 * M_PI;
+double tetaa = 0.25 * M_PI;
+FacetGash In = FacetGash(Vector3D(-cos(phii) * sin(tetaa),-sin(phii) * sin(tetaa),-cos(tetaa)), origen);
+
+
+
+
 
 ///////////////////     SETUP       ///////////////////////
 void Setup() {
 
   if (ciclo == 0) {
 	
-	box.pushFacet(octa[1]);	  
-	box.pushFacet(octa[2][0], octa[2][1], octa[2][2]);
+	In.cutFacet(octa[0]);
+	In.cutFacet(octa[3]);
+
+	In.restart();
+
+  
   }
 }
 
@@ -169,8 +190,7 @@ void updateProcessingProto() {
 
 	if (ciclo > 0) {
 	
-		plane = PlaneQuaternion(0, Vector3D(cos(angle), sin(angle), 1.0 * cos(2*angle)), origen);
-        	cout << "\n" << (plane[0]-plane[1]) * (plane[2]-plane[1]);
+		//plane = PlaneQuaternion(0, Vector3D(cos(angle), sin(angle), 1.0 * cos(2*angle)), origen);
 		/*For example here we are updating our matrix rotation system.*/
 
 
@@ -187,9 +207,16 @@ void Draw() {
  	
 	//drawFacet(box[0], 255, 0, 0);
 	//drawFacet(box[1], 255, 255, 0);
-	//drawOctahedron(Octahedron(0.1, box.getCenter()));
+	drawOctahedron(Octahedron(0.1, In.getCutPoint(0)));
+	drawOctahedron(Octahedron(0.1, In.getCutPoint(1)));
+	drawOctahedron(Octahedron(0.1, In.getCutPoint(2)));
+	
   //	drawPlaneQuaternion(plane, 255, 0, 255);
- 	drawFacetBox(box); 
+ 	
+	drawFacetGash(In, 255, 0, 255);
+	drawFacet(In.returnFacet(0), 255, 255, 0);
+	drawFacet(In.returnFacet(1), 255,   0, 255);
+	//drawFacetBox(pila); 
   }
 }
 

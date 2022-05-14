@@ -49,6 +49,7 @@ PlaneQuaternion::PlaneQuaternion(int m, const Vector3D& a, const Vector3D& b) {
 
 }	
 
+//Fetch PlaneQuaternion Data
 Vector3D PlaneQuaternion::operator [] (int k) const {
    if (k > 5)
       return Vector3D(0, 0, 0);
@@ -132,6 +133,10 @@ double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) {
 		if (equalR(t, 1.0) == 1) return t;
 		if (t < 0.0 || 1.0 < t) return -1.0;
 	}
+}
+
+void PlaneQuaternion::updateOrientation() {
+	this->normal = Quaternion(this->normal.r(), -1.0 * this->normal.V());
 }
 
 

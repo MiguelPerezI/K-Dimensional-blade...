@@ -19,13 +19,14 @@ class FacetGash {
 		Facet facet;
 		Vector3D * V;
 		Facet * facets;
+		FacetBox Facets;
 
 	public:
         	Vector3D  operator [] (int k) const;
-		FacetGash() {};
+		FacetGash();
 		FacetGash(const Vector3D& planeH, const Vector3D& planeB);
-		void updateFacetGash(const Vector3D& newHead, const Vector3D& newBase);
-		PlaneQuaternion getSaw() const;
+		void updateBlade(const Vector3D& newHead, const Vector3D& newBase);
+		PlaneQuaternion getBlade() const;
                 Vector3D getNormal () const;
                 Quaternion getM(int i, int j) const;
                 int getN() const;
@@ -34,10 +35,12 @@ class FacetGash {
                 double getT1(int nn) const;
                 double getT2(int nn) const;
                 Facet getFacet(int n0) const;
-                Vector3D getDir(double t) const;
+                Facet returnFacet(int i) const;
+		Vector3D getDir(double t) const;
                 int checkPoint(const Quaternion& p, const Quaternion& J);
-                void updateOrientation();
-                void intersectFacet(const Facet& facet0);
+                Vector3D getCutPoint(int i) const;
+		void updateOrientation();
+                void cutFacet(const Facet& facet0);
 		void restart();
 		void readListC(const Facet& facet, FacetBox * pila);
 		void readList(FacetBox * pila);

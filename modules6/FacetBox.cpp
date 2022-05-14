@@ -69,3 +69,9 @@ void FacetBox::pushFacet(const Vector3D& A, const Vector3D& B, const Vector3D& C
 	updateCenter();
 
 }
+
+void FacetBox::replaceFacet(int i, const Vector3D& A, const Vector3D& B, const Vector3D& C) {
+	
+	F[i] = Facet(A, B, C);
+	updateCenter();
+}
