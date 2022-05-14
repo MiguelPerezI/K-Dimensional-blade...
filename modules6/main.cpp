@@ -151,7 +151,6 @@ Octahedron octa = Octahedron(1.0, origen);
 double phii = 0.75 * M_PI;
 double tetaa = 0.25 * M_PI;
 FacetGash In = FacetGash(Vector3D(-cos(phii) * sin(tetaa),-sin(phii) * sin(tetaa),-cos(tetaa)), origen);
-QuaternionBoxBox v = QuaternionBoxBox(Quaternion(0, origen));
 
 ///////////////////     SETUP       ///////////////////////
 void Setup() {
@@ -160,12 +159,9 @@ void Setup() {
 	
 	In.cutFacet(octa[0]);
 	In.cutFacet(octa[3]);
-
-	In.restart();
-
-	v.push(Quaternion(K));
-	v.push(J);	
-	cout << v;	
+	
+	//In.restart();
+	cout << In;
   }
 }
 

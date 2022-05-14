@@ -2,6 +2,7 @@
 using namespace std;
 
 #include "FacetGash.hpp"
+#include "FacetBox.hpp"
 #include <cmath>
 #include <iomanip>
 #include <fstream>
@@ -82,37 +83,23 @@ void FacetGash::cutFacet(const Facet& facet0) {
 	//(*Note we don't care if there's one line intersection so we don't even check)
 	if ( (t > -1e-100 && t1 > -1e-100) || (t > -1e-100  && t2 > -1e-100) || (t1 > -1e-100  && t2 > -1e-100)) {
 		
-		cout << "\n ->CUUUT\n";
 		//We calculate the points at intersection with blade and facet
 		inter0 = t  * (facet[0] - facet[1]) + facet[1];
 		inter1 = t1 * (facet[2] - facet[1]) + facet[1];
 		inter2 = t2 * (facet[0] - facet[2]) + facet[2];
 
-
-		//If n is greater than zero we increase our arrays
-		
+		//Checking case for variuos cycles	
 		if (n == 0) {
 			Facets = FacetBox(facet);
-		}
+			MM = QuaternionBoxBox(inter0, inter1, inter2);
+			VV = Vector3D(t, t1, t2);	
+		} else {
 		
-		if (n > 0) {
-		
-			cout << "\nn greater than zero";	
-			M = (Quaternion * *) realloc (M, sizeof(Quaternion*) * (n + 1));
-			M[n] = (Quaternion * ) malloc (3 * sizeof(Quaternion));
-			V = (Vector3D *) realloc (V, sizeof(Vector3D) * (n + 1));
-			facets = (Facet *) realloc (facets, sizeof(Facet) * (n + 1));
 			Facets.pushFacet(facet);
+			MM.push(inter0, inter1, inter2);
+			VV.push(t, t1, t2);
 		}
 
-		M[n][0] = Quaternion(0.0, inter0);
-		M[n][1] = Quaternion(0.0, inter1);
-		M[n][2] = Quaternion(0.0, inter2);
-		facets[n] = Facet(facet);
-		V[n] = Vector3D(t, t1, t2);
-		
-		//Increase size parameter	
-		cout << "\nn = " << n << endl;
 		n += 1;
 	}
 
@@ -264,3 +251,17 @@ void FacetGash::checkR (const Vector3D& r0, const Vector3D& r1, const Vector3D& 
 	}
 }
 
+QuaternionBoxBox FacetGash::getMM() const {return MM;}
+Vector3DBox      FacetGash::getVV() const {return VV;}
+FacetBox         FacetGash::getFacets() const {return Facets;}
+
+
+ostream& operator << (ostream& os, const FacetGash& a) {
+
+        os << "\nFacetGash Data: \n";
+	os << a.getFacets();
+	os << a.getVV();
+	os << a.getMM();
+	os << "\n\n\n";
+        return os;
+}

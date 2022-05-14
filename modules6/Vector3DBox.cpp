@@ -89,7 +89,7 @@ void Vector3DBox::replace(int i, double a, double b, double c) {
 
 ostream& operator << (ostream& os, const Vector3DBox& a) {
 	
-	os << "\nCenter := " << a.getCenter() << "\n";
+	os << "\nVectorBox data:\n\nCenter := " << a.getCenter() << "\n";
 	for (int i = 0; i < a.getN(); i++) {
 		os << "[" << a[i] << "]\n";
 	}

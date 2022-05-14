@@ -8,7 +8,7 @@ using namespace std;
 #include "Facet.hpp"
 #include "FacetBox.hpp"
 #include "Vector3DBox.hpp"
-#include "QuaternionBox.hpp"
+#include "QuaternionBoxBox.hpp"
 #include <math.h>
 
 class FacetGash {
@@ -24,7 +24,7 @@ class FacetGash {
 		
 		
 		FacetBox Facets;
-		QuaternionBox MM;
+		QuaternionBoxBox MM;
 		Vector3DBox VV;
 
 	public:
@@ -53,9 +53,13 @@ class FacetGash {
 		int  linePointIntersection(const Vector3D& r, const Vector3D& a, const Vector3D& b);
 		void auxFun(int a, int b, int aa, int bb, int cc, int i, const Vector3D& A0, const Vector3D& B0, const Vector3D& C0, FacetBox * pila );
 		void checkR (const Vector3D& r0, const Vector3D& r1, const Vector3D& A0, const Vector3D& B0, const Vector3D& C0, FacetBox * pila);
-
+		QuaternionBoxBox getMM() const;
+		Vector3DBox getVV() const;
+		FacetBox getFacets() const;
+		void escFacetGash();
 };
 
+ostream& operator << (ostream& os, const FacetGash& a);
 
 #endif
 

@@ -23,7 +23,7 @@ class FacetBox {
 		void replaceFacet(int i, const Vector3D& A, const Vector3D& B, const Vector3D& C);
 		int getN() const;
 		void translate(const Vector3D& t);
-
+		void escFacetBox();
 
 };
 

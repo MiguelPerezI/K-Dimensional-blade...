@@ -75,3 +75,12 @@ void FacetBox::replaceFacet(int i, const Vector3D& A, const Vector3D& B, const V
 	F[i] = Facet(A, B, C);
 	updateCenter();
 }
+
+ostream& operator << (ostream& os, const FacetBox& a) {
+
+	os << "\n\nFacetBox data:\n";
+	for (int i = 0; i < a.getN(); i++)
+		os << a[i] << "\n";
+	os << "\n";
+	return os;
+}
