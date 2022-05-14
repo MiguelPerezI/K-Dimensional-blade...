@@ -6,7 +6,7 @@ using namespace std;
 #include <fstream>
 
 
-FacetBox::FacetBox() {};
+FacetBox::FacetBox() {n = 0;};
 FacetBox::FacetBox(const Facet& facet) {
 	
 	F = (Facet *) malloc (1 * sizeof(Facet));
@@ -83,4 +83,11 @@ ostream& operator << (ostream& os, const FacetBox& a) {
 		os << a[i] << "\n";
 	os << "\n";
 	return os;
+}
+
+void FacetBox::empty() {
+
+        n = 0;
+        free(F);
+        F = NULL;
 }

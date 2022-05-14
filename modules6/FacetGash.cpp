@@ -43,7 +43,7 @@ PlaneQuaternion FacetGash::getBlade() const {return blade;}
 Vector3D FacetGash::getNormal() const {return blade[0];};
 
 //Get Slash Quaternion Coordinates
-Quaternion FacetGash::getM(int i, int j) const {return M[i][j];}
+Vector3D FacetGash::getM(int i, int j) const {return MM[i][j];}
 
 //Auxilary Funstions
 int      FacetGash::getN() const {return n;}
@@ -105,16 +105,16 @@ void FacetGash::cutFacet(const Facet& facet0) {
 
 }
 
-Facet FacetGash::returnFacet(int i) const {
-	return Facets[i];	
-}
 
 //We restart our memory allocation for the next iteration
 void FacetGash::restart() {
 
-	M = (Quaternion * *) realloc (M, sizeof(Quaternion*) * (1));
-	V = (Vector3D *) realloc (V, sizeof(Vector3D) * (1));
-	facets = (Facet *) realloc (facets, sizeof(Facet) * (1));
+	//M = (Quaternion * *) realloc (M, sizeof(Quaternion*) * (1));
+	//V = (Vector3D *) realloc (V, sizeof(Vector3D) * (1));
+	//facets = (Facet *) realloc (facets, sizeof(Facet) * (1));
+	Facets.empty();
+	MM.empty();
+	VV.empty();
 	n = 0;
 }
 
@@ -125,23 +125,15 @@ void FacetGash::readListC(const Facet& facet, FacetBox * pila) {
 	Vector3D B0 = Vector3D(facet[1]);
 	Vector3D C0 = Vector3D(facet[2]);
 
-	Vector3D J = Vector3D(0, 1, 0);
+	Vector3D J = Vector3D(0, 0, 1);
 	Quaternion QJ = Quaternion(0.0, J);
 	int aa = checkPoint(A0, QJ);
 	int bb = checkPoint(B0, QJ);
 	int cc = checkPoint(C0, QJ);
 
 	//Checking which side does the facet belong to
-	if (aa == 1 && bb == 1 && cc == 1) {
-	
-		if (pila->getN() == 1) {
-			
-			pila->replaceFacet(0, A0, B0, C0);
-		}
-
-		if (pila->getN() > 1)	
-			pila->pushFacet(A0, B0, C0);
-	}
+	if (aa == 1 && bb == 1 && cc == 1)
+		pila->pushFacet(A0, B0, C0);
 }
 
 void FacetGash::readList(FacetBox * pila) {
@@ -151,9 +143,9 @@ void FacetGash::readList(FacetBox * pila) {
 	int n = 0;
 
 	Vector3D pp;
-	if (getT (0) > -1e-100) pp = Vector3D(getM(0, 0).V());
-	if (getT1(0) > -1e-100) pp = Vector3D(getM(0, 1).V());
-	if (getT2(0) > -1e-100) pp = Vector3D(getM(0, 2).V());;
+	if (getT (0) > -1e-100) pp = Vector3D(getM(0, 0));
+	if (getT1(0) > -1e-100) pp = Vector3D(getM(0, 1));
+	if (getT2(0) > -1e-100) pp = Vector3D(getM(0, 2));;
 
 	//We iterate through the facets saved
 	for (int i = 0; i < getN(); i++) {
@@ -175,19 +167,19 @@ void FacetGash::readList(FacetBox * pila) {
 		if ( getT(i) >-1e-7 && getT1(i) >-1e-7) {
 
 			auxFun(0, 1, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 0).V(), getM(i, 1).V(), pp);
+			pila->pushFacet(getM(i, 0), getM(i, 1), pp);
 		}
 
 		if ( getT(i) >-1e-7 && getT2(i) >-1e-7) {
 
 			auxFun(0, 2, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 0).V(), getM(i, 2).V(), pp);
+			pila->pushFacet(getM(i, 0), getM(i, 2), pp);
 		}
 
 		if (getT2(i) >-1e-7 && getT1(i) >-1e-7) {
 
 			auxFun(1, 2, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 1).V(), getM(i, 2).V(), pp);
+			pila->pushFacet(getM(i, 1), getM(i, 2), pp);
 		}
 
 	}
@@ -203,8 +195,8 @@ int  FacetGash::linePointIntersection(const Vector3D& r, const Vector3D& a, cons
 
 void FacetGash::auxFun(int a, int b, int aa, int bb, int cc, int i, const Vector3D& A0, const Vector3D& B0, const Vector3D& C0, FacetBox * pila ) {
 
-	Vector3D r0 = Vector3D(getM(i, a).V());
-	Vector3D r1 = Vector3D(getM(i, b).V());
+	Vector3D r0 = Vector3D(getM(i, a));
+	Vector3D r1 = Vector3D(getM(i, b));
 
 	if (aa == 1 && bb == 0 && cc == 0) {
 		pila->pushFacet(r0, r1, A0);

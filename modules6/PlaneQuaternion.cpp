@@ -13,12 +13,11 @@ PlaneQuaternion::PlaneQuaternion(int m, const Vector3D& a, const Vector3D& b) {
 	
 	//DEFINE THE NORMAL
 	this->normal = Quaternion(0.0, Vector3D(0, 0, 1));
-        this->point[0] = unit(Vector3D( 1, 1, 0));
-	this->point[1] = unit(Vector3D(-1, 1, 0));
-	this->point[2] = unit(Vector3D(-1,-1, 0));
-	this->point[3] = unit(Vector3D( 1,-1, 0));
-        this->m;
-
+        this->point[0] = unit(Vector3D( 1, 0, 0));
+	this->point[1] = unit(Vector3D( 0, 1, 0));
+	this->point[2] = unit(Vector3D(-1, 0, 0));
+	this->point[3] = unit(Vector3D( 0,-1, 0));
+	this->base = Vector3D(b);
 	//DEFINE THE DIFFERENCE VECTOR (v = a-b)
 	Quaternion J = Quaternion(0.0, unit(a-b));
 
@@ -41,11 +40,8 @@ PlaneQuaternion::PlaneQuaternion(int m, const Vector3D& a, const Vector3D& b) {
                 point[2] = Vector3D(p2.V());
                 point[3] = Vector3D(p3.V());
 
-	} else {
+	}
 		
-		//else stay put
-		base = Vector3D(0, 0, 0);
-	}	
 
 }	
 
@@ -95,7 +91,7 @@ int PlaneQuaternion::checkPoint(const Quaternion& p, const Quaternion& J) {
         Quaternion tauQ = Qan(phi, tau);
         Quaternion p0 = tauQ * P * tauQ.conjugate();
 
-        if (p0.V().y() >= 0.0) return 1;
+        if (p0.V().z() >= 0.0) return 1;
         else return 0;
 }
 
@@ -120,7 +116,7 @@ double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) {
 	double X0 = this->base.x();
 	double Y0 = this->base.y();
 	double Z0 = this->base.z();
-
+	
 	double D = Vector3D(A, B, C) * Vector3D(X0, Y0, Z0);
 	double Dpr = Vector3D(A, B, C) * b;
 	double Dps = Vector3D(A, B, C) * (a-b);
@@ -131,7 +127,7 @@ double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) {
 	else {
 		if (equalR(t, 0.0) == 1) return t;
 		if (equalR(t, 1.0) == 1) return t;
-		if (t < 0.0 || 1.0 < t) return -1.0;
+		if (t < 0.0 || 1.0 < t) return -10000.0;
 	}
 }
 

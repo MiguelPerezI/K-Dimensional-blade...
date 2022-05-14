@@ -107,7 +107,7 @@ Quaternion rotate(const Quaternion& p, const Vector3D& a, const Vector3D& b, con
 	//The diference Vector = a - b;
 	Quaternion difference = Quaternion( 0.0, unit(a-b));
 
-	int ll = line(unit(a-b), Vector3D(0, 1, 0), Vector3D(0, 0, 0));
+	int ll = line(unit(a-b), Vector3D(0, 0, 1), Vector3D(0, 0, 0));
 
 	if (ll != 1) {
 		

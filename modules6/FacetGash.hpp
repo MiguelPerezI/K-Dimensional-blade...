@@ -34,7 +34,7 @@ class FacetGash {
 		void updateBlade(const Vector3D& newHead, const Vector3D& newBase);
 		PlaneQuaternion getBlade() const;
                 Vector3D getNormal () const;
-                Quaternion getM(int i, int j) const;
+                Vector3D getM(int i, int j) const;
                 int getN() const;
                 int getM() const;
                 double  getT(int nn) const;
