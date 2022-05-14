@@ -7,6 +7,8 @@ using namespace std;
 #include "PlaneQuaternion.hpp"
 #include "Facet.hpp"
 #include "FacetBox.hpp"
+#include "Vector3DBox.hpp"
+#include "QuaternionBox.hpp"
 #include <math.h>
 
 class FacetGash {
@@ -19,7 +21,11 @@ class FacetGash {
 		Facet facet;
 		Vector3D * V;
 		Facet * facets;
+		
+		
 		FacetBox Facets;
+		QuaternionBox MM;
+		Vector3DBox VV;
 
 	public:
         	Vector3D  operator [] (int k) const;

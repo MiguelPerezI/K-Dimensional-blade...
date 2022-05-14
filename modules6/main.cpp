@@ -11,7 +11,9 @@
 #include "PlaneQuaternion.cpp"
 #include "FacetBox.cpp"
 #include "FacetGash.cpp"
-
+#include "Vector3DBox.cpp"
+#include "QuaternionBox.cpp"
+#include "QuaternionBoxBox.cpp"
 //////////////////////////////////////
 //                                  //
 //                                  //
@@ -145,26 +147,11 @@ void interface();
 /*Here we build our memory space and filled it with data using initObject methods corresponding to each class.*/
 /*initObjects methods are functions that should build memory space and fill it with data*/
 
-
-
-Facet f = Facet(Quaternion(0.0, Vector3D(1, 0, 0)),
-                          Quaternion(0.0, Vector3D(0, 1, 0)),
-                          Quaternion(0.0, Vector3D(0, 0, 1)));
-
 Octahedron octa = Octahedron(1.0, origen);
-PlaneQuaternion plane = PlaneQuaternion(0, Vector3D(1, 1, 1), origen);
-FacetBox box = FacetBox(octa[0]);
-
-FacetBox pila = FacetBox(octa[0]);
-FacetBox pila1 = FacetBox(octa[1]);
-
 double phii = 0.75 * M_PI;
 double tetaa = 0.25 * M_PI;
 FacetGash In = FacetGash(Vector3D(-cos(phii) * sin(tetaa),-sin(phii) * sin(tetaa),-cos(tetaa)), origen);
-
-
-
-
+QuaternionBoxBox v = QuaternionBoxBox(Quaternion(0, origen));
 
 ///////////////////     SETUP       ///////////////////////
 void Setup() {
@@ -176,7 +163,9 @@ void Setup() {
 
 	In.restart();
 
-  
+	v.push(Quaternion(K));
+	v.push(J);	
+	cout << v;	
   }
 }
 

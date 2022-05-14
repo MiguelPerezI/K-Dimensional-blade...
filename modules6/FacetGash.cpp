@@ -91,7 +91,9 @@ void FacetGash::cutFacet(const Facet& facet0) {
 
 		//If n is greater than zero we increase our arrays
 		
-		if (n == 0) Facets = FacetBox(facet);
+		if (n == 0) {
+			Facets = FacetBox(facet);
+		}
 		
 		if (n > 0) {
 		
