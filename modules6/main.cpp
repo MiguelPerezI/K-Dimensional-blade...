@@ -14,6 +14,7 @@
 #include "Vector3DBox.cpp"
 #include "QuaternionBox.cpp"
 #include "QuaternionBoxBox.cpp"
+#include "Dodecahedron.cpp"
 //////////////////////////////////////
 //                                  //
 //                                  //
@@ -154,7 +155,7 @@ void interface();
 /*Here we build our memory space and filled it with data using initObject methods corresponding to each class.*/
 /*initObjects methods are functions that should build memory space and fill it with data*/
 
-Octahedron octa = Octahedron(1.0, origen);
+Dodecahedron octa = Dodecahedron(1.0, origen);
 double phii = 0.5 * M_PI;
 double tetaa = 0.25 * M_PI;
 
@@ -212,7 +213,7 @@ void Draw() {
 	);
 	  
 	/*Divide the polytope in two*/
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 36; i++) {
                 In.cutFacet(octa[i]);
                 //In.readListC(octa[i], &pila);
         	int aa = In.checkFacet(octa[i]);
@@ -225,7 +226,7 @@ void Draw() {
 
 	drawFacetGash(In, 255, 0, 255);
 	
-      	for (int i = 0; i < 8; i++) {
+      	for (int i = 0; i < 36; i++) {
 	
 		for (int j = 0; j < 3; j++) {
 		
