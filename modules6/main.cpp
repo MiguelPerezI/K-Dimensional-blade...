@@ -15,6 +15,8 @@
 #include "QuaternionBox.cpp"
 #include "QuaternionBoxBox.cpp"
 #include "Dodecahedron.cpp"
+
+
 //////////////////////////////////////
 //                                  //
 //                                  //
@@ -125,8 +127,8 @@ void drawFacetBox(const FacetBox& box, int R, int G, int B) {
 
 void drawFacetGash(FacetGash gash, int R, int G, int B) {
 	
-	drawPlaneQuaternion(gash.getBlade(), 50, 100, 255);
-	drawFacetBox(gash.getFacets(), R, G, B);
+	//drawPlaneQuaternion(gash.getBlade(), 50, 100, 255);
+	//drawFacetBox(gash.getFacets(), R, G, B);
 	
 	for (int i = 0; i < gash.getMM().getM(); i++)
 		for (int j = 0; j < gash.getMM()[i].getN(); j++)
@@ -221,15 +223,18 @@ void Draw() {
 			pila.push(octa[i]);
 	}
 
+
+	In.readList(&pila);	
+	
+
+
+
 	/*Draw one of the first half not touching the boundary*/
 	drawFacetBox(pila, 0, 255, 0);
-
 	drawFacetGash(In, 255, 0, 255);
 	
       	for (int i = 0; i < 36; i++) {
-	
 		for (int j = 0; j < 3; j++) {
-		
 			if (In.checkPoint(Quaternion(octa[i][j]), Quaternion(K)) == 1) 
 				drawOctahedron(Octahedron(0.1, octa[i][j]), 0, 0, 255);
 		}
@@ -299,7 +304,7 @@ void ProcessingProto() {
 
 /*Posición y color de luz*/
 GLfloat light_diffuse[] = {1.0, 1.0, 1.0, 1.0};
-GLfloat light_position[] = {1.0, 1.0, 0.25, 0.0};
+GLfloat light_position[] = {1.0, 1.0, 2.25, 0.0};
 
 /*Funciones de OpenGL*/
 void display(void);
@@ -313,7 +318,7 @@ int main(int argc, char **argv)
   
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-  glutInitWindowSize(1080, 720);
+  glutInitWindowSize(720, 720);
   glutCreateWindow(" ------- 120 - cell ------- ");
   ProcessMenu(1);
   init(count);

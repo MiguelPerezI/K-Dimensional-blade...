@@ -17,15 +17,7 @@ FacetGash::FacetGash(const Vector3D& planeH, const Vector3D& planeB) {
 	
 	//Setting up balde
 	blade = PlaneQuaternion(10, head.V(), base.V());
-
-	//Setting up space needed
-	V = (Vector3D *) malloc (1 * sizeof(Vector3D));
-	facets = (Facet *) malloc (1 * sizeof(Facet));
-	M = (Quaternion **) malloc (1 * sizeof(Quaternion*));
         
-	//Preparing memory M
-	for (int i = 0; i < 1; i++)
-		M[i] = (Quaternion *) malloc (3 * sizeof(Quaternion));
 	n = 0;
 	m = 0;
 }
@@ -48,10 +40,10 @@ Vector3D FacetGash::getM(int i, int j) const {return MM[i][j];}
 //Auxilary Funstions
 int      FacetGash::getN() const {return n;}
 int      FacetGash::getM() const {return m;}
-double   FacetGash:: getT(int nn) const {return  V[nn].x();}
-double   FacetGash::getT1(int nn) const {return  V[nn].y();}
-double   FacetGash::getT2(int nn) const {return  V[nn].z();}
-Facet    FacetGash::getFacet(int n0) const {return facets[n0];}
+double   FacetGash:: getT(int nn) const {return  VV[nn].x();}
+double   FacetGash::getT1(int nn) const {return  VV[nn].y();}
+double   FacetGash::getT2(int nn) const {return  VV[nn].z();}
+Facet    FacetGash::getFacet(int n0) const {return Facets[n0];}
 Vector3D FacetGash::getDir(double t) const {return (t*(head.V()-base.V()));}
 int 	 FacetGash::checkPoint(const Quaternion& p, const Quaternion& J) {return blade.checkPoint(p, J);}
 Vector3D FacetGash::getCutPoint(int i) const {
@@ -109,9 +101,6 @@ void FacetGash::cutFacet(const Facet& facet0) {
 //We restart our memory allocation for the next iteration
 void FacetGash::restart() {
 
-	//M = (Quaternion * *) realloc (M, sizeof(Quaternion*) * (1));
-	//V = (Vector3D *) realloc (V, sizeof(Vector3D) * (1));
-	//facets = (Facet *) realloc (facets, sizeof(Facet) * (1));
 	Facets.empty();
 	MM.empty();
 	VV.empty();
@@ -166,17 +155,15 @@ void FacetGash::readList(FacetBox * pila) {
 	if (getT1(0) > -1e-100) pp = Vector3D(getM(0, 1));
 	if (getT2(0) > -1e-100) pp = Vector3D(getM(0, 2));;
 
-	//We iterate through the facets saved
+	//We iterate through the facets that touch the plane
 	for (int i = 0; i < getN(); i++) {
-
-		//if (intersection.getT2(i) > -1e-100) drawSphereTrans(0.001, intersection.getM(i, 2).V(), 0, 6, 7, 0.0);
 
 		//Check which vertices of the facet are in the correct side of the plane in R3
 		Facet facet = Facet(getFacet(i));
 		Vector3D A0 = Vector3D(getFacet(i)[0]);
 		Vector3D B0 = Vector3D(getFacet(i)[1]);
 		Vector3D C0 = Vector3D(getFacet(i)[2]);
-		Vector3D J = Vector3D(0, 1, 0);
+		Vector3D J = Vector3D(0, 0, 1);
 		Quaternion QJ = Quaternion(0.0, J);
 		int aa = checkPoint(A0, QJ);
 		int bb = checkPoint(B0, QJ);
@@ -186,19 +173,19 @@ void FacetGash::readList(FacetBox * pila) {
 		if ( getT(i) >-1e-7 && getT1(i) >-1e-7) {
 
 			auxFun(0, 1, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 0), getM(i, 1), pp);
+			pila->push(getM(i, 0), getM(i, 1), pp);
 		}
 
 		if ( getT(i) >-1e-7 && getT2(i) >-1e-7) {
 
 			auxFun(0, 2, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 0), getM(i, 2), pp);
+			pila->push(getM(i, 0), getM(i, 2), pp);
 		}
 
 		if (getT2(i) >-1e-7 && getT1(i) >-1e-7) {
 
 			auxFun(1, 2, aa, bb, cc, i, A0, B0, C0, pila);
-			pila->pushFacet(getM(i, 1), getM(i, 2), pp);
+			pila->push(getM(i, 1), getM(i, 2), pp);
 		}
 
 	}
@@ -218,15 +205,15 @@ void FacetGash::auxFun(int a, int b, int aa, int bb, int cc, int i, const Vector
 	Vector3D r1 = Vector3D(getM(i, b));
 
 	if (aa == 1 && bb == 0 && cc == 0) {
-		pila->pushFacet(r0, r1, A0);
+		pila->push(r0, r1, A0);
 	}
 
 	if (aa == 0 && bb == 1 && cc == 0) {
-		pila->pushFacet(r0, r1, B0);
+		pila->push(r0, r1, B0);
 	}
 
 	if (aa == 0 && bb == 0 && cc == 1) {
-		pila->pushFacet(r0, r1, C0);
+		pila->push(r0, r1, C0);
 	}
 
 	if (aa == 0 && bb == 1 && cc == 1) {
@@ -251,14 +238,14 @@ void FacetGash::checkR (const Vector3D& r0, const Vector3D& r1, const Vector3D& 
 
 	if ( l == 1) {
 
-		pila->pushFacet(r0, B0, C0);
-		pila->pushFacet(C0, r1, r0);
+		pila->push(r0, B0, C0);
+		pila->push(C0, r1, r0);
 	}
 
 	if ( l0 == 1) {
 
-		pila->pushFacet(r1, B0, C0);
-		pila->pushFacet(C0, r1, r0);
+		pila->push(r1, B0, C0);
+		pila->push(C0, r1, r0);
 	}
 }
 
