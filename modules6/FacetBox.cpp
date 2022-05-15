@@ -38,6 +38,20 @@ void FacetBox::updateCenter() {
 
 }
 
+void FacetBox::push(const Facet& facet) {
+
+	if (n == 0) {
+		F = (Facet *) malloc (1 * sizeof(Facet));
+		F[0] = Facet(facet[0], facet[1], facet[2]);
+                n = 1;
+	} else {
+		F = (Facet *) realloc(F, sizeof(Facet) * (n+1));
+                n = n + 1;
+                F[n-1] = Facet(facet[0], facet[1], facet[2]);
+                updateCenter();
+	}
+}
+
 void FacetBox::pushFacet(const Facet& facet) {
 
 	if (n == 0) {
@@ -70,6 +84,7 @@ void FacetBox::pushFacet(const Vector3D& A, const Vector3D& B, const Vector3D& C
 
 }
 
+
 void FacetBox::replaceFacet(int i, const Vector3D& A, const Vector3D& B, const Vector3D& C) {
 	
 	F[i] = Facet(A, B, C);
@@ -86,8 +101,10 @@ ostream& operator << (ostream& os, const FacetBox& a) {
 }
 
 void FacetBox::empty() {
-
-        n = 0;
-        free(F);
-        F = NULL;
+	
+	if (getN() != 0) {
+        	n = 0;
+        	free(F);
+        	F = NULL;
+	}
 }

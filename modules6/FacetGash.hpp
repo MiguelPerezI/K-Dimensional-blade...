@@ -57,6 +57,7 @@ class FacetGash {
 		Vector3DBox getVV() const;
 		FacetBox getFacets() const;
 		void escFacetGash();
+		int checkFacet(const Facet& facet);
 };
 
 ostream& operator << (ostream& os, const FacetGash& a);

@@ -18,6 +18,7 @@ class FacetBox {
 		FacetBox(const Facet& facet);
 		Vector3D getCenter() const;
 		void updateCenter();
+		void push(const Facet& facet);
 		void pushFacet(const Facet& facet);
 		void pushFacet(const Vector3D& A, const Vector3D& B, const Vector3D& C);
 		void replaceFacet(int i, const Vector3D& A, const Vector3D& B, const Vector3D& C);

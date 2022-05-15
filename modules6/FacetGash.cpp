@@ -132,8 +132,27 @@ void FacetGash::readListC(const Facet& facet, FacetBox * pila) {
 	int cc = checkPoint(C0, QJ);
 
 	//Checking which side does the facet belong to
+	if (aa == 1 && bb == 1 && cc == 1) {
+		pila->pushFacet(facet);
+	}
+}
+
+int FacetGash::checkFacet(const Facet& facet) {
+
+	Vector3D A0 = Vector3D(facet[0]);
+        Vector3D B0 = Vector3D(facet[1]);
+        Vector3D C0 = Vector3D(facet[2]);
+
+        Vector3D J = Vector3D(0, 0, 1);
+        Quaternion QJ = Quaternion(0.0, J);
+        int aa = checkPoint(A0, QJ);
+        int bb = checkPoint(B0, QJ);
+        int cc = checkPoint(C0, QJ);
+
 	if (aa == 1 && bb == 1 && cc == 1)
-		pila->pushFacet(A0, B0, C0);
+		return 1;
+	else 
+		return 0;
 }
 
 void FacetGash::readList(FacetBox * pila) {

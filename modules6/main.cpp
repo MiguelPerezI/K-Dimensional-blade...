@@ -115,8 +115,9 @@ void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B) {
 
 void drawFacetBox(const FacetBox& box, int R, int G, int B) {
 	
-	for (int i = 0; i < box.getN(); i++)
-		drawFacet(box[i], B, G, B);
+	if (box.getN() != 0)	
+		for (int i = 0; i < box.getN(); i++)
+			drawFacet(box[i], B, G, B);
 
 	//drawOctahedron(Octahedron(0.1 * abs(box.getCenter()-box[0][0]), box.getCenter()), R, G, B);
 }
@@ -157,7 +158,6 @@ Octahedron octa = Octahedron(1.0, origen);
 double phii = 0.5 * M_PI;
 double tetaa = 0.25 * M_PI;
 
-FacetBox pila, pila1;
 //FacetGash In = FacetGash(
 //		2*Vector3D(cos(phii) * sin(tetaa), sin(phii) * sin(tetaa), cos(tetaa)),
 //		Vector3D(0.33, 0.33, 0.33));
@@ -196,21 +196,32 @@ void updateProcessingProto() {
 }
 
 ///////////////////     DRAW       ///////////////////////
-
+FacetBox pila;
 /*Everything is made up of triangles and each class of geometrical objects have triangle drawing methods.*/
 void Draw() {
 
   if (ciclo > 0) {
-    /*Draw Here*/
 
+    	
+	/*Draw Here*/
+
+	/*Prepare Blade*/
   	FacetGash In = FacetGash(
-              2*Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-              Vector3D(0.0, 0.0, 0.0));
+              2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
+              rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa))
+	);
 	  
+	/*Divide the polytope in two*/
 	for (int i = 0; i < 8; i++) {
                 In.cutFacet(octa[i]);
-                //In.readListC();
-        }
+                //In.readListC(octa[i], &pila);
+        	int aa = In.checkFacet(octa[i]);
+		if (aa == 1)
+			pila.push(octa[i]);
+	}
+
+	/*Draw one of the first half not touching the boundary*/
+	drawFacetBox(pila, 0, 255, 0);
 
 	drawFacetGash(In, 255, 0, 255);
 	
@@ -223,7 +234,8 @@ void Draw() {
 		}
 	}
 
-	In.restart();	
+	In.restart();
+	pila.empty();
   
   }
 }
@@ -442,11 +454,11 @@ void keyboard(unsigned char key, int x, int y) {
       break;
 
     case 'v':
-      rot += 0.05;
+      rot += 0.005;
       break;
 
     case 'V':
-      rot -= 0.05;
+      rot -= 0.005;
       break;
 
 
