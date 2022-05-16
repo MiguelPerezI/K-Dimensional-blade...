@@ -24,7 +24,7 @@ class Torus {
 		int n;
 		FacetBox f;
 	public:
-		Torus(double R, double r, const Vector3D& c);
+		Torus(double R, double r, const Vector3D& c, int N);
 		int getN() const;
 		Facet  operator [] (int k) const;
 		double G1(double u, double v, double R, double r);

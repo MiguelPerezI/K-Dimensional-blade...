@@ -96,9 +96,9 @@ Facet Dodecahedron::operator [] (int k) const {
    }
 }
 
-Torus::Torus(double R, double r, const Vector3D& c) {
+Torus::Torus(double R, double r, const Vector3D& c, int N) {
 	
-	n = 10;
+	n = 20;
 	double PI = 3.14159265358979;
 	double dx = (2 * PI) / ((double) n);
 	double dy = (2 * PI) / ((double) n);

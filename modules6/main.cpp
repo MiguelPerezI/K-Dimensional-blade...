@@ -15,7 +15,7 @@
 #include "QuaternionBox.cpp"
 #include "QuaternionBoxBox.cpp"
 #include "Dodecahedron.cpp"
-
+#include "STL.cpp"
 
 //////////////////////////////////////
 //                                  //
@@ -54,6 +54,9 @@ int pass = 0;
 int pass1 = 0;
 int pass2 = 0;
 int ITT = 35;
+
+int stlP = 0;
+
 Vector3D origen = Vector3D(0.0, 0.0, 0.0);
 Vector3D I = Vector3D(1.0, 0.0, 0.0);
 Vector3D J = Vector3D(0.0, 1.0, 0.0);
@@ -118,16 +121,27 @@ void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B) {
 
 void drawFacetBox(const FacetBox& box, int R, int G, int B) {
 	
-	if (box.getN() != 0)	
-		for (int i = 0; i < box.getN(); i++)
-			drawFacet(box[i], R, G, B);
 
-	//drawOctahedron(Octahedron(0.1 * abs(box.getCenter()-box[0][0]), box.getCenter()), R, G, B);
+	if (box.getN() != 0)	
+		for (int i = 0; i < box.getN(); i++) {
+			drawFacet(box[i], R, G, B);
+		}
+}
+
+void drawFacetBoxSTL(const FacetBox& box, string fname) {
+
+        STL stl = STL(fname);
+
+        if (box.getN() != 0)
+                for (int i = 0; i < box.getN(); i++) {
+                        stl.facet(box[i][0], box[i][1], box[i][2]);
+                }
+        stl.closeSTL();
 }
 
 void drawFacetGash(FacetGash gash, int R, int G, int B) {
 	
-	//drawPlaneQuaternion(gash.getBlade(), 50, 100, 255);
+	drawPlaneQuaternion(gash.getBlade(), 50, 100, 255);
 	//drawFacetBox(gash.getFacets(), R, G, B);
 	
 	for (int i = 0; i < gash.getMM().getM(); i++)
@@ -200,8 +214,9 @@ void updateProcessingProto() {
 
 ///////////////////     DRAW       ///////////////////////
 FacetBox pila;
-Torus T = Torus(1, 0.5, origen);
+Torus T = Torus(1, 0.85, origen, 40);
 /*Everything is made up of triangles and each class of geometrical objects have triangle drawing methods.*/
+
 void Draw() {
 
   if (ciclo > 0) {
@@ -258,22 +273,20 @@ void Draw() {
  	
 
 
-
-
-
 	//for (int i = 0; i < T.getBoxSize(); i++)
 	//	drawFacet(T[i], 255, 0, 255);
-
-
 
 
    FacetGash In = FacetGash(
               2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
               rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa))
    );
+   
+   /////////////////////
+
 
    /*Divide the polytope in two*/
-   for (int i = 0; i < 200; i++) {
+   for (int i = 0; i < T.getBoxSize(); i++) {
                 In.cutFacet(T[i]);
            int aa = In.checkFacet(T[i]);
            if (aa == 1)
@@ -282,12 +295,24 @@ void Draw() {
    In.readList(&pila);
 
    /*Draw one of the first half not touching the boundary*/
+   Vector3D t0 = piecewise(0.25, pila.getCenter(), In.getBlade()[0]);
+   pila.translate(t0);
+   
    drawFacetBox(pila, 0, 0, 255);
+   
+   if (stlP%2 == 1)
+	   drawFacetBoxSTL(pila, "torus1.stl");
+   
    pila.empty();
    In.restart();
 
+   
+   //////////////////////
+
+
+   
    In.updateOrientation();
-   for (int i = 0; i < 200; i++) {
+   for (int i = 0; i < T.getBoxSize(); i++) {
                 In.cutFacet(T[i]);
                 int aa = In.checkFacet(T[i]);
                 if (aa == 1)
@@ -296,22 +321,21 @@ void Draw() {
         In.readList(&pila);
 
         /*Draw one of the first half not touching the boundary*/
-   Vector3D t0 = piecewise(1, pila.getCenter(), origen);
+   t0 = piecewise(1, pila.getCenter(), In.getBlade()[0]);
    pila.translate(t0);
    drawFacetBox(pila, 255, 0, 0);
 
-
-   drawFacetGash(In, 255, 0, 0);
-
-           for (int i = 0; i < 200; i++) {
-           for (int j = 0; j < 3; j++) {
-                   if (In.checkPoint(Quaternion(T[i][j]), Quaternion(K)) == 1)
-                           drawOctahedron(Octahedron(0.1, T[i][j]), 0, 0, 255);
-           }
+   if (stlP%2 == 1) {
+           drawFacetBoxSTL(pila, "torus2.stl");
+   	   stlP += 1;
    }
+		
+
+   drawFacetGash(In, 255, 0, 255);
 
    In.restart();
    pila.empty();
+	
 
 
   }
@@ -538,6 +562,8 @@ void keyboard(unsigned char key, int x, int y) {
       rot -= 0.005;
       break;
 
+     case 'p':
+      stlP += 1;
 
   }
 
