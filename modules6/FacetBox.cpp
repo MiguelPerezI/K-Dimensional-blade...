@@ -122,3 +122,11 @@ void FacetBox::empty() {
         	F = NULL;
 	}
 }
+
+void FacetBox::translate(const Vector3D& t) {
+	
+	if (n != 0)
+		for (int i = 0; i < n; i++)
+			F[i].translate(t);
+
+}

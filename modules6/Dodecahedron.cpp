@@ -96,17 +96,67 @@ Facet Dodecahedron::operator [] (int k) const {
    }
 }
 
-//ostream& operator << (ostream& os, const Facet& a) {
-//
-//   int w= os.width();
-//   int p= os.precision();
-//   os << setw(0) << "Facet[ " 
-//      << setw(w) << setprecision(p) << a[0] << setw(0) << ", " 
-//      << setw(w) << setprecision(p) << a[1] << setw(0) << ", " 
-//      << setw(w) << setprecision(p) << a[2] << setw(0) << ", Normal("
-//      << setw(w) << setprecision(p) << a[3] << setw(0) << ") ] ";
-//   os.width(w);
-//   os.precision(p);
-//   return os;
-//}
+Torus::Torus(double R, double r, const Vector3D& c) {
+	
+	n = 10;
+	double PI = 3.14159265358979;
+	double dx = (2 * PI) / ((double) n);
+	double dy = (2 * PI) / ((double) n);
+
+	for (int i = 0; i < n; i++) 
+		for (int j = 0; j < n; j++) {
+			
+			double u1 = (i * dx);
+			double v1 = (j * dy);
+
+			double u2 = (i * dx) + dx;
+			double v2 = (j * dy);
+
+			double u3 = (i * dx) + dx;
+			double v3 = (j * dy) + dy;
+
+			double u4 = (i * dx);
+			double v4 = (j * dy) + dy;
+			
+			Vector3D a1 = Vector3D(G1(u1, v1, R, r), G2(u1, v1, R, r), G3(u1, v1, R, r));
+			Vector3D a2 = Vector3D(G1(u2, v2, R, r), G2(u2, v2, R, r), G3(u2, v2, R, r));
+			Vector3D a3 = Vector3D(G1(u3, v3, R, r), G2(u3, v3, R, r), G3(u3, v3, R, r));
+			Vector3D a4 = Vector3D(G1(u4, v4, R, r), G2(u4, v4, R, r), G3(u4, v4, R, r));
+
+			f.push(Facet(a1, a2, a3));
+			f.push(Facet(a3, a4, a1));			
+
+		}
+		
+		cout << "\n\n Torus Box size " << f.getN() << endl;	
+
+}
+
+double Torus::G1(double u, double v, double R, double r) {
+	double g = ( R + (r*cos(v)) ) * cos(u);
+	return g;
+}
+
+double Torus::G2(double u, double v, double R, double r){
+
+	double g = ( R + (r*cos(v)) ) * sin(u);
+	return g;
+}
+
+double Torus::G3(double u, double v, double R, double r) {
+                  
+	double g = r * sin(v);
+	return g;
+}
+
+int Torus::getN() const {return n;}
+
+
+Facet  Torus::operator [] (int k) const {
+	return f[k];
+}
+
+int Torus::getBoxSize() const {return f.getN();}
+
+
 

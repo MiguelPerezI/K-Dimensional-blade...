@@ -120,7 +120,7 @@ void drawFacetBox(const FacetBox& box, int R, int G, int B) {
 	
 	if (box.getN() != 0)	
 		for (int i = 0; i < box.getN(); i++)
-			drawFacet(box[i], R, G, B);
+			drawFacet(box[i], B, G, B);
 
 	//drawOctahedron(Octahedron(0.1 * abs(box.getCenter()-box[0][0]), box.getCenter()), R, G, B);
 }
@@ -157,7 +157,7 @@ void interface();
 /*Here we build our memory space and filled it with data using initObject methods corresponding to each class.*/
 /*initObjects methods are functions that should build memory space and fill it with data*/
 
-Dodecahedron octa = Dodecahedron(1.0, origen);
+Octahedron octa = Octahedron(1.0, origen);
 double phii = 0.5 * M_PI;
 double tetaa = 0.25 * M_PI;
 
@@ -200,7 +200,6 @@ void updateProcessingProto() {
 
 ///////////////////     DRAW       ///////////////////////
 FacetBox pila;
-Torus T = Torus(1, 0.5, origen);
 /*Everything is made up of triangles and each class of geometrical objects have triangle drawing methods.*/
 void Draw() {
 
@@ -210,110 +209,40 @@ void Draw() {
 	/*Draw Here*/
 
 	/*Prepare Blade*/
-/////  	FacetGash In = FacetGash(
-/////              2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-/////              rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa))
-/////	);
-/////	  
-/////	/*Divide the polytope in two*/
-/////	for (int i = 0; i < 36; i++) {
-/////                In.cutFacet(octa[i]);
-/////        	int aa = In.checkFacet(octa[i]);
-/////		if (aa == 1)
-/////			pila.push(octa[i]);
-/////	}
-/////	In.readList(&pila);
-/////
-/////	/*Draw one of the first half not touching the boundary*/
-/////	drawFacetBox(pila, 0, 0, 255);
-/////	pila.empty();
-/////	In.restart();
-/////	
-/////	In.updateOrientation();
-/////	for (int i = 0; i < 36; i++) {
-/////                In.cutFacet(octa[i]);
-/////                int aa = In.checkFacet(octa[i]);
-/////                if (aa == 1)
-/////                        pila.push(octa[i]);
-/////        }
-/////        In.readList(&pila);
-/////
-/////        /*Draw one of the first half not touching the boundary*/
-/////        Vector3D t0 = piecewise(1, pila.getCenter(), origen);
-/////	pila.translate(t0);
-/////	drawFacetBox(pila, 255, 0, 0);
-/////	
-/////	
-/////	drawFacetGash(In, 255, 0, 0);
-/////	
-/////      	for (int i = 0; i < 36; i++) {
-/////		for (int j = 0; j < 3; j++) {
-/////			if (In.checkPoint(Quaternion(octa[i][j]), Quaternion(K)) == 1) 
-/////				drawOctahedron(Octahedron(0.1, octa[i][j]), 0, 0, 255);
-/////		}
-/////	}
-/////
-/////	In.restart();
-/////	pila.empty();
- 	
-
-
-
-
-
-	//for (int i = 0; i < T.getBoxSize(); i++)
-	//	drawFacet(T[i], 255, 0, 255);
-
-
-
-
-   FacetGash In = FacetGash(
+  	FacetGash In = FacetGash(
               2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
               rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa))
-   );
-
-   /*Divide the polytope in two*/
-   for (int i = 0; i < 200; i++) {
-                In.cutFacet(T[i]);
-           int aa = In.checkFacet(T[i]);
-           if (aa == 1)
-                   pila.push(T[i]);
-   }
-   In.readList(&pila);
-
-   /*Draw one of the first half not touching the boundary*/
-   drawFacetBox(pila, 0, 0, 255);
-   pila.empty();
-   In.restart();
-
-   In.updateOrientation();
-   for (int i = 0; i < 200; i++) {
-                In.cutFacet(T[i]);
-                int aa = In.checkFacet(T[i]);
-                if (aa == 1)
-                        pila.push(T[i]);
-        }
-        In.readList(&pila);
-
-        /*Draw one of the first half not touching the boundary*/
-   Vector3D t0 = piecewise(1, pila.getCenter(), origen);
-   pila.translate(t0);
-   drawFacetBox(pila, 255, 0, 0);
+	);
+	  
+	/*Divide the polytope in two*/
+	for (int i = 0; i < 8; i++) {
+                In.cutFacet(octa[i]);
+                //In.readListC(octa[i], &pila);
+        	int aa = In.checkFacet(octa[i]);
+		if (aa == 1)
+			pila.push(octa[i]);
+	}
 
 
-   drawFacetGash(In, 255, 0, 0);
-
-           for (int i = 0; i < 200; i++) {
-           for (int j = 0; j < 3; j++) {
-                   if (In.checkPoint(Quaternion(T[i][j]), Quaternion(K)) == 1)
-                           drawOctahedron(Octahedron(0.1, T[i][j]), 0, 0, 255);
-           }
-   }
-
-   In.restart();
-   pila.empty();
+	In.readList(&pila);	
+	
 
 
+
+	/*Draw one of the first half not touching the boundary*/
+	drawFacetBox(pila, 0, 255, 0);
+	drawFacetGash(In, 255, 0, 255);
+	
+      	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 3; j++) {
+			if (In.checkPoint(Quaternion(octa[i][j]), Quaternion(K)) == 1) 
+				drawOctahedron(Octahedron(0.1, octa[i][j]), 0, 0, 255);
+		}
+	}
+
+	In.restart();
+	pila.empty();
+  
   }
 }
 

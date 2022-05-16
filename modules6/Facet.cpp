@@ -77,3 +77,11 @@ ostream& operator << (ostream& os, const Facet& a) {
    return os;
 }
 
+void Facet::translate(const Vector3D& a) {
+
+	Quaternion aa = A + Quaternion(a);
+	Quaternion bb = B + Quaternion(a);
+	Quaternion cc = C + Quaternion(a);
+
+	updateFacet(aa.V(), bb.V(), cc.V());
+}

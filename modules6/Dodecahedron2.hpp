@@ -17,22 +17,6 @@ class Dodecahedron {
 		Dodecahedron();
 };
 
-class Torus {
-
-	private:
-		QuaternionBox q;
-		int n;
-		FacetBox f;
-	public:
-		Torus(double R, double r, const Vector3D& c);
-		int getN() const;
-		Facet  operator [] (int k) const;
-		double G1(double u, double v, double R, double r);
-        	double G2(double u, double v, double R, double r);
-        	double G3(double u, double v, double R, double r);
-		int getBoxSize() const;	
-};
-
 istream& operator >> (istream& is, Facet& a);
 ostream& operator << (ostream& os, const Facet& a);
 
