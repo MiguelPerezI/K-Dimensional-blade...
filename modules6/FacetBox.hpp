@@ -28,6 +28,8 @@ class FacetBox {
 		void escFacetBox();
 		void empty();
 
+		void push(const Vector3D& a, const Vector3D& b, const Vector3D& c, const Vector3D& d);
+
 };
 
 

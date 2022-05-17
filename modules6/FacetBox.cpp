@@ -52,6 +52,29 @@ void FacetBox::push(const Facet& facet) {
 	}
 }
 
+void FacetBox::push(const Vector3D& a, const Vector3D& b, const Vector3D& c, const Vector3D& d) {
+	
+	if (n == 0) {
+                F = (Facet *) malloc (2 * sizeof(Facet));
+                F[0] = Facet(a, b, c);
+		F[1] = Facet(c, d, a);
+                n = 2;
+
+        } else {
+                F = (Facet *) realloc(F, sizeof(Facet) * (n+2));
+                
+		n = n + 1;
+                F[n-1] = Facet(a, b, c);
+
+		n = n + 1;
+                F[n-1] = Facet(c, d, a);
+
+                updateCenter();
+        }
+
+}
+
+
 void FacetBox::push(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
 
         if (n == 0) {
