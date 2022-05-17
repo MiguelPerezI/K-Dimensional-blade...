@@ -25,23 +25,19 @@ ModuleSpaces::ModuleSpaces(const Vector3D& a, const Vector3D& b, const FacetBox&
 	}
 	In.readList(&box0);
 
-	/*Draw one of the first half not touching the boundary*/
-	Vector3D t0 = piecewise(0.25, box0.getCenter(), In.getBlade()[0]);
-	box0.translate(t0);
 
 
 	In.restart();
 	In.updateOrientation();
 	//Second half
-        for (int i = 0; i < D.getN(); i++) {
+        
+	for (int i = 0; i < D.getN(); i++) {
                 In.cutFacet(D[i]);
                 if (In.checkFacet(D[i]) == 1)
                         box1.push(D[i]);
         }
         In.readList(&box1);
-	t0 = piecewise(0.25, box1.getCenter(), In.getBlade()[0]);
-        box1.translate(t0);
-
+	
 	In.restart();
 }
 

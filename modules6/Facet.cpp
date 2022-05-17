@@ -85,3 +85,12 @@ void Facet::translate(const Vector3D& a) {
 
 	updateFacet(aa.V(), bb.V(), cc.V());
 }
+
+void Facet::crunch(double t, const Vector3D& a) {
+	
+	Vector3D z0 = t * (a - A.V()) + A.V();
+	Vector3D z1 = t * (a - B.V()) + B.V();
+	Vector3D z2 = t * (a - C.V()) + C.V();
+
+	updateFacet(z0, z1, z2);
+}

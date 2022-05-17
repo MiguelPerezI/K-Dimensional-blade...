@@ -34,7 +34,7 @@ int color = 0;
 double count = 0.25 * M_PI;
 double angle = 0.0;
 double count2 = 0.25 * 3.14159265358979;
-double count3 = 0.25 * M_PI;
+double count3 = 1e-2;
 double rotSpeed = 0.0;
 double rotAxe = 0.0;
 double rad = 20.0;
@@ -88,7 +88,7 @@ void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B);
 void drawFacetBox(const FacetBox& box, int R, int G, int B);
 void drawFacetBoxSTL(const FacetBox& box, string fname);
 void drawFacetGash(FacetGash gash, int R, int G, int B);
-
+void axis();
 
 
 void drawHypercube(int p, const Hypercube& cube) {
@@ -191,6 +191,7 @@ Dodecahedron D = Dodecahedron(6.0, origen);
 FacetBox box0;
 ModuleSpaces mod;
 double tetaa = 0.25 * M_PI;
+double phii = 0.25 * M_PI;
 
 void Setup() {
 
@@ -226,16 +227,63 @@ void Draw() {
 
 	if (ciclo > 0) {
 	
+
+		axis();
+
+
 		mod = ModuleSpaces(
                         2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
                         rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-                        box0);	
+                        box0);
 
-
+		mod[0].crunch(0.25, mod[0].getCenter());	
 		drawFacetBox(mod[0], 255, 0, 0);
-		drawFacetBox(mod[1], 0, 0, 255);
+		//drawFacetBox(mod[1], 0, 0, 255);
 	
-		mod.restart();	
+
+
+
+
+		FacetBox fff;
+		for (int i = 0; i < mod[1].getN(); i++)
+			fff.push(mod[1][i]);
+		mod.restart();
+		mod = ModuleSpaces(
+                        2 *   Vector3D(cos(count3 + phii) * sin(tetaa), sin(count3 + phii) * sin(tetaa), cos(tetaa)),
+                        rot * Vector3D(cos(count3 + phii) * sin(tetaa), sin(count3 + phii) * sin(tetaa), cos(tetaa)),
+                        fff);
+
+		mod[0].crunch(0.25, mod[0].getCenter());
+		drawFacetBox(mod[0], 255, 255, 0);
+		//drawFacetBox(mod[1], 0, 255, 0);
+		//mod.restart();
+		fff.empty();
+
+
+
+
+
+	
+		for (int i = 0; i < mod[1].getN(); i++)
+                        fff.push(mod[1][i]);
+                mod.restart();
+                mod = ModuleSpaces(
+                        2 *   Vector3D(cos(0.0) * sin(count3), sin(0.0) * sin(count3), cos(count3)),
+                        0 *   Vector3D(cos(0.0) * sin(count3), sin(0.0) * sin(count3), cos(count3)),
+                        fff);
+                
+		mod[0].crunch(0.25, mod[0].getCenter());
+		drawFacetBox(mod[0], 255, 0, 255);
+                
+		mod[1].crunch(0.25, mod[1].getCenter());	
+		drawFacetBox(mod[1], 0, 255, 0);
+                mod.restart();
+                fff.empty();
+
+
+
+
+
 	}
 }
 
@@ -263,10 +311,18 @@ Vector3D piecewise(double t, const Vector3D& a, const Vector3D& b) {
 void drawLine(const Vector3D& a, const Vector3D& b) {
 
         glColor3ub(0, 0, 0);
+	glLineWidth(2.0);
         glBegin(GL_LINES);
         glVertex3f(a.x(), a.y(), a.z());
         glVertex3f(b.x(), b.y(), b.z());
         glEnd();
+}
+
+void axis() {
+
+	drawLine(Vector3D(20,  0,  0), origen);
+	drawLine(Vector3D( 0, 20,  0), origen);
+	drawLine(Vector3D( 0,  0, 20), origen);
 }
 
 void drawFacet(const Facet& f, int R, int G, int B) {
@@ -532,12 +588,12 @@ void keyboard(unsigned char key, int x, int y) {
 
     
 		case 'C':
-      			count3 += 0.05;
+      			count3 += 0.0001;
       		break;
 
     		
 		case 'c':
-      			count3 -= 0.05;
+      			count3 -= 0.0001;
       		break;
 
     		

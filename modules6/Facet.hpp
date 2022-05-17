@@ -19,7 +19,8 @@ class Facet {
 		Facet(const Facet& facet);
 		void updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c);
 		Vector3D getCenter();
-		void translate(const Vector3D& a);	
+		void translate(const Vector3D& a);
+		void crunch(double t, const Vector3D& a);	
 };
 
 istream& operator >> (istream& is, Facet& a);

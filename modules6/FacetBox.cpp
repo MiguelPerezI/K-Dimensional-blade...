@@ -153,3 +153,11 @@ void FacetBox::translate(const Vector3D& t) {
 			F[i].translate(t);
 
 }
+
+void FacetBox::crunch(double t, const Vector3D& a) {
+
+        if (n != 0)
+                for (int i = 0; i < n; i++)
+                        F[i].crunch(t, a);
+
+}

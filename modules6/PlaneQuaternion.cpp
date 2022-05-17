@@ -40,7 +40,10 @@ PlaneQuaternion::PlaneQuaternion(int m, const Vector3D& a, const Vector3D& b) {
                 point[2] = Vector3D(p2.V());
                 point[3] = Vector3D(p3.V());
 
+	} else {
+		normal = Quaternion(0.0, Vector3D(1e-20, 0, 1));
 	}
+
 		
 
 }	
