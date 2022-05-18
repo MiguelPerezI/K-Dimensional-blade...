@@ -208,7 +208,7 @@ bool isLeaf(ModuleTree * node) {
 	return (node->left == nullptr && node->right == nullptr);
 }
 
-void printRootToLeafPaths(ModuleTree * node, vector<string> &path) {
+void printRootToLeafPaths(ModuleTree * node, vector<string> &path, int io) {
     // base case
     if (node == nullptr) {
         return;
@@ -218,27 +218,29 @@ void printRootToLeafPaths(ModuleTree * node, vector<string> &path) {
     path.push_back(node->getString());
  
     // if a leaf node is found, print the path
-    if (isLeaf(node))
-    {
+    if (isLeaf(node)) {
+
+	cout << "drawFacetBoxSTL(";    
         for (string data: path) {
             cout << data << "->";
         }
+	cout << "getBox(), \"chok.stl\")";
         cout << endl;
     }
  
     // recur for the left and right subtree
-    printRootToLeafPaths(node->left, path);
-    printRootToLeafPaths(node->right, path);
+    printRootToLeafPaths(node->left, path, io);
+    printRootToLeafPaths(node->right, path, io);
  
     // backtrack: remove the current node after the left, and right subtree are done
     path.pop_back();
 }
 
-void printRootToLeafPaths(ModuleTree * node) {
+void printRootToLeafPaths(ModuleTree * node, int io) {
     // vector to store root-to-leaf path
     vector<string> path;
  
-    printRootToLeafPaths(node, path);
+    printRootToLeafPaths(node, path, io);
 }
 //////////////////////////////////////
 //
@@ -367,42 +369,597 @@ void Setup() {
 		tree->right->right->right->right->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
 
 		/*6*/
-		//tree->left->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
-		//tree->left->left->left->right->
-		//tree->left->left->right->left->
-		//tree->left->left->right->right->
-		//tree->left->right->left->left->left->
-		//tree->left->right->left->left->right->
-		//tree->left->right->left->right->left->
-		//tree->left->right->left->right->right->
-		//tree->left->right->right->left->left->
-		//tree->left->right->right->left->right->
-		//tree->left->right->right->right->left->
-		//tree->left->right->right->right->right->
-		//tree->right->left->left->left->left->
-		//tree->right->left->left->left->right->
-		//tree->right->left->left->right->left->
-		//tree->right->left->left->right->right->
-		//tree->right->left->right->left->left->
-		//tree->right->left->right->left->right->
-		//tree->right->left->right->right->left->
-		//tree->right->left->right->right->right->
-		//tree->right->right->left->left->left->
-		//tree->right->right->left->left->right->left->
-		//tree->right->right->left->left->right->right->
-		//tree->right->right->left->right->left->
-		//tree->right->right->left->right->right->left->
-		//tree->right->right->left->right->right->right->
-		//tree->right->right->right->left->left->
-		//tree->right->right->right->left->right->left->
-		//tree->right->right->right->left->right->right->
-		//tree->right->right->right->right->left->
-		//tree->right->right->right->right->right->left->
-		//tree->right->right->right->right->right->right->
+		tree->left->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->left->left->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->left->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->left->left->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->left->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->right->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->right->left->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->right->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->left->right->right->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->left->left->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->left->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->right->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->right->left->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->right->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->left->right->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->left->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->right->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->left->right->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->left->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->left->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->right->right->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		tree->right->right->right->right->right->right->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+
+
+		/*7*/
+		tree->left->left->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->left->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->left->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->left->right->right->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->left->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->left->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->left->right->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->left->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->right->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->right->left->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->left->right->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->left->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->left->left->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->left->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->left->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->left->right->right->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->right->left->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->right->left->right->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+		tree->right->right->right->right->right->right->left->growBranch(10.0 * w[7], (0.1*gold) * w[7]);
+
+		/*8*/
+		tree->left->left->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->left->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->left->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->left->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->left->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->left->right->right->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->left->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->left->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->left->right->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->left->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->left->right->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->left->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->right->left->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->right->left->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->right->right->left->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+		tree->right->right->right->right->right->right->right->growBranch(10.0 * w[8], (0.1*gold) * w[8]);
+
+		/*9*/
+tree->left->left->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->left->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->left->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->left->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->left->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->left->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->left->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->left->right->right->right->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->left->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->left->right->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->left->right->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->left->right->right->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->left->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->left->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->left->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->left->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->left->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->right->left->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->right->left->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->right->right->left->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+tree->right->right->right->right->right->right->right->right->growBranch(10.0 * w[9], (0.1*gold) * w[9]);
+
+
+
+/*10*/
+
+tree->left->left->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->left->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->left->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->left->right->right->right->right->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->left->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->left->right->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->left->right->right->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->left->right->right->right->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->left->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->left->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->left->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->left->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->left->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->right->left->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->right->left->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->right->right->left->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+tree->right->right->right->right->right->right->right->right->right->growBranch(10.0 * w[10], (0.1*gold) * w[10]);
+
+
+tree->left->left->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->left->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->left->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->left->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->left->right->right->right->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->left->right->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->left->right->right->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->left->right->right->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->left->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->left->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->left->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->left->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->left->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->left->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->left->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->left->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->right->left->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->right->left->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->right->right->right->left->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+tree->right->right->right->right->right->right->right->right->right->right->growBranch(10.0 * w[11], (0.1*gold) * w[11]);
+
 
 		escTree(tree, 0, "root");
 		cout << "\n\n\n";
-		printRootToLeafPaths(tree);
+		printRootToLeafPaths(tree, 11);
 	
 	}
 
@@ -415,7 +972,7 @@ void Draw() {
 	
 
 		axis();
-	
+		drawFacetBox(tree->right->right->getBox(), 255, 0, 0);	
 	}
 }
 
@@ -600,7 +1157,7 @@ void ProcessMenu(int value);
 
 int main(int argc, char **argv)
 {
-  
+ 	srand(time(NULL)); 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
 	glutInitWindowSize(720, 720);
