@@ -18,6 +18,15 @@ FacetBox::FacetBox(const Facet& facet) {
 
 }
 
+void FacetBox::copy(const FacetBox& box) {
+
+	if (box.getN() != 0) {
+		
+		for (int i = 0; i < box.getN(); i++)
+			this->push(box[i]);
+	}
+}
+
 Facet FacetBox::operator [] (int k) const {
    if (k > n-1)
       	return F[0];

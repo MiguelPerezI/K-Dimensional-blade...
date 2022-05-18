@@ -16,6 +16,7 @@ class FacetBox {
         	Facet  operator [] (int k) const;
         	FacetBox();
 		FacetBox(const Facet& facet);
+		void copy(const FacetBox& box);
 		Vector3D getCenter() const;
 		void updateCenter();
 		void push(const Facet& facet);

@@ -18,6 +18,7 @@
 #include "STL.cpp"
 #include "Hypercube.cpp"
 #include "ModuleSpaces.cpp"
+#include "ModuleTree.cpp"
 
 //////////////////////////////////////
 //                                  
@@ -157,6 +158,15 @@ void drawLattice(int p, int n, int ternary, double Rs, const Matrix4D& M) {
 }
 
 
+Vector3D spherical(double rs, double phi, double teta) {
+	return rs * Vector3D(
+			cos(phi) * sin(teta),
+			sin(phi) * sin(teta),
+			cos(teta));
+}
+
+
+
 //////////////////////////////////////
 //
 //
@@ -193,23 +203,41 @@ ModuleSpaces mod;
 double tetaa = 0.25 * M_PI;
 double phii = 0.25 * M_PI;
 
+ModuleTree * tree;
+
 void Setup() {
 
 	if (ciclo == 0) {
 		
 		for (int i = 0; i < 36; i++)
 			box0.push(D[i]);
-
-		mod = ModuleSpaces(
-			2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-              		rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-			box0);	
 	
 		
-		//drawFacetBoxSTL(mod[0], "Torus0.stl");
-                //drawFacetBoxSTL(mod[1], "Torus1.stl");
-	
-	
+		tree = new ModuleTree(box0);	
+		tree->growBranch( 
+				spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
+                                spherical(1.25, 0.25 * M_PI, 0.25 * M_PI));
+		
+		//tree->left = new ModuleTree(
+		//		spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
+                //                spherical(1.25, 0.25 * M_PI, 0.25 * M_PI),
+		//	       	tree->getBox(0));
+		//
+		//
+		//tree->right = new ModuleTree(
+                //                spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
+                //                spherical(-1.25, 0.25 * M_PI, 0.25 * M_PI),
+                //                tree->getBox(1));
+
+		//
+
+
+
+		//tree->left->left = new ModuleTree(
+                //                spherical(3.0, 0.25 * M_PI, 0.25 * M_PI),
+                //                spherical(2.5, 0.25 * M_PI, 0.25 * M_PI),
+                //                tree->left->getBox(0));
+
 	}
 
 }
@@ -231,56 +259,12 @@ void Draw() {
 		axis();
 
 
-		mod = ModuleSpaces(
-                        2 *   Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-                        rot * Vector3D(cos(count3) * sin(tetaa), sin(count3) * sin(tetaa), cos(tetaa)),
-                        box0);
+		//mod[1].crunch(0.25, mod[1].getCenter());	
+		
+		//drawFacetBox(tree->getBox(), 255, 0, 0);		
 
-		mod[0].crunch(0.25, mod[0].getCenter());	
-		drawFacetBox(mod[0], 255, 0, 0);
-		//drawFacetBox(mod[1], 0, 0, 255);
-	
-
-
-
-
-		FacetBox fff;
-		for (int i = 0; i < mod[1].getN(); i++)
-			fff.push(mod[1][i]);
-		mod.restart();
-		mod = ModuleSpaces(
-                        2 *   Vector3D(cos(count3 + phii) * sin(tetaa), sin(count3 + phii) * sin(tetaa), cos(tetaa)),
-                        rot * Vector3D(cos(count3 + phii) * sin(tetaa), sin(count3 + phii) * sin(tetaa), cos(tetaa)),
-                        fff);
-
-		mod[0].crunch(0.25, mod[0].getCenter());
-		drawFacetBox(mod[0], 255, 255, 0);
-		//drawFacetBox(mod[1], 0, 255, 0);
-		//mod.restart();
-		fff.empty();
-
-
-
-
-
-	
-		for (int i = 0; i < mod[1].getN(); i++)
-                        fff.push(mod[1][i]);
-                mod.restart();
-                mod = ModuleSpaces(
-                        2 *   Vector3D(cos(0.0) * sin(count3), sin(0.0) * sin(count3), cos(count3)),
-                        0 *   Vector3D(cos(0.0) * sin(count3), sin(0.0) * sin(count3), cos(count3)),
-                        fff);
-                
-		mod[0].crunch(0.25, mod[0].getCenter());
-		drawFacetBox(mod[0], 255, 0, 255);
-                
-		mod[1].crunch(0.25, mod[1].getCenter());	
-		drawFacetBox(mod[1], 0, 255, 0);
-                mod.restart();
-                fff.empty();
-
-
+		drawFacetBox(tree->left ->getBox(), 0, 255,   0);
+                drawFacetBox(tree->right->getBox(), 0,   0, 255);
 
 
 
