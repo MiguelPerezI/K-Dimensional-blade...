@@ -12,14 +12,16 @@ class ModuleTree {
        	//private:	
 	public:	
 		FacetBox box;
+		string s;
 		
 		ModuleTree * left;
 		ModuleTree * right;
 	//public:
 		ModuleTree() {};	
-		ModuleTree(const FacetBox& box);
+		ModuleTree(const FacetBox& box, string S);
 		FacetBox getBox() const;
 		int getN() const;
+		string getString() const;
 		ModuleTree * getLeft() const;
 		ModuleTree * getRight() const;
 		void growBranch(const Vector3D& a, const Vector3D& b);

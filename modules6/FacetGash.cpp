@@ -61,7 +61,7 @@ void FacetGash::updateOrientation() {blade.updateOrientation();}
 //	
 //	MAIN FACET CUTTING ALGORITHM
 //
-void FacetGash::cutFacet(const Facet& facet0) {
+int FacetGash::cutFacet(const Facet& facet0) {
 
 	//We start by copying the facet to be cut
 	facet = Facet(facet0[0], facet0[1], facet0[2]);
@@ -82,19 +82,19 @@ void FacetGash::cutFacet(const Facet& facet0) {
 
 		//Checking case for variuos cycles	
 		if (n == 0) {
-			Facets = FacetBox(facet);
+			Facets.push(facet);
 			MM = QuaternionBoxBox(inter0, inter1, inter2);
 			VV = Vector3D(t, t1, t2);	
 		} else {
 		
-			Facets.pushFacet(facet);
+			Facets.push(facet);
 			MM.push(inter0, inter1, inter2);
 			VV.push(t, t1, t2);
 		}
 
 		n += 1;
 	}
-
+	return n;
 }
 
 

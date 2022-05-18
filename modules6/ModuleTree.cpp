@@ -5,11 +5,11 @@ using namespace std;
 #include <iomanip>
 #include <fstream>
 
-ModuleTree::ModuleTree(const FacetBox& B) {
+ModuleTree::ModuleTree(const FacetBox& B, string S) {
 
 	//DATA
 	box.copy(B);
-
+	s = S;	
 	//BRANCHES
 	left = NULL;
 	right = NULL;
@@ -26,27 +26,23 @@ int ModuleTree::getN() const {
 
 void ModuleTree::growBranch(const Vector3D& a, const Vector3D& b) {
 	
+		
 	ModuleSpaces mod = ModuleSpaces(a, b, box);	
 	
-	if (mod[0].getN() != 0) {	
-		this->left = new ModuleTree;
-		ModuleTree * node0 = new ModuleTree(mod[0]);
-		this->left = node0;
-	} else {
-		//this->left = new ModuleTree;
-                //ModuleTree * node0 = new ModuleTree(box);
-                //this->left = node0;
-	}
+	if (mod.getCut() != 0)	{
 
-	if (mod[1].getN() != 0) {
+		this->left = new ModuleTree;
+		ModuleTree * node0 = new ModuleTree(mod[0], "left");
+		this->left = node0;
+
 		this->right = new ModuleTree;
-        	ModuleTree * node1 = new ModuleTree(mod[1]);
+        	ModuleTree * node1 = new ModuleTree(mod[1], "right");
         	this->right = node1;
 	} else {
-		//this->right = new ModuleTree;
-                //ModuleTree * node1 = new ModuleTree(box);
-                //this->right = node1;
-	}
+		
+	} 
+
+	mod.restart();
 }
 
 //FacetBox ModuleTree::search(int l, int * S, ModuleTree * tree) {	
@@ -58,3 +54,4 @@ void ModuleTree::growBranch(const Vector3D& a, const Vector3D& b) {
 //
 //}
 
+string ModuleTree::getString() const {return s;}

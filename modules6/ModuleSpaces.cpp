@@ -18,13 +18,14 @@ ModuleSpaces::ModuleSpaces(const Vector3D& a, const Vector3D& b, const FacetBox&
 	In = FacetGash(a, b);
 
 	//First half
+	cut = 0;
 	for (int i = 0; i < D.getN(); i++) {
-		In.cutFacet(D[i]);
+		cut = In.cutFacet(D[i]);
 		if (In.checkFacet(D[i]) == 1)
 			box0.push(D[i]);
 	}
 
-	if (box0.getN() != 0) {
+	if (cut != 0) {
 		In.readList(&box0);
 
 		In.restart();
@@ -37,10 +38,8 @@ ModuleSpaces::ModuleSpaces(const Vector3D& a, const Vector3D& b, const FacetBox&
         	                box1.push(D[i]);
         	}
 
-		if (box1.getN() != 0) {
         		In.readList(&box1);
 			In.restart();
-		}
 
 	}
 }
@@ -50,4 +49,5 @@ void ModuleSpaces::restart() {
 	
 	box0.empty();
 	box1.empty();
+	cut = 0;
 }

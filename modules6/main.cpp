@@ -1,3 +1,5 @@
+#include <vector>
+#include <iostream>
 #include <stdio.h>
 #include <math.h>
 #include <GL/glut.h>
@@ -166,84 +168,78 @@ Vector3D spherical(double rs, double phi, double teta) {
 }
 
 
-void drawTree(int l, int * S, ModuleTree * tree) {
+void drawTree(int l, int * S, ModuleTree * tree, int R, int G, int B) {
 
         ModuleTree * user = tree;
-        ModuleTree * tmp;
         int i = 0;
         while (i < l) {
-
-                tmp = user;
-
-                if (S[i] == 0)
-                        if (user->left == NULL || user->right == NULL) {
-                		drawFacetBox(tmp->getBox(), 0, 255, 0);
-                                break;
-                        } else {	
-				drawFacetBox(user-> left->getBox(), 255, 255,   0);	
+                if (S[i] == 0) {
+				drawFacetBox(user-> left->getBox(), R, G, B);	
 				user = user-> left;
+		} else {
+                                drawFacetBox(user->right->getBox(), R, G, B);  
+                                user = user->right;
 			}
-                else
-			if (user->left == NULL || user->right == NULL) {
-                                drawFacetBox(tmp->getBox(), 0, 255, 0);
-                                break;
-                        } else {        
-                                drawFacetBox(user->right->getBox(), 255, 255,   0);  
-                                user = user->right;
-                        }
                 i++;
         }
-
 }
 
 
-void drawTreeSTL(int l, int * S, ModuleTree * tree) {
-
-        ModuleTree * user = tree;
-        ModuleTree * tmp;
-        int i = 0;
-        while (i < l) {
-
-                tmp = user;
-
-                if (S[i] == 0)
-                        if (user->left == NULL || user->right == NULL) {
-                                drawFacetBoxSTL(tmp->getBox(), "dode" + to_string(i) + ".stl");
-                                break;
-                        } else {
-                                drawFacetBoxSTL(user-> left->getBox(), "dode" + to_string(i) + ".stl");
-                                user = user-> left;
-                        }
-                else
-                        if (user->left == NULL || user->right == NULL) {
-                                drawFacetBoxSTL(tmp->getBox(), "dode" + to_string(i) + ".stl") ;
-                                break;
-                        } else {
-                                drawFacetBoxSTL(user->right->getBox(), "dode" + to_string(i) + ".stl");
-                                user = user->right;
-                        }
-                i++;
-        }
-
-}
-
-int COUNT = 2;
-void escTree(ModuleTree * root, int space) {
+int COUNT = 10;
+int treenode = 0; 
+void escTree(ModuleTree * root, int space, string s) {
 	
 	if (root == NULL)
 		return;
 	
 	space += COUNT;
-	escTree(root->right, space);
+	escTree(root->left, space, "left");
 	
 	//cout << endl;
 	for (int i = COUNT; i < space; i++)
 		cout << " ";
 
-	cout << "1\n";
-	escTree(root->left, space);
+	cout << root->getString() << "\n";
+		treenode++;
+	escTree(root->right, space, "right");
 }
 
+bool isLeaf(ModuleTree * node) {
+	return (node->left == nullptr && node->right == nullptr);
+}
+
+void printRootToLeafPaths(ModuleTree * node, vector<string> &path) {
+    // base case
+    if (node == nullptr) {
+        return;
+    }
+ 
+    // include the current node to the path
+    path.push_back(node->getString());
+ 
+    // if a leaf node is found, print the path
+    if (isLeaf(node))
+    {
+        for (string data: path) {
+            cout << data << "->";
+        }
+        cout << endl;
+    }
+ 
+    // recur for the left and right subtree
+    printRootToLeafPaths(node->left, path);
+    printRootToLeafPaths(node->right, path);
+ 
+    // backtrack: remove the current node after the left, and right subtree are done
+    path.pop_back();
+}
+
+void printRootToLeafPaths(ModuleTree * node) {
+    // vector to store root-to-leaf path
+    vector<string> path;
+ 
+    printRootToLeafPaths(node, path);
+}
 //////////////////////////////////////
 //
 //
@@ -282,7 +278,7 @@ double phii = 0.25 * M_PI;
 
 ModuleTree * tree;
 
-int * bi = (int *) malloc (3 * sizeof(int));
+int * bi = (int *) malloc (5 * sizeof(int));
 void Setup() {
 
 	if (ciclo == 0) {
@@ -312,43 +308,106 @@ void Setup() {
 		double gold = 0.5 * (1 + sqrt(5));
 		
 		/*0*/
-		tree = new ModuleTree(box0);	
+		tree = new ModuleTree(box0, "tree");	
 
 		/*1*/
-		tree->growBranch(10.0 * w[0], (0.1*gold) * w[0]);
-	
-		/*2*/
-		tree->left ->growBranch(10.0 * w[1], (0.1*gold) * w[1]);
-		tree->right->growBranch(10.0 * w[1], (0.1*gold) * w[1]);
-
-		/*3*/
-		tree-> left-> left->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
-		tree-> left->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);	
-
-		tree->right-> left->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
-                tree->right->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+		tree->growBranch(10.0 * w[0], (0.1*gold) * w[0]); 
 		
-		bi[0] = 0;
-		bi[1] = 0;
-		bi[2] = 0;
+		/*2*/
+		tree->left ->growBranch(10.0 * w[1], (0.1*gold) * w[1]); 	
+		tree->right ->growBranch(10.0 * w[1], (0.1*gold) * w[1]);
+		
+		/*3*/
+		tree->left ->left ->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+		tree->left ->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+		tree->right->left ->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+                tree->right->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
 
-		escTree(tree, 0);
-		bi[0] = 0; bi[1] = 0;
-                drawTreeSTL(2, bi, tree);
+		/*4*/
 
-                bi[0] = 1; bi[1] = 1;
-                drawTreeSTL(2, bi, tree);
+		
+		tree->left ->left ->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+		tree->left ->right->left ->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+		tree->left ->right->right->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+		
+		tree->right->left ->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+		tree->right->right->left ->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+		tree->right->right->right->growBranch(10.0 * w[3], (0.1*gold) * w[3]);
+
+	
+		/*5*/
+		tree->left->left->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->left->right->left->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->left->right->right->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->left->left->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->left->right->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->right->left->left->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->right->left->right->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->right->right->left->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+		tree->right->right->right->right->growBranch(10.0 * w[4], (0.1*gold) * w[4]);
+
+		/*6*/
+		tree->left->left->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->left->left->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->left->right->left->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->left->right->left->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->left->right->right->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->left->right->right->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->left->left->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->left->left->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->left->right->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->left->right->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->left->left->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->left->left->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->left->right->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->left->right->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->right->left->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->right->left->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->right->right->left->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+		tree->right->right->right->right->right->growBranch(10.0 * w[5], (0.1*gold) * w[5]);
+
+		/*6*/
+		//tree->left->left->left->left->growBranch(10.0 * w[6], (0.1*gold) * w[6]);
+		//tree->left->left->left->right->
+		//tree->left->left->right->left->
+		//tree->left->left->right->right->
+		//tree->left->right->left->left->left->
+		//tree->left->right->left->left->right->
+		//tree->left->right->left->right->left->
+		//tree->left->right->left->right->right->
+		//tree->left->right->right->left->left->
+		//tree->left->right->right->left->right->
+		//tree->left->right->right->right->left->
+		//tree->left->right->right->right->right->
+		//tree->right->left->left->left->left->
+		//tree->right->left->left->left->right->
+		//tree->right->left->left->right->left->
+		//tree->right->left->left->right->right->
+		//tree->right->left->right->left->left->
+		//tree->right->left->right->left->right->
+		//tree->right->left->right->right->left->
+		//tree->right->left->right->right->right->
+		//tree->right->right->left->left->left->
+		//tree->right->right->left->left->right->left->
+		//tree->right->right->left->left->right->right->
+		//tree->right->right->left->right->left->
+		//tree->right->right->left->right->right->left->
+		//tree->right->right->left->right->right->right->
+		//tree->right->right->right->left->left->
+		//tree->right->right->right->left->right->left->
+		//tree->right->right->right->left->right->right->
+		//tree->right->right->right->right->left->
+		//tree->right->right->right->right->right->left->
+		//tree->right->right->right->right->right->right->
+
+		escTree(tree, 0, "root");
+		cout << "\n\n\n";
+		printRootToLeafPaths(tree);
+	
 	}
 
 }
 
-
-void updateProcessingProto() {
-
-	if (ciclo > 0) {
-
-	}
-}
 ///////////////////     DRAW       ///////////////////////
 void Draw() {
 
@@ -356,31 +415,7 @@ void Draw() {
 	
 
 		axis();
-
-		/*0*/
-		//drawFacetBox(tree->getBox(), 255, 0, 0);
-		
-		/*1*/
-		//drawFacetBox(tree->left ->getBox(), 0, 255,   0);
-                //drawFacetBox(tree->right->getBox(), 0,   0, 255);
-		//drawFacetBox(tree->search(1, pp, tree), 0, 255, 0);
-
-		/*2*/
-		//drawFacetBox(tree->left ->left ->getBox(), 255,   0,   0);
-                //drawFacetBox(tree->left ->right->getBox(),   0, 255,   0);
-
-		//drawFacetBox(tree->right ->left ->getBox(),   0,   0, 255);
-                //drawFacetBox(tree->right ->right->getBox(), 255, 255,   0);
-
-
-		/*3*/
-                
-		bi[0] = 0; bi[1] = 0; 
-		drawTree(2, bi, tree);	
-		
-		bi[0] = 1; bi[1] = 1; 
-                drawTree(2, bi, tree);
-
+	
 	}
 }
 
@@ -388,7 +423,6 @@ void Draw() {
 void ProcessingProto() {
 
 	Setup();
-	updateProcessingProto();
 	Draw();
 }
 

@@ -46,7 +46,7 @@ class FacetGash {
                 int checkPoint(const Quaternion& p, const Quaternion& J);
                 Vector3D getCutPoint(int i) const;
 		void updateOrientation();
-                void cutFacet(const Facet& facet0);
+                int cutFacet(const Facet& facet0);
 		void restart();
 		void readListC(const Facet& facet, FacetBox * pila);
 		void readList(FacetBox * pila);
