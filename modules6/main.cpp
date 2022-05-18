@@ -38,7 +38,7 @@ double count2 = 0.25 * 3.14159265358979;
 double count3 = 1e-2;
 double rotSpeed = 0.0;
 double rotAxe = 0.0;
-double rad = 20.0;
+double rad = 5.0;
 double rot = 0.0;
 int iter0 = 0;
 int iter = 9;
@@ -166,6 +166,83 @@ Vector3D spherical(double rs, double phi, double teta) {
 }
 
 
+void drawTree(int l, int * S, ModuleTree * tree) {
+
+        ModuleTree * user = tree;
+        ModuleTree * tmp;
+        int i = 0;
+        while (i < l) {
+
+                tmp = user;
+
+                if (S[i] == 0)
+                        if (user->left == NULL || user->right == NULL) {
+                		drawFacetBox(tmp->getBox(), 0, 255, 0);
+                                break;
+                        } else {	
+				drawFacetBox(user-> left->getBox(), 255, 255,   0);	
+				user = user-> left;
+			}
+                else
+			if (user->left == NULL || user->right == NULL) {
+                                drawFacetBox(tmp->getBox(), 0, 255, 0);
+                                break;
+                        } else {        
+                                drawFacetBox(user->right->getBox(), 255, 255,   0);  
+                                user = user->right;
+                        }
+                i++;
+        }
+
+}
+
+
+void drawTreeSTL(int l, int * S, ModuleTree * tree) {
+
+        ModuleTree * user = tree;
+        ModuleTree * tmp;
+        int i = 0;
+        while (i < l) {
+
+                tmp = user;
+
+                if (S[i] == 0)
+                        if (user->left == NULL || user->right == NULL) {
+                                drawFacetBoxSTL(tmp->getBox(), "dode" + to_string(i) + ".stl");
+                                break;
+                        } else {
+                                drawFacetBoxSTL(user-> left->getBox(), "dode" + to_string(i) + ".stl");
+                                user = user-> left;
+                        }
+                else
+                        if (user->left == NULL || user->right == NULL) {
+                                drawFacetBoxSTL(tmp->getBox(), "dode" + to_string(i) + ".stl") ;
+                                break;
+                        } else {
+                                drawFacetBoxSTL(user->right->getBox(), "dode" + to_string(i) + ".stl");
+                                user = user->right;
+                        }
+                i++;
+        }
+
+}
+
+int COUNT = 2;
+void escTree(ModuleTree * root, int space) {
+	
+	if (root == NULL)
+		return;
+	
+	space += COUNT;
+	escTree(root->right, space);
+	
+	//cout << endl;
+	for (int i = COUNT; i < space; i++)
+		cout << " ";
+
+	cout << "1\n";
+	escTree(root->left, space);
+}
 
 //////////////////////////////////////
 //
@@ -197,7 +274,7 @@ void interface();
 //                                  
 //////////////////////////////////////
 
-Dodecahedron D = Dodecahedron(6.0, origen);
+Dodecahedron D = Dodecahedron(1, origen);
 FacetBox box0;
 ModuleSpaces mod;
 double tetaa = 0.25 * M_PI;
@@ -205,39 +282,62 @@ double phii = 0.25 * M_PI;
 
 ModuleTree * tree;
 
+int * bi = (int *) malloc (3 * sizeof(int));
 void Setup() {
 
 	if (ciclo == 0) {
+
+
+
+
+		Vector3D w[12] = {
+		Vector3D(       0.0,     0.5617,  0.917587),
+    		Vector3D(       0.0,    -0.5617,  0.917587),
+    		Vector3D(       0.0,     0.5617, -0.917587),
+    		Vector3D(       0.0,    -0.5617, -0.917587),
+    		Vector3D(  0.917587,        0.0,    0.5671),
+    		Vector3D( -0.917587,        0.0,    0.5671),
+    		Vector3D(  0.917587,        0.0,   -0.5671),
+    		Vector3D( -0.917587,        0.0,   -0.5671),
+    		Vector3D(    0.5671,   0.917587,       0.0),
+    		Vector3D(   -0.5671,   0.917587,       0.0),
+    		Vector3D(    0.5671,  -0.917587,       0.0),
+    		Vector3D(   -0.5671,  -0.917587,       0.0)
+		};
+
 		
 		for (int i = 0; i < 36; i++)
 			box0.push(D[i]);
 	
+		double gold = 0.5 * (1 + sqrt(5));
 		
+		/*0*/
 		tree = new ModuleTree(box0);	
-		tree->growBranch( 
-				spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
-                                spherical(1.25, 0.25 * M_PI, 0.25 * M_PI));
+
+		/*1*/
+		tree->growBranch(10.0 * w[0], (0.1*gold) * w[0]);
+	
+		/*2*/
+		tree->left ->growBranch(10.0 * w[1], (0.1*gold) * w[1]);
+		tree->right->growBranch(10.0 * w[1], (0.1*gold) * w[1]);
+
+		/*3*/
+		tree-> left-> left->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+		tree-> left->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);	
+
+		tree->right-> left->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
+                tree->right->right->growBranch(10.0 * w[2], (0.1*gold) * w[2]);
 		
-		//tree->left = new ModuleTree(
-		//		spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
-                //                spherical(1.25, 0.25 * M_PI, 0.25 * M_PI),
-		//	       	tree->getBox(0));
-		//
-		//
-		//tree->right = new ModuleTree(
-                //                spherical(2.0, 0.25 * M_PI, 0.25 * M_PI),
-                //                spherical(-1.25, 0.25 * M_PI, 0.25 * M_PI),
-                //                tree->getBox(1));
+		bi[0] = 0;
+		bi[1] = 0;
+		bi[2] = 0;
 
-		//
+		escTree(tree, 0);
+		bi[0] = 0; bi[1] = 0;
+                drawTreeSTL(2, bi, tree);
 
-
-
-		//tree->left->left = new ModuleTree(
-                //                spherical(3.0, 0.25 * M_PI, 0.25 * M_PI),
-                //                spherical(2.5, 0.25 * M_PI, 0.25 * M_PI),
-                //                tree->left->getBox(0));
-
+                bi[0] = 1; bi[1] = 1;
+                drawTreeSTL(2, bi, tree);
 	}
 
 }
@@ -249,7 +349,6 @@ void updateProcessingProto() {
 
 	}
 }
-
 ///////////////////     DRAW       ///////////////////////
 void Draw() {
 
@@ -258,15 +357,29 @@ void Draw() {
 
 		axis();
 
-
-		//mod[1].crunch(0.25, mod[1].getCenter());	
+		/*0*/
+		//drawFacetBox(tree->getBox(), 255, 0, 0);
 		
-		//drawFacetBox(tree->getBox(), 255, 0, 0);		
+		/*1*/
+		//drawFacetBox(tree->left ->getBox(), 0, 255,   0);
+                //drawFacetBox(tree->right->getBox(), 0,   0, 255);
+		//drawFacetBox(tree->search(1, pp, tree), 0, 255, 0);
 
-		drawFacetBox(tree->left ->getBox(), 0, 255,   0);
-                drawFacetBox(tree->right->getBox(), 0,   0, 255);
+		/*2*/
+		//drawFacetBox(tree->left ->left ->getBox(), 255,   0,   0);
+                //drawFacetBox(tree->left ->right->getBox(),   0, 255,   0);
+
+		//drawFacetBox(tree->right ->left ->getBox(),   0,   0, 255);
+                //drawFacetBox(tree->right ->right->getBox(), 255, 255,   0);
 
 
+		/*3*/
+                
+		bi[0] = 0; bi[1] = 0; 
+		drawTree(2, bi, tree);	
+		
+		bi[0] = 1; bi[1] = 1; 
+                drawTree(2, bi, tree);
 
 	}
 }

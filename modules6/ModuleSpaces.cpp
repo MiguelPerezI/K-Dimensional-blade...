@@ -23,22 +23,26 @@ ModuleSpaces::ModuleSpaces(const Vector3D& a, const Vector3D& b, const FacetBox&
 		if (In.checkFacet(D[i]) == 1)
 			box0.push(D[i]);
 	}
-	In.readList(&box0);
 
+	if (box0.getN() != 0) {
+		In.readList(&box0);
 
+		In.restart();
+		In.updateOrientation();
+		//Second half
+        	
+		for (int i = 0; i < D.getN(); i++) {
+        	        In.cutFacet(D[i]);
+        	        if (In.checkFacet(D[i]) == 1)
+        	                box1.push(D[i]);
+        	}
 
-	In.restart();
-	In.updateOrientation();
-	//Second half
-        
-	for (int i = 0; i < D.getN(); i++) {
-                In.cutFacet(D[i]);
-                if (In.checkFacet(D[i]) == 1)
-                        box1.push(D[i]);
-        }
-        In.readList(&box1);
-	
-	In.restart();
+		if (box1.getN() != 0) {
+        		In.readList(&box1);
+			In.restart();
+		}
+
+	}
 }
 
 Vector3D ModuleSpaces::piecewise(double t, const Vector3D& a, const Vector3D& b) {return (t*(a-b)) + b;}

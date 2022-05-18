@@ -10,9 +10,9 @@ using namespace std;
 
 Dodecahedron::Dodecahedron(double r, const Vector3D& center) {
 	
-	double gold= (1 + sqrt(5))/2;
-	double g1= 1/gold;
-	double g2= 1/(gold*gold);
+	double gold = 0.5 * (1 + sqrt(5));
+	double g1 = 1/gold;
+	double g2 = 1/(gold*gold);
                         
 	v[0] =  Quaternion(0.0, Vector3D( center.x() +  g2 * r,  center.y() + 0.0 * r, center.z() +  1.0 * r));
 	v[1] =  Quaternion(0.0, Vector3D( center.x() -  g2 * r,  center.y() + 0.0 * r, center.z() +  1.0 * r));
