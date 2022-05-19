@@ -1202,14 +1202,6 @@ drawFacetBoxSTL(tree->right->right->right->right->right->right->right->right->ri
 drawFacetBoxSTL(tree->right->right->right->right->right->right->right->right->right->right->left->getBox(), "chok243.stl");
 drawFacetBoxSTL(tree->right->right->right->right->right->right->right->right->right->right->right->getBox(), "chok245.stl");
 
-
-
-
-
-
-
-
-
 	}
 
 }
