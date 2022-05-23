@@ -26,5 +26,6 @@ class ModuleTree {
 		ModuleTree * getRight() const;
 		void growBranch(const Vector3D& a, const Vector3D& b);
 		FacetBox search(int l, int * S, ModuleTree * tree);
+		void crunch(double a);
 };
 #endif

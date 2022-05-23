@@ -20,6 +20,10 @@ FacetBox ModuleTree::getBox() const {
 	return box;
 }
 
+void ModuleTree::crunch(double a) {
+	box.crunch(a, box.getCenter());
+}
+
 int ModuleTree::getN() const {
 	return box.getN();
 }

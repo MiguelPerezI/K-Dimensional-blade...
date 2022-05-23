@@ -21,6 +21,7 @@ class PlaneQuaternion {
 		int checkPoint(const Quaternion& p, const Quaternion& J);
 		//Calculates whether a line intersects the plane
 		double intersectionLine(const Vector3D& a, const Vector3D& b);
+		
 		int equalR(double a, double b);
 		void updateOrientation();
 };

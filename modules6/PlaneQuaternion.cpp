@@ -134,6 +134,7 @@ double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) {
 	}
 }
 
+
 void PlaneQuaternion::updateOrientation() {
 	this->normal = Quaternion(this->normal.r(), -1.0 * this->normal.V());
 }

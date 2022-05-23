@@ -5,6 +5,7 @@ using namespace std;
 
 #include <iostream>
 #include "Vector3D.hpp"
+#include "Vector4D.hpp"
 #include <math.h>
 
 class Quaternion {
