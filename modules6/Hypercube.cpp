@@ -1,6 +1,7 @@
 using namespace std;
 
 #include "Hypercube.hpp"
+#include "Quaternion.hpp"
 #include <cmath>
 #include <iomanip>
 #include <fstream>
@@ -8,7 +9,7 @@ using namespace std;
 
 
 //Facet  operator [] (int k) const;
-Hypercube::Hypercube(double R, const Vector4D& c, const Matrix4D& M, double pro) {
+Hypercube::Hypercube(double R, const Vector4D& c, const Matrix4D& M, double pro, double r) {
 	
 Vector4D	v0 = Vector4D( R + c.x(), R + c.y(), R + c.z(), R + c.t());
 Vector4D	v1 = Vector4D(-R + c.x(), R + c.y(), R + c.z(), R + c.t());
@@ -31,23 +32,87 @@ Vector4D	v14 = Vector4D(-R + c.x(),-R + c.y(),-R + c.z(),-R + c.t());
 Vector4D	v15 = Vector4D( R + c.x(),-R + c.y(),-R + c.z(),-R + c.t());	
 
 
-         v0 = M * v0;
-	 v1 = M * v1;
-	 v2 = M * v2;
-	 v3 = M * v3;
-	 v4 = M * v4;
-	 v5 = M * v5;
-	 v6 = M * v6;
-	 v7 = M * v7;
-	 v8 = M * v8;
-	 v9 = M * v9;
-	 v10 = M * v10;
-	 v11 = M * v11;
-	 v12 = M * v12;
-	 v13 = M * v13;
-	 v14 = M * v14;
-	 v15 = M * v15;
-	 
+         //v0 = M * v0;
+	 //v1 = M * v1;
+	 //v2 = M * v2;
+	 //v3 = M * v3;
+	 //v4 = M * v4;
+	 //v5 = M * v5;
+	 //v6 = M * v6;
+	 //v7 = M * v7;
+	 //v8 = M * v8;
+	 //v9 = M * v9;
+	 //v10 = M * v10;
+	 //v11 = M * v11;
+	 //v12 = M * v12;
+	 //v13 = M * v13;
+	 //v14 = M * v14;
+	 //v15 = M * v15;
+
+	double angle = r;
+	double an_2 = 0.5 * angle;
+	
+	//Quaternion p = Quaternion(cos(an_2), sin(an_2) * Vector3D(0, 0, 1));
+	//Quaternion q = Quaternion(cos(-an_2), sin(-an_2) * Vector3D(0, 0, 1));
+	
+	//Quaternion p = Quaternion(cos(an_2), sin(an_2) * Vector3D(0, 1, 0));
+        //Quaternion q = Quaternion(cos(-an_2), sin(-an_2) * Vector3D(0, 1, 0));
+
+	Quaternion p = Quaternion( cos(an_2), sin(an_2) * Vector3D(0, 0, 1));
+        Quaternion q = Quaternion(-cos(an_2), sin(an_2) * Vector3D(0, 0, 1));
+	
+	Quaternion V0 = Quaternion(v0);
+	Quaternion V1 = Quaternion(v1);
+	Quaternion V2 = Quaternion(v2);
+	Quaternion V3 = Quaternion(v3);
+	Quaternion V4 = Quaternion(v4);
+	Quaternion V5 = Quaternion(v5);
+	Quaternion V6 = Quaternion(v6);
+	Quaternion V7 = Quaternion(v7);
+	Quaternion V8 = Quaternion(v8);
+	Quaternion V9 = Quaternion(v9);
+	Quaternion V10 = Quaternion(v10);
+	Quaternion V11 = Quaternion(v11);
+	Quaternion V12 = Quaternion(v12);
+	Quaternion V13 = Quaternion(v13);
+	Quaternion V14 = Quaternion(v14);
+ 	Quaternion V15 = Quaternion(v15);
+
+	V0 = p * V0 * q.conjugate();
+	V1 = p * V1 * q.conjugate();
+	V2 = p * V2 * q.conjugate();
+	V3 = p * V3 * q.conjugate();
+	V4 = p * V4 * q.conjugate();
+	V5 = p * V5 * q.conjugate();
+	V6 = p * V6 * q.conjugate();
+	V7 = p * V7 * q.conjugate();
+	V8 = p * V8 * q.conjugate();
+	V9 = p * V9 * q.conjugate();
+	V10 = p * V10 * q.conjugate();
+	V11 = p * V11 * q.conjugate();
+	V12 = p * V12 * q.conjugate();
+	V13 = p * V13 * q.conjugate();
+	V14 = p * V14 * q.conjugate();
+	V15 = p * V15 * q.conjugate();
+	
+	v0 = V0.v4();
+	v1 = V1.v4();
+	v2 = V2.v4();
+	v3 = V3.v4();
+	v4 = V4.v4();
+	v5 = V5.v4();
+	v6 = V6.v4();
+	v7 = V7.v4();
+	v8 = V8.v4();
+	v9 = V9.v4();
+	v10 = V10.v4();
+	v11 = V11.v4();
+	v12 = V12.v4();
+	v13 = V13.v4();
+	v14 = V14.v4();
+	v15 = V15.v4();
+
+
 	 Vector3D G0 = projection3D(v0, pro);
 	 Vector3D G1 = projection3D(v1, pro);
 	 Vector3D G2 = projection3D(v2, pro);

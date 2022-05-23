@@ -16,7 +16,7 @@ class Hypercube {
 	public:
         	FacetBox  operator [] (int k) const;
         	~Hypercube(){empty();};
-		Hypercube(double radius, const Vector4D& center, const Matrix4D& M, double pro);
+		Hypercube(double radius, const Vector4D& center, const Matrix4D& M, double pro, double r);
 		Hypercube();
 		Vector3D projection3D(const Vector4D& vec, double proy);
 		int numFacet();

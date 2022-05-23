@@ -43,7 +43,7 @@ double count3 = 1e-2;
 double rotSpeed = 0.0;
 double rotAxe = 0.25;
 double rad = 5.0;
-double rot = 0.25;
+double rot = 0.0;
 int iter0 = 0;
 int iter = 9;
 int iter1 = 0;
@@ -86,6 +86,7 @@ int faces[1440][5];
 
 Vector3D piecewise(double t, const Vector3D& a, const Vector3D& b);
 void drawLine(const Vector3D& a, const Vector3D& b);
+void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B);
 void drawFacet(const Facet& f, int R, int G, int B);
 void drawFacetTrans(const Facet& f, int R, int G, int B, double trans);
 void drawFacet2(const Vector3D& a, const Vector3D& b, const Vector3D& c, int R, int G, int B);
@@ -156,8 +157,8 @@ void drawLattice(int p, int n, int ternary, double Rs, const Matrix4D& M) {
 					if (ttt == ternary) {			
 						Vector4D a0 = Vector4D(i * ds, j * ds, k * ds, l * ds);
 						a0 = a0 - 0.5*(n-1) * Vector4D(ds, ds, ds, ds);
-						Hypercube cube = Hypercube(rs, a0, M, 1.75 * Rs);
-						drawHypercube(8, cube);
+						//Hypercube cube = Hypercube(rs, a0, M, 1.75 * Rs);
+						//drawHypercube(8, cube);
 					}
 				}
 }
@@ -307,7 +308,21 @@ void Draw() {
 	
 
 		axis();
-			
+
+		Matrix4D M = Matrix4D(
+                                                1, 0, 0, 0,
+                                                0, 1, 0, 0,
+                                                0, 0, cos(rot),-sin(rot),
+                                                0, 0, sin(rot), cos(rot)
+                                                );
+
+		Hypercube cubee = Hypercube(1.0, Vector4D(0, 0, 0, 0), M, 1.75, rot);
+		drawHypercube(8, cubee);		
+
+
+
+
+	
 	}
 }
 
@@ -341,11 +356,21 @@ void drawLine(const Vector3D& a, const Vector3D& b) {
         glEnd();
 }
 
+void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
+
+        glColor3ub(R, G, B);
+        glLineWidth(2.0);
+        glBegin(GL_LINES);
+        glVertex3f(a.x(), a.y(), a.z());
+        glVertex3f(b.x(), b.y(), b.z());
+        glEnd();
+}
+
 void axis() {
 
-	drawLine(Vector3D(20,  0,  0), origen);
-	drawLine(Vector3D( 0, 20,  0), origen);
-	drawLine(Vector3D( 0,  0, 20), origen);
+	drawLineColor(Vector3D(20,  0,  0), origen, 255, 0, 0);
+	drawLineColor(Vector3D( 0, 20,  0), origen, 0, 255, 0);
+	drawLineColor(Vector3D( 0,  0, 20), origen, 0, 0, 255);
 }
 
 void drawFacet(const Facet& f, int R, int G, int B) {
@@ -689,12 +714,12 @@ void keyboard(unsigned char key, int x, int y) {
 
     
 		case 'v':
-      			rot += 0.01;
+      			rot += 0.1;
       		break;
 
     
 		case 'V':
-      			rot -= 0.01;
+      			rot -= 0.1;
       		break;
 
      

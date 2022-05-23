@@ -18,12 +18,13 @@ class Quaternion {
          Vector3D  operator [] (int k) const;
          Quaternion(double xx = 0, const Vector3D& vv = Vector3D(0,0,0));
          Quaternion(const Quaternion& a);
-         double r() const { return u; };
+         Quaternion(const Vector4D& a);
+	 double r() const { return u; };
          double i() const { return v.x(); };
 	 double j() const { return v.y(); };
 	 double k() const { return v.z(); };
 	 Vector3D V() const {return v;};
-
+	 Vector4D v4() const {return Vector4D(u, v.x(), v.y(), v.z());};
          Quaternion& operator  = (const Quaternion&);
          Quaternion& operator += (const Quaternion&);
          Quaternion& operator /= (double);

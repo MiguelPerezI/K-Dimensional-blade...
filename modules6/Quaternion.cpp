@@ -19,6 +19,12 @@ Quaternion::Quaternion(const Quaternion& a)
 	v = a.V();
 }
 
+Quaternion::Quaternion(const Vector4D& a) {
+	
+	u = a.x();
+	v = Vector3D(a.y(), a.z(), a.t());
+}
+
 Vector3D Quaternion::operator [] (int k) const {
    if (k > 1)
       return Vector3D(0, 0, 0);
