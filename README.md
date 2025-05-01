@@ -59,12 +59,12 @@ std::cout << "u = " << u << '\n'
 The equality comparison operator `==` for `Vector3D` objects uses a tolerance-based approach inspired by a result from **real analysis**:
 
 > **Theorem (Bartle & Sherbert, _Introduction to Real Analysis_):**  
-> Let \( a \in \mathbb{R} \). If \( x \in V(a) \) for **every** \( \varepsilon > 0 \), then \( x = a \).
+> Let a in R (real number set). If x in V(a) (neighborhood of a) for every epsilon > 0, then x = a.
 
 This guides the implementation of `operator==` using a neighborhood epsilon approach. In `Vector3D`, two vectors `a` and `b` are considered equal if their Euclidean distance is less than a small epsilon:
 
 ```cpp
-constexpr double epsilon = 1e-8;
+constexpr double epsilon = 1e-12;
 ```
 
 This accounts for small numerical inaccuracies common in floating-point arithmetic.
