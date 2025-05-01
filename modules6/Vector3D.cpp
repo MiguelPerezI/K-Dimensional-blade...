@@ -5,97 +5,111 @@
 using namespace std;
 
 
+/*————— element access ——————————————————————————————————————————————————*/
+/* Write access ---------------------------------------------------------*/
+double& Vector3D::operator[](int k)
+{
+    if (k < 0 || k > 2)
+        throw std::out_of_range("Vector3D::operator[] index must be 0,1,2");
+    return u[k];
+}
 
+/* Read access ----------------------------------------------------------*/
+double Vector3D::operator[](int k) const
+{
+    if (k < 0 || k > 2)
+        throw std::out_of_range("Vector3D::operator[] index must be 0,1,2");
+    return u[k];
+}
+/*———————————————————————————————————————————————————————————————————————*/
+
+
+
+/* Constructors —————————————————————————————————————————————————————————*/
+/* Construct a Vector3D by providing three real numbers -----------------*/
+/* Explicitly initialize all components via member-initializer list */
 Vector3D::Vector3D(double xx, double yy, double zz)
-{
-   u[0]= xx;
-   u[1]= yy;
-   u[2]= zz;
-}
+    : u{ xx, yy, zz }
+{ }
+/*———————————————————————————————————————————————————————————————————————*/
 
-Vector3D::Vector3D(const Vector3D& a)
-{
-   u[0]= a.x();
-   u[1]= a.y();
-   u[2]= a.z();
-}
 
-//double&           operator [] (int k);
-double& Vector3D::operator [] (int k)
-{
-   if (k==3)
-      return u[3]= 1.0;
-   else
-      return u[k];
-}
 
-//double           operator [] (int k) const;
-double Vector3D::operator [] (int k) const
-{
-   if (k==3)
-      return 1.0;
-   else
-      return u[k];
-}
-
-Vector3D& Vector3D::operator = (const Vector3D& a)
-{
-   u[0]= a.x();
-   u[1]= a.y();
-   u[2]= a.z();
-   return *this;
-}
-
-Vector3D& Vector3D::operator+= (const Vector3D& a)
+/*----- compound operator  ----------------------------------------------*/
+Vector3D& Vector3D::operator+= (const Vector3D& a) noexcept
 {
     return *this= *this+a;
 }
 
-Vector3D operator + (const Vector3D& a, const Vector3D& b)
+Vector3D& Vector3D::operator-= (const Vector3D& a) noexcept
 {
-   return Vector3D( a.x()+b.x(), a.y()+b.y(), a.z()+b.z() );
+    return *this= *this-a;
+}
+/*———————————————————————————————————————————————————————————————————————*/
+
+/* Free functions ———————————————————————————————————————————————————————*/
+/* Adition ---------------------------------------------------------------*/
+Vector3D operator + (const Vector3D& a, const Vector3D& b) noexcept
+{
+    return Vector3D(a.x() + b.x(),
+                    a.y() + b.y(),
+                    a.z() + b.z());
 }
 
-Vector3D operator - (const Vector3D& a, const Vector3D& b)
+/* Subtraction -----------------------------------------------------------*/
+Vector3D operator - (const Vector3D& a, const Vector3D& b) noexcept
 {
-   return Vector3D( a.x()-b.x(), a.y()-b.y(), a.z()-b.z() );
+    return Vector3D(a.x() - b.x(),
+                    a.y() - b.y(),
+                    a.z() - b.z());
 }
 
-Vector3D operator % (const Vector3D& a, const Vector3D& b)
+/* Unitary minus ---------------------------------------------------------*/
+Vector3D operator - (const Vector3D& a) noexcept
+{
+   return Vector3D(-a.x(), -a.y(), -a.z());
+}
+
+/* Scalar x Vector -------------------------------------------------------*/
+Vector3D operator * (const double s, const Vector3D& b) noexcept
+{
+   return Vector3D( s * b.x(), s * b.y(), s * b.z() );
+}
+
+/* Scalar / Vector -------------------------------------------------------*/
+Vector3D operator / (const Vector3D& a, const double s)
+{
+    if (abs(a) < 1e-12)
+        throw std::runtime_error("Vector3D::operator/ division by zero");
+    return Vector3D(
+        a.x() / s, 
+        a.y() / s, 
+        a.z() / s
+    );
+}
+
+/* Dot Product -----------------------------------------------------------*/
+double operator * (const Vector3D& a, const Vector3D& b) noexcept
+{
+   return a.x() * b.x() + a.y() * b.y() + a.z() * b.z();
+}
+
+/* Cross Product ---------------------------------------------------------*/
+Vector3D operator % (const Vector3D& a, const Vector3D& b) noexcept
 {
    return Vector3D(a.y() * b.z() - a.z() * b.y(),
                   -a.x() * b.z() + a.z() * b.x(),
                    a.x() * b.y() - a.y() * b.x() );
 }
 
-Vector3D cruz(const Vector3D& a, const Vector3D& b) {
-  return Vector3D(a.y() * b.z() - a.z() * b.y(),
-                 -a.x() * b.z() + a.z() * b.x(),
-                  a.x() * b.y() - a.y() * b.x() );
-}
-
-Vector3D operator * (const double a, const Vector3D& b)
+/* Compare Vector closeness upto radius of 1E-8 --------------------------*/
+bool     operator == (const Vector3D& a, const Vector3D& b) noexcept
 {
-   return Vector3D( a * b.x(), a * b.y(), a * b.z() );
+    return abs(a-b)<1E-8;
 }
 
-double operator * (const Vector3D& a, const Vector3D& b)
-{
-   return a.x() * b.x() + a.y() * b.y() + a.z() * b.z();
-}
-
-Vector3D operator / (const Vector3D& a, const double b)
-{
-   return Vector3D( a.x()/b, a.y()/b, a.z()/b );
-}
-
-Vector3D operator - (const Vector3D& a)
-{
-   return Vector3D(-a.x(), -a.y(), -a.z());
-}
-
-
-double abs(const Vector3D& a)
+/* Euclidean length ------------------------------------------------------*/
+double abs(const Vector3D& a) noexcept
 {
    double x= fabs(a.x());
    double y= fabs(a.y());
@@ -109,12 +123,27 @@ double abs(const Vector3D& a)
    return t*sqrt(x*x + y*y + z*z);
 }
 
-Vector3D unit(const Vector3D& v)
+/* ∞-norm ---------------------------------------------------------------*/                                                                                          
+double infty(const Vector3D& a) noexcept
 {
-   double n= abs(v);
-   return n==0.0 ? Vector3D(0,0,0) : v/n;
+   return fabs(a.x()) + fabs(a.y()) + fabs(a.z());
 }
 
+/* normalized copy ------------------------------------------------------*/
+Vector3D unit(const Vector3D& v)
+{
+    double n= abs(v);
+    return (n < 1e-12) ? Vector3D(0,0,0)
+                       : v / n;
+}
+
+/* helper for linear interpolation on a segment -------------------------*/
+Vector3D line(double t, Vector3D& b, Vector3D& e) noexcept
+{
+   return b + t * (e-b);
+}
+
+/* stream operators -----------------------------------------------------*/
 istream& operator >> (istream& is, Vector3D& a)
 {
    while (!is.eof() && is.get() != '(')
@@ -164,53 +193,47 @@ ostream& operator << (ostream& os, const Vector3D& a)
    return os << "(" << a.x() << ", " << a.y() << ", " << a.z() << ") ";
 }
 
-Vector3D line(double t, Vector3D& b, Vector3D& e)
+/*———— Geometric helpers ————————————————————————————————————————————————*/
+/* center for 4 vectors -------------------------------------------------*/
+Vector3D centerM4(
+                    const Vector3D& a0, const Vector3D& a1,
+                    const Vector3D& a2, const Vector3D& a3) noexcept
 {
-   return b + t * (e-b);
+	return (a0 + a1 + a2 + a3) * 0.25;
 }
 
-double infty(const Vector3D& a)
+/*center for 5 vectors --------------------------------------------------*/
+Vector3D cPenta(
+                    Vector3D a0, Vector3D a1, 
+                    Vector3D a2, Vector3D a3, Vector3D a4) noexcept
 {
-   return fabs(a.x()) + fabs(a.y()) + fabs(a.z());
+	return (a0 + a1 + a2 + a3 + a4) * 0.20;
 }
 
-bool     operator == (const Vector3D& a, const Vector3D& b)
+/* center for 20 vectors ------------------------------------------------*/
+Vector3D cDodeca(Vector3D a[]) noexcept
 {
-    return abs(a-b)<1E-8;
+    Vector3D sum{0,0,0};
+    for (int i = 0; i < 20; i++)
+        sum += a[i];
+    return sum * (1.0/20.0);
 }
 
-
-Vector3D centerM4(const Vector3D& a0, const Vector3D& a1, const Vector3D& a2, const Vector3D& a3){
-	Vector3D center;
-
-	center = ((a0 + a1) + a2) + a3;
-	center = (0.25) * center;
-	return center;
+/* center for 8 vectors -------------------------------------------------*/
+Vector3D centerM8(
+                    const Vector3D& a0, const Vector3D& a1, 
+                    const Vector3D& a2, const Vector3D& a3,
+                    const Vector3D& a4, const Vector3D& a5, 
+                    const Vector3D& a6, const Vector3D& a7) noexcept
+{
+    Vector3D sum = a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7;
+    return sum * (1.0/8.0);
 }
 
-Vector3D cPenta(Vector3D a0, Vector3D a1, Vector3D a2, Vector3D a3, Vector3D a4){
-	Vector3D center;
-
-	center = (((a0 + a1) + a2) + a3) + a4;
-	center = (0.20) * center;
-	return center;
-}
-
-Vector3D cDodeca(Vector3D a[]){
-	Vector3D center;
-  Vector3D s = Vector3D(0, 0, 0);
-  for (int i = 0; i < 20; i++) {
-    s += a[i];
-  }
-	center = (1.0/20.0) * s;
-	return center;
-}
-
-Vector3D centerM8(const Vector3D& a0, const Vector3D& a1, const Vector3D& a2, const Vector3D& a3,
-                  const Vector3D& a4, const Vector3D& a5, const Vector3D& a6, const Vector3D& a7){
-	Vector3D center;
-
-	center = (1.0/8.0) * (((((((a0 + a1) + a2) + a3) + a4) + a5) + a6) + a7);
-
-	return center;
+/* cross product as function --------------------------------------------*/
+Vector3D cruz(const Vector3D& a, const Vector3D& b) noexcept
+{
+  return Vector3D(a.y() * b.z() - a.z() * b.y(),
+                 -a.x() * b.z() + a.z() * b.x(),
+                  a.x() * b.y() - a.y() * b.x() );
 }

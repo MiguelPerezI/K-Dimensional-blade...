@@ -4,248 +4,27 @@
 #include <math.h>
 #include <GL/glut.h>
 #include "Vector3D.cpp"
-#include "Matrix3D.cpp"
-#include "Vector4D.cpp"
-#include "Matrix4D.cpp"
 #include "Quaternion.cpp"
-#include "Facet.cpp"
-#include "Octahedron.cpp"
-#include "PlaneQuaternion.cpp"
-#include "FacetBox.cpp"
-#include "FacetGash.cpp"
-#include "Vector3DBox.cpp"
-#include "QuaternionBox.cpp"
-#include "QuaternionBoxBox.cpp"
-#include "Dodecahedron.cpp"
-#include "STL.cpp"
-#include "Hypercube.cpp"
-#include "ModuleSpaces.cpp"
-#include "ModuleTree.cpp"
-#include "Cube.cpp"
-#include "PlaneQuaternion4D.cpp"
 
 //////////////////////////////////////
 //                                  
 //                                  
-//        VARIABLES GLOBALES PARA EL TECLADO        
+//  VARIABLES GLOBALES PARA EL TECLADO        
 //                                  
 //                                  
 //////////////////////////////////////
 
-/*variables*/ 
+// ciclo: Frame number.
 int ciclo = 0;
-int cicloSegund = 0;
-int color = 0;
+
+// count: Is used to measure rotating angle length.
 double count = 0.25 * M_PI;
-double angle = 0.0;
 double count2 = 0.25 * 3.14159265358979;
 double count3 = 1e-2;
-double rotSpeed = 0.0;
-double rotAxe = 0.25;
+
+// rad: Radius between camaera and center.
 double rad = 5.0;
-double rot = 0.0;
-int iter0 = 0;
-int iter = 9;
-int iter1 = 0;
-int iter2 = 0;
-int pass00 = 0;
-int pass0 = 0;
-int pass = 0;
-int pass1 = 0;
-int pass2 = 0;
-int ITT = 35;
-int stlP = 8;
 
-
-//////////////////////////////////////
-//                                  
-//                                  
-//        BASE EUCLIDEANA Y CENTRO        
-//                                  
-//                                  
-//////////////////////////////////////
-
-
-
-Vector3D origen = Vector3D(0.0, 0.0, 0.0);
-Vector3D I = Vector3D(1.0, 0.0, 0.0);
-Vector3D J = Vector3D(0.0, 1.0, 0.0);
-Vector3D K = Vector3D(0.0, 0.0, 1.0);
-int faces[1440][5];
-
-
-//////////////////////////////////////
-//                                  
-//                                  
-//        FUNCIONES PARA DIBUJAR OBJETOS EN OPENGL        
-//                                  
-//                                  
-//////////////////////////////////////
-
-
-
-Vector3D piecewise(double t, const Vector3D& a, const Vector3D& b);
-void drawLine(const Vector3D& a, const Vector3D& b);
-void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B);
-void drawFacet(const Facet& f, int R, int G, int B);
-void drawFacetTrans(const Facet& f, int R, int G, int B, double trans);
-void drawFacet2(const Vector3D& a, const Vector3D& b, const Vector3D& c, int R, int G, int B);
-void drawOctahedron(const Octahedron& octa, int R, int G, int B);
-void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B);
-void drawFacetBox(const FacetBox& box, int R, int G, int B);
-void drawFacetBoxTrans(const FacetBox& box, int R, int G, int B, double trans);
-void drawFacetBoxSTL(const FacetBox& box, string fname);
-void drawFacetGash(FacetGash gash, int R, int G, int B);
-void axis();
-void drawHypercube(int p, const Hypercube& cube);
-void drawHypercube(int p, const Hypercube& cube) {
-	
-		p = p%9;
-	        if (p == 0) drawFacetBox(cube[0], 255,   0,   0);
-                if (p == 1) drawFacetBox(cube[1],   0, 255,   0);
-                if (p == 2) drawFacetBox(cube[2],   0,   0, 255);
-                if (p == 3) drawFacetBox(cube[3], 255, 255,   0);
-                if (p == 4) drawFacetBox(cube[4], 255,   0, 255);
-                if (p == 5) drawFacetBox(cube[5],   0, 255, 255);
-                if (p == 6) drawFacetBox(cube[6], 255,   0, 255);
-                if (p == 7) drawFacetBox(cube[7], 255,   0,   0);
-		if (p == 8) {
-			drawFacetBox(cube[0], 255,   0,   0);
-                	drawFacetBox(cube[1],   0, 255,   0);
-                	drawFacetBox(cube[2],   0,   0, 255);
-                	drawFacetBox(cube[3], 255, 255,   0);
-                	drawFacetBox(cube[4], 255,   0, 255);
-                	drawFacetBox(cube[5],   0, 255, 255);
-                	drawFacetBox(cube[6], 255,   0, 255);
-                	//drawFacetBox(cube[7], 255,   0,   0);
-		}
-}
-
-
-bool ternaryCat(int i, int j, int k, int l){
-
-                        if (i<0) i*= -1;
-                        if (j<0) j*= -1;
-                        if (k<0) k*= -1;
-                        if (l<0) l*= -1;
-                        while ((i>0 && j>0) || (j>0 && k>0) || (k>0 && i >0) ||
-                               (i>0 && l>0) || (l>0 && j>0) || (l>0 && k>0)) {
-                                if ((i%3==1 && j%3==1) || (j%3==1 && k%3==1) || (k%3==1 && i%3==1) ||
-                                    (i%3==1 && l%3==1) || (l%3==1 && j%3==1) || (l%3==1 && k%3==1))
-                                        return true;
-                                i/=3;
-                                j/=3;
-                                k/=3;
-                                l/=3;
-                           }
-
-                        return false;
-        }
-
-
-void drawLattice(int p, int n, int ternary, double Rs, const Matrix4D& M) {
-	
-	p %= n;	
-	double ds = Rs/(double) n;
-	double rs = 0.5 * ds;
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-			for (int k = 0; k < n; k++)
-				for (int l = p; l < p+1; l++) {
-				
-					int ttt = ternaryCat(i, j, k, l);
-					if (ttt == ternary) {			
-						Vector4D a0 = Vector4D(i * ds, j * ds, k * ds, l * ds);
-						a0 = a0 - 0.5*(n-1) * Vector4D(ds, ds, ds, ds);
-						//Hypercube cube = Hypercube(rs, a0, M, 1.75 * Rs);
-						//drawHypercube(8, cube);
-					}
-				}
-}
-
-
-Vector3D spherical(double rs, double phi, double teta) {
-	return rs * Vector3D(
-			cos(phi) * sin(teta),
-			sin(phi) * sin(teta),
-			cos(teta));
-}
-
-
-void drawTree(int l, int * S, ModuleTree * tree, int R, int G, int B) {
-
-        ModuleTree * user = tree;
-        int i = 0;
-        while (i < l) {
-                if (S[i] == 0) {
-				drawFacetBox(user-> left->getBox(), R, G, B);	
-				user = user-> left;
-		} else {
-                                drawFacetBox(user->right->getBox(), R, G, B);  
-                                user = user->right;
-			}
-                i++;
-        }
-}
-
-
-int COUNT = 10;
-int treenode = 0; 
-void escTree(ModuleTree * root, int space, string s) {
-	
-	if (root == NULL)
-		return;
-	
-	space += COUNT;
-	escTree(root->left, space, "left");
-	
-	//cout << endl;
-	for (int i = COUNT; i < space; i++)
-		cout << " ";
-
-	cout << root->getString() << "\n";
-		treenode++;
-	escTree(root->right, space, "right");
-}
-
-bool isLeaf(ModuleTree * node) {
-	return (node->left == nullptr && node->right == nullptr);
-}
-
-void printRootToLeafPaths(ModuleTree * node, vector<string> &path, int io) {
-    // base case
-    if (node == nullptr) {
-        return;
-    }
- 
-    // include the current node to the path
-    path.push_back(node->getString());
- 
-    // if a leaf node is found, print the path
-    if (isLeaf(node)) {
-
-	cout << "drawFacetBoxSTL(";    
-        for (string data: path) {
-            cout << data << "->";
-        }
-	cout << "getBox(), \"chok.stl\");";
-        cout << endl;
-    }
- 
-    // recur for the left and right subtree
-    printRootToLeafPaths(node->left, path, io);
-    printRootToLeafPaths(node->right, path, io);
- 
-    // backtrack: remove the current node after the left, and right subtree are done
-    path.pop_back();
-}
-
-void printRootToLeafPaths(ModuleTree * node, int io) {
-    // vector to store root-to-leaf path
-    vector<string> path;
- 
-    printRootToLeafPaths(node, path, io);
-}
 //////////////////////////////////////
 //
 //
@@ -258,8 +37,6 @@ void printRootToLeafPaths(ModuleTree * node, int io) {
 //
 //////////////////////////////////////
 
-
-
 /*Funciones para dibujar sin pensar en OpenGL*/
 void Setup();
 void Draw();
@@ -267,37 +44,28 @@ void updateProcessingProto();
 void ProcessingProto();
 void interface();
 
-//////////////////////////////////////
-//                                  
-//                                  
 //        La variable ciclo es el número de FRAMES que lleva el sistema
 //        Inicia con 0        
-//                                  
-//                                  
-//////////////////////////////////////
 
-double tetaa = 0.25 * M_PI;
-double phii = 0.25 * M_PI;
-
-Vector3D v;
 
 void Setup() {
 
 	if (ciclo == 0) {
 
-        cout << "\n\n--->> Testing objects" << "\n\n";
+        cout << "\n\n--->> Testing Vector3D Class" << "\n\n";
         // --- Construction ---------------------------------------------------
         Vector3D p;                       // (0,0,0)
+        cout << "constructor p: p = " << p << "'\n'";
         Vector3D q(1.0, 2.0, 3.0);        // explicit components
         Vector3D r = q;                   // copy constructor
-        cout << "r = " << r << '\n';
-        cout << "q = " << q << '\n';
+        cout << "constructor r=q: r = " << r << '\n';
+        cout << "constructor q(a, b, c): q = " << q << '\n';
 
         // --- Access & modification -----------------------------------------
         q[0] = 4.0;                       // write via operator[]
         double zy = q[2];                 // read via operator[]
-        r += Vector3D(1,1,1);             // compound add
-        
+        r += Vector3D(2,2,2);             // compound add
+        r -= Vector3D(0.5, 0.5, 0.5);
         // --- Arithmetic -----------------------------------------------------
         cout << "p = " << p << '\n';
         cout << "r = " << r << '\n';
@@ -331,46 +99,18 @@ void Setup() {
 void Draw() {
 
 	if (ciclo > 0) {
-	
-
-		//axis();
-
-		//Matrix4D M = Matrix4D(
-        //                                        1, 0, 0, 0,
-        //                                        0, 1, 0, 0,
-        //                                        0, 0, cos(rot),-sin(rot),
-        //                                        0, 0, sin(rot), cos(rot)
-        //                                        );
-
-		//Hypercube cubee = Hypercube(1.0, Vector4D(0, 0, 0, 0), M, 1.75, rot);
-		//drawHypercube(8, cubee);		
-
-
-
-
+        /*Draw here with OpenGL*/	
 	
 	}
 }
 
 
 void ProcessingProto() {
-
 	Setup();
 	Draw();
 }
 
 
-
-
-
-
-
-
-
-Vector3D piecewise(double t, const Vector3D& a, const Vector3D& b) {
-
-        return (t*(a-b)) + b;
-}
 
 void drawLine(const Vector3D& a, const Vector3D& b) {
 
@@ -391,124 +131,6 @@ void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
         glVertex3f(b.x(), b.y(), b.z());
         glEnd();
 }
-
-void axis() {
-
-	drawLineColor(Vector3D(20,  0,  0), origen, 255, 0, 0);
-	drawLineColor(Vector3D( 0, 20,  0), origen, 0, 255, 0);
-	drawLineColor(Vector3D( 0,  0, 20), origen, 0, 0, 255);
-}
-
-void drawFacet(const Facet& f, int R, int G, int B) {
-
-        Vector3D n = f[3];
-        Vector3D a = f[0];
-        Vector3D b = f[1];
-        Vector3D c = f[2];
-	
-	glColor4f(R, G, B, 0.75 );
-	glBegin(GL_TRIANGLES);
-        glNormal3f( n.x(), n.y(), n.z());
-        glVertex3f( a.x(), a.y(), a.z());
-        glVertex3f( b.x(), b.y(), b.z());
-        glVertex3f( c.x(), c.y(), c.z());
-        glEnd();
-
-	drawLine(a, b);
-	drawLine(b, c);
-}
-
-void drawFacetTrans(const Facet& f, int R, int G, int B, double trans) {
-
-        Vector3D n = f[3];
-        Vector3D a = f[0];
-        Vector3D b = f[1];
-        Vector3D c = f[2];
-
-        glColor4f(R, G, B, trans );
-        glBegin(GL_TRIANGLES);
-        glNormal3f( n.x(), n.y(), n.z());
-        glVertex3f( a.x(), a.y(), a.z());
-        glVertex3f( b.x(), b.y(), b.z());
-        glVertex3f( c.x(), c.y(), c.z());
-        glEnd();
-
-        //drawLine(a, b);
-        //drawLine(b, c);
-}
-
-
-void drawFacet2(const Vector3D& a, const Vector3D& b, const Vector3D& c, int R, int G, int B) {
-
-        Vector3D n = unit( (b-a) % (c-a));
-        glColor3ub(R, G, B);
-        glBegin(GL_TRIANGLES);
-        glNormal3f( n.x(), n.y(), n.z());
-        glVertex3f( a.x(), a.y(), a.z());
-        glVertex3f( b.x(), b.y(), b.z());
-        glVertex3f( c.x(), c.y(), c.z());
-        glEnd();
-}
-
-void drawOctahedron(const Octahedron& octa, int R, int G, int B) {
-
-        for (int i = 0; i < 8; i++)
-                drawFacet(octa[i], R, G, B);
-}
-
-void drawPlaneQuaternion(const PlaneQuaternion& plane, int R, int G, int B) {
-
-        double l = abs(plane[2]-plane[3]);
-        drawOctahedron(Octahedron(0.05 * l, plane[0]), R, G, B);
-        drawLine(plane[0], plane[1]);
-        drawFacet2(piecewise(2.0, plane[2], plane[1]), piecewise(2.0, plane[3], plane[1]), piecewise(2.0, plane[4], plane[1]), R, G, B);
-        drawFacet2(piecewise(2.0, plane[4], plane[1]), piecewise(2.0, plane[5], plane[1]), piecewise(2.0, plane[2], plane[1]), R, G, B);
-}
-
-void drawFacetBox(const FacetBox& box, int R, int G, int B) {
-
-
-        if (box.getN() != 0)
-                for (int i = 0; i < box.getN(); i++) {
-                        drawFacet(box[i], R, G, B);
-                }
-}
-
-void drawFacetBoxTrans(const FacetBox& box, int R, int G, int B, double trans) {
-
-
-        if (box.getN() != 0)
-                for (int i = 0; i < box.getN(); i++) {
-                        drawFacetTrans(box[i], R, G, B, trans);
-                }
-}
-
-void drawFacetBoxSTL(const FacetBox& box, string fname) {
-
-        STL stl = STL(fname);
-
-        if (box.getN() != 0)
-                for (int i = 0; i < box.getN(); i++) {
-                        stl.facet(box[i][0], box[i][1], box[i][2]);
-                }
-        stl.closeSTL();
-}
-
-void drawFacetGash(FacetGash gash, int R, int G, int B) {
-
-        drawPlaneQuaternion(gash.getBlade(), 50, 100, 255);
-        //drawFacetBox(gash.getFacets(), R, G, B);
-
-        for (int i = 0; i < gash.getMM().getM(); i++)
-                for (int j = 0; j < gash.getMM()[i].getN(); j++)
-                        drawOctahedron(Octahedron(0.1, gash.getMM()[i][j]), 255, 0, 0);
-
-
-}
-
-
-
-
 
 
 /**/
@@ -644,13 +266,10 @@ void init(double theta)
 void TimerFunction(int value) {
 
 	count += 0.0;
-	rotSpeed += 0.00;
 	ciclo += 1;
-	angle += 0.006283;
 
 	if (count > 2 * M_PI) count = 0;
 	if (ciclo > 100) ciclo = 1; //CICLO NUNCA ES CERO JAJAJA
-	if (angle > 2 * M_PI) angle = 0;
 	
 	glLoadIdentity();
 
@@ -679,16 +298,6 @@ void keyboard(unsigned char key, int x, int y) {
 
 	switch (key) {
 
-		case 'b': 
-			rotSpeed += 0.05;
-      		break;
-
-    		
-		case 'B':
-      			rotSpeed -= 0.05;
-      		break;
-
-    
 		case 'C':
       			count3 += 0.01;
       		break;
@@ -718,16 +327,6 @@ void keyboard(unsigned char key, int x, int y) {
       			count -= 0.05;
       		break;
 
-
-    		case 'm':
-			rotAxe += 0.01;
-      		break;
-
-    		
-		case 'M':
-      			rotAxe -= 0.01;
-      		break;
-
     		
 		case 'f':
       			rad += 0.2;
@@ -737,34 +336,7 @@ void keyboard(unsigned char key, int x, int y) {
 		case 'F':
       			rad -= 0.2;
       		break;
-
     
-		case 'v':
-      			rot += 0.1;
-      		break;
-
-    
-		case 'V':
-      			rot -= 0.1;
-      		break;
-
-     
-		case 'p':
-      			stlP += 1;
-		break;
-
-		case 'P':
-                        stlP -= 1;
-                break;
-
-		case 'i':
-                        iter = 9;
-                break;
-
-                case 'I':
-                        iter = 27;
-                break;
-
 	}
 
 	glutPostRedisplay();
