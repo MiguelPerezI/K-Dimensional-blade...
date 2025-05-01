@@ -1,4 +1,4 @@
-# K-vla
+# K-Dimensional Blade
 
 A C++ geometry toolkit for exploring **3‑manifolds**, surfaces and vectors, with ongoing work to generalize the core to **quaternions**, 3‑D simplices (Facets) and higher‑order polytopes such as dodecahedra.  Quaternions serve as the common backbone, letting every geometric object be manipulated, rotated and composed with ease.
 
