@@ -1,4 +1,8 @@
-# K-Dimensional-blade...
+# K-vla
+
+A C++ geometry toolkit for exploring **3‑manifolds**, surfaces and vectors, with ongoing work to generalize the core to **quaternions**, 3‑D simplices (Facets) and higher‑order polytopes such as dodecahedra.  Quaternions serve as the common backbone, letting every geometric object be manipulated, rotated and composed with ease.
+
+---
 
 # Vector3D Usage Guide
 
@@ -36,18 +40,20 @@ std::cout << "u = " << u << '\n'
 ```
 
 ## What each line demonstrates
-| Section | Purpose | Key Functionality |
-|---------|---------|-------------------|
-| **Construction** | Shows default, parameterized, and copy construction | Constructors |
-| **Access & Modification** | Demonstrates indexed assignment and compound addition | `operator[]`, `operator+=` |
-| **Arithmetic** | Basic vector math (add, subtract, scale, normalize) | `operator+`, `operator-`, scalar `operator*`, `unit()` |
-| **Dot & Cross** | Inner and outer products | `operator*` (dot), `operator%` (cross) |
-| **Geometry Helpers** | Linear interpolation between two points | `line()` helper |
-| **Output** | Streaming to `std::ostream` | `operator<<` |
+
+| Section                   | Purpose                                               | Key Functionality                                      |
+| ------------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| **Construction**          | Shows default, parameterized, and copy construction   | Constructors                                           |
+| **Access & Modification** | Demonstrates indexed assignment and compound addition | `operator[]`, `operator+=`                             |
+| **Arithmetic**            | Basic vector math (add, subtract, scale, normalize)   | `operator+`, `operator-`, scalar `operator*`, `unit()` |
+| **Dot & Cross**           | Inner and outer products                              | `operator*` (dot), `operator%` (cross)                 |
+| **Geometry Helpers**      | Linear interpolation between two points               | `line()` helper                                        |
+| **Output**                | Streaming to `std::ostream`                           | `operator<<`                                           |
 
 ---
 
 ### Building the Sample
+
 Assuming all sources are in the current directory:
 
 ```bash
@@ -56,6 +62,7 @@ g++ -std=c++11 -I. main.cpp Vector3D.cpp -o vector_demo
 ```
 
 You should see something like:
+
 ```
 u = (5.0, 5.0, 6.0)
 n (unit u) = (0.57, 0.57, 0.68)
@@ -69,8 +76,9 @@ midpoint = (2.5, 3.5, 3.5)
 ---
 
 ### Next Steps
-* Explore other helper functions like `centerM4`, `cPenta`, and `cDodeca`.
-* Integrate `Vector3D` into your geometry pipeline or simulation code.
-* Consider adding more operator overloads (e.g., comparison) or migrating to `std::array<double,3>` if you want bounds‑checked indexing.
+
+- Explore other helper functions like `centerM4`, `cPenta`, and `cDodeca`.
+- Integrate `Vector3D` into your geometry pipeline or simulation code.
+- Consider adding more operator overloads (e.g., comparison) or migrating to `std::array<double,3>` if you want bounds‑checked indexing.
 
 
