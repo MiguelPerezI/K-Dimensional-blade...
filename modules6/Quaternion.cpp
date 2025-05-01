@@ -25,14 +25,44 @@ Quaternion::Quaternion(const Vector4D& a) {
 	v = Vector3D(a.y(), a.z(), a.t());
 }
 
-Vector3D Quaternion::operator [] (int k) const {
-   if (k > 1)
-      return Vector3D(0, 0, 0);
-   else {
+//Vector3D Quaternion::operator [] (int k) const {
+//   if (k > 1)
+//      return Vector3D(0, 0, 0);
+//   else {
+//
+//        if (k == 0 || k ==1) return v;
+//   }
+//}
 
-        if (k == 0) return v;
-   }
+
+
+/*-----------------------------------------------------------
+ * Non-const overload (returns a reference so the caller can
+ * modify v’s components directly when k == 0).
+ *----------------------------------------------------------*/
+Vector3D& Quaternion::operator[](int k)
+{
+    if (k == 0) {
+        return v;                       // vector part (x, y, z)
+    }
+    throw std::out_of_range("Quaternion index must be 0");  // any other index invalid
 }
+
+/*-----------------------------------------------------------
+ * Const overload (returns a value).
+ *  k == 0 → vector part        (x, y, z)
+ *  k == 1 → scalar broadcast   (u, u, u)
+ *  else   → zero vector        (0, 0, 0)
+ *----------------------------------------------------------*/
+Vector3D Quaternion::operator[](int k) const
+{
+    switch (k) {
+        case 0:  return v;                         // (x, y, z)
+        case 1:  return Vector3D(u, u, u);         // (u, u, u)
+        default: return Vector3D(0.0, 0.0, 0.0);   // out-of-range → zero
+    }
+}
+
 
 Quaternion& Quaternion::operator = (const Quaternion& a)
 {

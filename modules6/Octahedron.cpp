@@ -29,20 +29,30 @@ Octahedron::Octahedron(double r, const Vector3D& center) {
 
 Octahedron::Octahedron() {}
 
-Facet Octahedron::operator [] (int k) const {
-   if (k > 7)
-      return Facet();
-   else {
-   
-   	if (k == 0) return f[0];
-	if (k == 1) return f[1];
-	if (k == 2) return f[2];
-	if (k == 3) return f[3];
-	if (k == 4) return f[4];
-	if (k == 5) return f[5];
-	if (k == 6) return f[6];
-	if (k == 7) return f[7];
-   }
+//Facet Octahedron::operator [] (int k) const {
+//   if (k > 7)
+//      return Facet();
+//   else {
+//   
+//   	if (k == 0) return f[0];
+//	if (k == 1) return f[1];
+//	if (k == 2) return f[2];
+//	if (k == 3) return f[3];
+//	if (k == 4) return f[4];
+//	if (k == 5) return f[5];
+//	if (k == 6) return f[6];
+//	if (k == 7) return f[7];
+//   }
+//}
+
+#include <stdexcept>
+
+Facet Octahedron::operator[](int k) const
+{
+    if (k >= 0 && k < 8)
+        return f[k];
+
+    throw std::out_of_range("Octahedron index must be 0..7");
 }
 
 //ostream& operator << (ostream& os, const Facet& a) {

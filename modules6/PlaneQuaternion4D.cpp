@@ -85,20 +85,38 @@ int PlaneQuaternion4D::equal4R(double a, double b) {
 		return 0;
 }
 
-double PlaneQuaternion4D::intersectionLine4D(const Vector4D& a, const Vector4D& b) {
+//double PlaneQuaternion4D::intersectionLine4D(const Vector4D& a, const Vector4D& b) {
+//
+//
+//	double D = normal * base;
+//	double Dpr = normal * b;
+//	double Dps = normal *(a-b);
+//
+//	double t = (D - Dpr) / Dps;
+//
+//	if (0.0 < t && t < 1.0 ) return t;
+//        else {
+//                if (equal4R(t, 0.0) == 1) return t;
+//                if (equal4R(t, 1.0) == 1) return t;
+//                if (t < 0.0 || 1.0 < t) return -10000.0;
+//        }
+//}
 
+double PlaneQuaternion4D::intersectionLine4D(const Vector4D& a,
+                                             const Vector4D& b)
+{
+    const double D   = normal * base;      // n·P0   (plane constant)
+    const double Dpr = normal * b;         // n·P1
+    const double Dps = normal * (a - b);   // n·(P0 − P1)
 
-	double D = normal * base;
-	double Dpr = normal * b;
-	double Dps = normal *(a-b);
+    if (std::abs(Dps) < 1e-12)               // line is parallel to plane
+        return std::numeric_limits<double>::infinity();  // or throw
 
-	double t = (D - Dpr) / Dps;
+    const double t = (D - Dpr) / Dps;        // parametric distance
 
-	if (0.0 < t && t < 1.0 ) return t;
-        else {
-                if (equal4R(t, 0.0) == 1) return t;
-                if (equal4R(t, 1.0) == 1) return t;
-                if (t < 0.0 || 1.0 < t) return -10000.0;
-        }
+    if (0.0 < t && t < 1.0)          return t;      // interior hit
+    if (equal4R(t, 0.0) == 1)        return 0.0;    // hits at a
+    if (equal4R(t, 1.0) == 1)        return 1.0;    // hits at b
+
+    return -10000.0;                              // no intersection
 }
-

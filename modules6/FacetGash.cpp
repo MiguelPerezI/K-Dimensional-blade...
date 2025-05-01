@@ -46,12 +46,24 @@ double   FacetGash::getT2(int nn) const {return  VV[nn].z();}
 Facet    FacetGash::getFacet(int n0) const {return Facets[n0];}
 Vector3D FacetGash::getDir(double t) const {return (t*(head.V()-base.V()));}
 int 	 FacetGash::checkPoint(const Quaternion& p, const Quaternion& J) {return blade.checkPoint(p, J);}
-Vector3D FacetGash::getCutPoint(int i) const {
-	
-	if (i == 0) return inter0;
-	if (i == 1) return inter1;
-	if (i == 2) return inter2;
+//Vector3D FacetGash::getCutPoint(int i) const {
+//	
+//	if (i == 0) return inter0;
+//	if (i == 1) return inter1;
+//	if (i == 2) return inter2;
+//}
+
+#include <stdexcept>
+
+Vector3D FacetGash::getCutPoint(int i) const
+{
+    if      (i == 0) return inter0;
+    else if (i == 1) return inter1;
+    else if (i == 2) return inter2;
+
+    throw std::out_of_range("FacetGash::getCutPoint – index must be 0, 1, or 2");
 }
+
 
 //Tell blade to switch orientation
 void FacetGash::updateOrientation() {blade.updateOrientation();}

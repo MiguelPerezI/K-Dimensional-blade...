@@ -49,20 +49,31 @@ PlaneQuaternion::PlaneQuaternion(int m, const Vector3D& a, const Vector3D& b) {
 }	
 
 //Fetch PlaneQuaternion Data
-Vector3D PlaneQuaternion::operator [] (int k) const {
-   if (k > 5)
-      return Vector3D(0, 0, 0);
-   else {
-   
-   	if (k == 0) return normal.V();
-	if (k == 1) return base;
-	if (k == 2) return point[0];
-	if (k == 3) return point[1];
-	if (k == 4) return point[2];
-	if (k == 5) return point[3];
-   }
-}
+//Vector3D PlaneQuaternion::operator [] (int k) const {
+//   if (k > 5)
+//      return Vector3D(0, 0, 0);
+//   else {
+//   
+//   	if (k == 0) return normal.V();
+//	if (k == 1) return base;
+//	if (k == 2) return point[0];
+//	if (k == 3) return point[1];
+//	if (k == 4) return point[2];
+//	if (k == 5) return point[3];
+//   }
+//}
 
+#include <stdexcept>
+
+Vector3D PlaneQuaternion::operator[](int k) const
+{
+    if (k >= 0 && k < 6)
+        return (k == 0) ? normal.V() :
+               (k == 1) ? base       :
+                          point[k - 2];
+
+    throw std::out_of_range("PlaneQuaternion index must be 0..5");
+}
 
 int  PlaneQuaternion::linePointIntersection(const Vector3D& r, const Vector3D& a, const Vector3D& b) {
 
@@ -110,28 +121,56 @@ int PlaneQuaternion::equalR(double a, double b) {
 }
 
 
-double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) { 
+//double PlaneQuaternion::intersectionLine(const Vector3D& a, const Vector3D& b) { 
+//
+//	double A = this->normal.V().x();
+//	double B = this->normal.V().y();
+//	double C = this->normal.V().z();
+//
+//	double X0 = this->base.x();
+//	double Y0 = this->base.y();
+//	double Z0 = this->base.z();
+//	
+//	double D = Vector3D(A, B, C) * Vector3D(X0, Y0, Z0);
+//	double Dpr = Vector3D(A, B, C) * b;
+//	double Dps = Vector3D(A, B, C) * (a-b);
+//
+//	double t = (D - Dpr) / Dps;
+//
+//	if (0.0 < t && t < 1.0 ) return t;
+//	else {
+//		if (equalR(t, 0.0) == 1) return t;
+//		if (equalR(t, 1.0) == 1) return t;
+//		if (t < 0.0 || 1.0 < t) return -10000.0;
+//	}
+//}
 
-	double A = this->normal.V().x();
-	double B = this->normal.V().y();
-	double C = this->normal.V().z();
+double PlaneQuaternion::intersectionLine(const Vector3D& a,
+                                         const Vector3D& b)
+{
+    // plane coefficients
+    const double A = normal.V().x();
+    const double B = normal.V().y();
+    const double C = normal.V().z();
 
-	double X0 = this->base.x();
-	double Y0 = this->base.y();
-	double Z0 = this->base.z();
-	
-	double D = Vector3D(A, B, C) * Vector3D(X0, Y0, Z0);
-	double Dpr = Vector3D(A, B, C) * b;
-	double Dps = Vector3D(A, B, C) * (a-b);
+    const double X0 = base.x();
+    const double Y0 = base.y();
+    const double Z0 = base.z();
 
-	double t = (D - Dpr) / Dps;
+    const Vector3D n(A, B, C);          // plane normal as vector
 
-	if (0.0 < t && t < 1.0 ) return t;
-	else {
-		if (equalR(t, 0.0) == 1) return t;
-		if (equalR(t, 1.0) == 1) return t;
-		if (t < 0.0 || 1.0 < t) return -10000.0;
-	}
+    const double D      = n * Vector3D(X0, Y0, Z0);   // n · P0
+    const double D_pr   = n * b;                      // n · P1
+    const double D_ps   = n * (a - b);                // n · (P0 − P1)
+
+    const double t = (D - D_pr) / D_ps;               // parametric distance
+
+    /*---  return as soon as we know the answer  ---*/
+    if (0.0 < t && t < 1.0)          return t;         // genuine interior hit
+    if (equalR(t, 0.0) == 1)         return 0.0;       // hits at a
+    if (equalR(t, 1.0) == 1)         return 1.0;       // hits at b
+
+    return -10000.0;                                   // no intersection
 }
 
 

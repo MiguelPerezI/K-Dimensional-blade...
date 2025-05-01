@@ -33,16 +33,29 @@ Facet::Facet(const Facet& facet) {
         N = Quaternion(0, facet[3]);
 }
 
-Vector3D Facet::operator [] (int k) const {
-   if (k > 3)
-      return Vector3D(0, 0, 0);
-   else {
-   
-   	if (k == 0) return A.V();
-	if (k == 1) return B.V();
-	if (k == 2) return C.V();
-	if (k == 3) return N.V();
-   }
+//Vector3D Facet::operator [] (int k) const {
+//   if (k > 3)
+//      return Vector3D(0, 0, 0);
+//   else {
+//   
+//   	if (k == 0) return A.V();
+//	if (k == 1) return B.V();
+//	if (k == 2) return C.V();
+//	if (k == 3) return N.V();
+//   }
+//}
+
+#include <stdexcept>
+
+Vector3D Facet::operator[](int k) const
+{
+    switch (k) {
+        case 0:  return A.V();
+        case 1:  return B.V();
+        case 2:  return C.V();
+        case 3:  return N.V();
+        default: throw std::out_of_range("Facet index must be 0..3");
+    }
 }
 
 void Facet::updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {

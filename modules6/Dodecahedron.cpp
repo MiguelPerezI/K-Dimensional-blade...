@@ -39,61 +39,89 @@ Dodecahedron::Dodecahedron(double r, const Vector3D& center) {
 
 Dodecahedron::Dodecahedron() {}
 
-Facet Dodecahedron::operator [] (int k) const {
-   if (k > 35)
-      return Facet();
-   else {
-   
-	if (k == 0) return Facet(v[19], v[14], v[3 ]);
-	if (k == 1) return Facet(v[19], v[13], v[14]);
-	if (k == 2) return Facet(v[19], v[ 4], v[ 3]);
+//Facet Dodecahedron::operator [] (int k) const {
+//   if (k > 35)
+//      return Facet();
+//   else {
+//   
+//	if (k == 0) return Facet(v[19], v[14], v[3 ]);
+//	if (k == 1) return Facet(v[19], v[13], v[14]);
+//	if (k == 2) return Facet(v[19], v[ 4], v[ 3]);
+//
+//	if (k == 3) return Facet(v[19], v[13], v[8 ]);
+//	if (k == 4) return Facet(v[19], v[8 ], v[12]);
+//	if (k == 5) return Facet(v[19], v[12], v[16]);
+//
+//	if (k == 6) return Facet(v[4 ], v[19], v[16]);
+//	if (k == 7) return Facet(v[16], v[0 ], v[4 ]);
+//	if (k == 8) return Facet(v[0 ], v[16], v[6 ]);
+//
+//	if (k == 9) return Facet(v[0 ], v[2 ], v[3 ]);
+//	if (k ==10) return Facet(v[0 ], v[1 ], v[2 ]);
+//	if (k ==11) return Facet(v[0 ], v[3 ], v[4 ]);
+//
+//	if (k ==12) return Facet(v[2 ], v[17], v[15]);
+//	if (k ==13) return Facet(v[2 ], v[15], v[14]);
+//	if (k ==14) return Facet(v[2 ], v[14], v[3 ]);
+//
+//	if (k ==15) return Facet(v[8 ], v[13], v[14]);
+//	if (k ==16) return Facet(v[8 ], v[14], v[15]);
+//	if (k ==17) return Facet(v[8 ], v[15], v[9 ]);
+//
+//	if (k ==18) return Facet(v[ 5], v[6 ], v[12]);
+//	if (k ==19) return Facet(v[11], v[5 ], v[12]);
+//	if (k ==20) return Facet(v[ 6], v[16], v[12]);
+//
+//	if (k ==21 ) return Facet(v[8  ],  v[9 ], v[12]);
+//	if (k ==22 ) return Facet(v[9  ],  v[10], v[12]);
+//	if (k ==23 ) return Facet(v[10 ],  v[11], v[12]);
+//
+//	if (k ==24 ) return Facet(v[9  ],  v[15], v[10]);
+//	if (k ==25 ) return Facet(v[15 ],  v[17], v[10]);
+//	if (k ==26 ) return Facet(v[17 ],  v[18], v[10]);
+//
+//	if (k ==27 ) return Facet(v[18 ],  v[ 7], v[10]);
+//	if (k ==28 ) return Facet(v[7  ],  v[ 5], v[10]);
+//	if (k ==29 ) return Facet(v[5  ],  v[11], v[10]);
+//
+//	if (k ==30 ) return Facet(v[18 ],  v[17], v[2 ]);
+//	if (k ==31 ) return Facet(v[7  ],  v[18], v[2 ]);
+//	if (k ==32 ) return Facet(v[1  ],  v[7 ], v[2 ]);
+//
+//	if (k ==33 ) return Facet(v[0  ],  v[7 ], v[1 ]);
+//	if (k ==34 ) return Facet(v[0  ],  v[5 ], v[7 ]);
+//	if (k ==35 ) return Facet(v[0  ],  v[6 ], v[5 ]);
+//
+//
+//   }
+//}
 
-	if (k == 3) return Facet(v[19], v[13], v[8 ]);
-	if (k == 4) return Facet(v[19], v[8 ], v[12]);
-	if (k == 5) return Facet(v[19], v[12], v[16]);
 
-	if (k == 6) return Facet(v[4 ], v[19], v[16]);
-	if (k == 7) return Facet(v[16], v[0 ], v[4 ]);
-	if (k == 8) return Facet(v[0 ], v[16], v[6 ]);
+#include <stdexcept>
 
-	if (k == 9) return Facet(v[0 ], v[2 ], v[3 ]);
-	if (k ==10) return Facet(v[0 ], v[1 ], v[2 ]);
-	if (k ==11) return Facet(v[0 ], v[3 ], v[4 ]);
+Facet Dodecahedron::operator[](int k) const
+{
+    if (k < 0 || k > 35)
+        throw std::out_of_range("Dodecahedron index must be 0..35");
 
-	if (k ==12) return Facet(v[2 ], v[17], v[15]);
-	if (k ==13) return Facet(v[2 ], v[15], v[14]);
-	if (k ==14) return Facet(v[2 ], v[14], v[3 ]);
+    /* now k is guaranteed valid */
+    static const int triplets[36][3] = {
+        {19,14, 3}, {19,13,14}, {19, 4, 3},
+        {19,13, 8}, {19, 8,12}, {19,12,16},
+        { 4,19,16}, {16, 0, 4}, { 0,16, 6},
+        { 0, 2, 3}, { 0, 1, 2}, { 0, 3, 4},
+        { 2,17,15}, { 2,15,14}, { 2,14, 3},
+        { 8,13,14}, { 8,14,15}, { 8,15, 9},
+        { 5, 6,12}, {11, 5,12}, { 6,16,12},
+        { 8, 9,12}, { 9,10,12}, {10,11,12},
+        { 9,15,10}, {15,17,10}, {17,18,10},
+        {18, 7,10}, { 7, 5,10}, { 5,11,10},
+        {18,17, 2}, { 7,18, 2}, { 1, 7, 2},
+        { 0, 7, 1}, { 0, 5, 7}, { 0, 6, 5}
+    };
 
-	if (k ==15) return Facet(v[8 ], v[13], v[14]);
-	if (k ==16) return Facet(v[8 ], v[14], v[15]);
-	if (k ==17) return Facet(v[8 ], v[15], v[9 ]);
-
-	if (k ==18) return Facet(v[ 5], v[6 ], v[12]);
-	if (k ==19) return Facet(v[11], v[5 ], v[12]);
-	if (k ==20) return Facet(v[ 6], v[16], v[12]);
-
-	if (k ==21 ) return Facet(v[8  ],  v[9 ], v[12]);
-	if (k ==22 ) return Facet(v[9  ],  v[10], v[12]);
-	if (k ==23 ) return Facet(v[10 ],  v[11], v[12]);
-
-	if (k ==24 ) return Facet(v[9  ],  v[15], v[10]);
-	if (k ==25 ) return Facet(v[15 ],  v[17], v[10]);
-	if (k ==26 ) return Facet(v[17 ],  v[18], v[10]);
-
-	if (k ==27 ) return Facet(v[18 ],  v[ 7], v[10]);
-	if (k ==28 ) return Facet(v[7  ],  v[ 5], v[10]);
-	if (k ==29 ) return Facet(v[5  ],  v[11], v[10]);
-
-	if (k ==30 ) return Facet(v[18 ],  v[17], v[2 ]);
-	if (k ==31 ) return Facet(v[7  ],  v[18], v[2 ]);
-	if (k ==32 ) return Facet(v[1  ],  v[7 ], v[2 ]);
-
-	if (k ==33 ) return Facet(v[0  ],  v[7 ], v[1 ]);
-	if (k ==34 ) return Facet(v[0  ],  v[5 ], v[7 ]);
-	if (k ==35 ) return Facet(v[0  ],  v[6 ], v[5 ]);
-
-
-   }
+    const auto &t = triplets[k];
+    return Facet(v[t[0]], v[t[1]], v[t[2]]);
 }
 
 Torus::Torus(double R, double r, const Vector3D& c, int N) {
