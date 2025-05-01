@@ -279,25 +279,51 @@ void interface();
 double tetaa = 0.25 * M_PI;
 double phii = 0.25 * M_PI;
 
+Vector3D v;
+
 void Setup() {
 
 	if (ciclo == 0) {
 
-		cout << "\n\n--->>>>	4D Intersections" << "\n\n";	
-		PlaneQuaternion4D plane = PlaneQuaternion4D(Vector4D(0, 0, 0, 1), Vector4D(0, 0, 0, 0));
-		double inter00 = plane.intersectionLine4D(Vector4D( 1, 1, 1, 1), Vector4D( 1, 1,-1, 0));	
-		double inter01 = plane.intersectionLine4D(Vector4D(-1, 1, 1, 1), Vector4D(-1, 1,-1, 0));
-		double inter02 = plane.intersectionLine4D(Vector4D(-1,-1, 1, 1), Vector4D(-1,-1,-1, 0));
-		double inter03 = plane.intersectionLine4D(Vector4D( 1,-1, 1, 1), Vector4D( 1,-1,-1, 0));
-		
-		cout << "Intersection0 := " << inter00 << endl;
-		cout << "Intersection1 := " << inter01 << endl;
-		cout << "Intersection2 := " << inter02 << endl;
-		cout << "Intersection3 := " << inter03 << endl;
+        cout << "\n\n--->> Testing objects" << "\n\n";
+        // --- Construction ---------------------------------------------------
+        Vector3D p;                       // (0,0,0)
+        Vector3D q(1.0, 2.0, 3.0);        // explicit components
+        Vector3D r = q;                   // copy constructor
+        cout << "r = " << r << '\n';
+        cout << "q = " << q << '\n';
 
-
-	
-	}
+        // --- Access & modification -----------------------------------------
+        q[0] = 4.0;                       // write via operator[]
+        double zy = q[2];                 // read via operator[]
+        r += Vector3D(1,1,1);             // compound add
+        
+        // --- Arithmetic -----------------------------------------------------
+        cout << "p = " << p << '\n';
+        cout << "r = " << r << '\n';
+        cout << "q = " << q << '\n';
+        Vector3D u = q + r;               // vector addition
+        Vector3D v = r - q;               // subtraction
+        Vector3D w = 2.5 * u;             // scalar multiplication
+        cout << "w = " << w << '\n'; 
+        Vector3D n = unit(w);             // normalized
+        
+        double d  = u * r;                // dot product
+        Vector3D c = u % r;               // cross product
+        
+        // --- Geometry helpers ----------------------------------------------
+        Vector3D mid = line(0.5, q, r);   // midpoint of segment
+        
+        // --- Output ---------------------------------------------------------
+        cout << "v = " << v << '\n';
+        cout << "n = " << n << '\n';
+        std::cout << "u = " << u << '\n'
+                  << "n (unit u) = " << n << '\n'
+                  << "u·r = " << d << '\n'
+                  << "u×r = " << c << '\n'
+                  << "midpoint = " << mid << '\n';		
+        
+        }
 
 }
 
@@ -307,17 +333,17 @@ void Draw() {
 	if (ciclo > 0) {
 	
 
-		axis();
+		//axis();
 
-		Matrix4D M = Matrix4D(
-                                                1, 0, 0, 0,
-                                                0, 1, 0, 0,
-                                                0, 0, cos(rot),-sin(rot),
-                                                0, 0, sin(rot), cos(rot)
-                                                );
+		//Matrix4D M = Matrix4D(
+        //                                        1, 0, 0, 0,
+        //                                        0, 1, 0, 0,
+        //                                        0, 0, cos(rot),-sin(rot),
+        //                                        0, 0, sin(rot), cos(rot)
+        //                                        );
 
-		Hypercube cubee = Hypercube(1.0, Vector4D(0, 0, 0, 0), M, 1.75, rot);
-		drawHypercube(8, cubee);		
+		//Hypercube cubee = Hypercube(1.0, Vector4D(0, 0, 0, 0), M, 1.75, rot);
+		//drawHypercube(8, cubee);		
 
 
 

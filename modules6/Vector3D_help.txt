@@ -1,0 +1,35 @@
+#include "Vector3D.hpp"
+#include <iostream>
+
+int main()
+{
+    // --- Construction ---------------------------------------------------
+    Vector3D p;                       // (0,0,0)
+    Vector3D q(1.0, 2.0, 3.0);        // explicit components
+    Vector3D r = q;                   // copy constructor
+
+    // --- Access & modification -----------------------------------------
+    q[0] = 4.0;                       // write via operator[]
+    double zy = q[2];                 // read via operator[]
+    r += Vector3D(1,1,1);             // compound add
+
+    // --- Arithmetic -----------------------------------------------------
+    Vector3D u = q + r;               // vector addition
+    Vector3D v = r - q;               // subtraction
+    Vector3D w = 2.5 * u;             // scalar multiplication
+    Vector3D n = unit(w);             // normalized
+
+    double d  = u * r;                // dot product
+    Vector3D c = u % r;               // cross product
+
+    // --- Geometry helpers ----------------------------------------------
+    Vector3D mid = line(0.5, q, r);   // midpoint of segment
+
+    // --- Output ---------------------------------------------------------
+    std::cout << "u = " << u << '\n'
+              << "n (unit u) = " << n << '\n'
+              << "u·r = " << d << '\n'
+              << "u×r = " << c << '\n'
+              << "midpoint = " << mid << '\n';
+}
+

@@ -11,7 +11,7 @@ using namespace std;
 class Quaternion {
        private:
          double u;
-	 Vector3D v;
+         Vector3D v;
 
        public:
          Vector3D& operator [] (int k);
