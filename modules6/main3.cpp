@@ -51,47 +51,107 @@ void interface();
 void Setup() {
 
 	if (ciclo == 0) {
-
-        cout << "\n\n--->> Testing Vector3D Class" << "\n\n";
-        // --- Construction ---------------------------------------------------
-        Vector3D p;                       // (0,0,0)
-        cout << "constructor p: p = " << p << "'\n'";
-        Vector3D q(1.0, 2.0, 3.0);        // explicit components
-        Vector3D r = q;                   // copy constructor
-        cout << "constructor r=q: r = " << r << '\n';
-        cout << "constructor q(a, b, c): q = " << q << '\n';
-
-        // --- Access & modification -----------------------------------------
-        q[0] = 4.0;                       // write via operator[]
-        double zy = q[2];                 // read via operator[]
-        r += Vector3D(2,2,2);             // compound add
-        r -= Vector3D(0.5, 0.5, 0.5);
-        // --- Arithmetic -----------------------------------------------------
-        cout << "p = " << p << '\n';
-        cout << "r = " << r << '\n';
-        cout << "q = " << q << '\n';
-        Vector3D u = q + r;               // vector addition
-        Vector3D v = r - q;               // subtraction
-        Vector3D w = 2.5 * u;             // scalar multiplication
-        cout << "w = " << w << '\n'; 
-        Vector3D n = unit(w);             // normalized
         
-        double d  = u * r;                // dot product
-        Vector3D c = u % r;               // cross product
+        cout << "\n\n";
+        cout << "|———————————————————————————————————|\n";
+        cout << "|          _                        |\n"; 
+        cout << "|          \\`*-.                    |\n"; 
+        cout << "|           )  _`-.                 |\n"; 
+        cout << "|          .  : `. .                |\n"; 
+        cout << "|          : _   '  \\               |\n"; 
+        cout << "|          ; *` _.   `*-._          |\n"; 
+        cout << "|          `-.-'          `-.       |\n"; 
+        cout << "|            ;       `       `.     |\n"; 
+        cout << "|            :.       .        \\    |\n"; 
+        cout << "|            . \\  .   :   .-'   .   |\n"; 
+        cout << "|            '  `+.;  ;  '      :   |\n"; 
+        cout << "|            :  '  |    ;       ;-. |\n"; 
+        cout << "|            ; '   : :`-:     _.`* ;|\n";
+        cout << "|[K-Blade] .*' /  .*' ; .*`- +'  `*'|\n";
+        cout << "|         `*-*   `*-*  `*-*'        |\n";
+        cout << "|———————————————————————————————————|\n";
+        cout << "\n\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "|- Testing Vector3D Class——————————————————————————————————————————————\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+        
+        // --- Construction ---------------------------------------------------
+        cout << "- List of constructors ————————————————————————————————————————————————\n";
+        Vector3D p;                       // Default constructor
+        cout << "Default constructor:       Vector3D p;              → p = " << p << "\n";
+        
+        Vector3D q(1.0, 2.0, 3.0);        // Constructor with components
+        cout << "Component constructor:     Vector3D q(1.0, 2.0, 3.0) → q = " << q << "\n";
+        
+        Vector3D r = q;                   // Copy constructor
+        cout << "Copy constructor:          Vector3D r = q;           → r = " << r << "\n";
+        
+        Vector3D r1{0.1, 0.1, 0.12};      // Brace-initialized constructor
+        cout << "Brace constructor:         Vector3D r1{0.1,0.1,0.12}          → r1 = " << r1 << "\n";
+       
+        Vector3D sup = Vector3D(r1);  // Copy constructor (explicit expression)
+        cout << "Copy constructor (explicit):   Vector3D sup = Vector3D(r1)  → sup = " << sup << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n"; 
+
+        // --- Access & Modification -----------------------------------------
+        cout << "- Access & Modification Examples ——————————————————————————————————————\n";
+        cout << "";
+        q[0] = 4.0;                       // Write to q[0]
+        double zy = q[2];                 // Read from q[2]
+        cout << "After q[0] = 4.0:          q = " << q << "\n";
+        cout << "Reading q[2]:              q[2] = " << zy << "\n";
+        
+        r += Vector3D(2, 2, 2);           // Compound addition
+        cout << "After r += Vector3D(2,2,2): r = " << r << "\n";
+        
+        r -= Vector3D(0.5, 0.5, 0.5);     // Compound subtraction
+        cout << "After r -= Vector3D(0.5,...): r = " << r << "\n";
+        
+        r1 /= 0.5;                        // Compound scalar division
+        cout << "After r1 /= 0.5: r1 = " << r1 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Arithmetic -----------------------------------------------------
+        cout << "- Arithmetic ——————————————————————————————————————————————————————————\n";
+        Vector3D u = q + r;               // Addition
+        cout << "Vector addition:           u = q + r                → u = " << u << "\n";
+        
+        Vector3D v = r - q;               // Subtraction
+        cout << "Vector subtraction:        v = r - q                → v = " << v << "\n";
+        
+        Vector3D w = 2.5 * u;             // Scalar multiplication
+        cout << "Scalar multiplication:     w = 2.5 * u              → w = " << w << "\n";
+        
+        Vector3D n = unit(w);             // Normalization
+        cout << "Normalized vector:         n = unit(w)              → n = " << n << "\n";
+        
+        double d  = u * r;                // Dot product
+        cout << "Dot product:               d = u · r                → d = " << d << "\n";
+        
+        Vector3D c = u % r;               // Cross product
+        cout << "Cross product:             c = u × r                → c = " << c << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
         
         // --- Geometry helpers ----------------------------------------------
-        Vector3D mid = line(0.5, q, r);   // midpoint of segment
+        cout << "- Geometry helpers ————————————————————————————————————————————————————\n";
+        Vector3D mid = line(0.5, q, r);   // Midpoint
+        cout << "Midpoint of q and r:       mid = line(0.5, q, r)    → mid = " << mid << "\n";
         
-        // --- Output ---------------------------------------------------------
-        cout << "v = " << v << '\n';
-        cout << "n = " << n << '\n';
-        std::cout << "u = " << u << '\n'
-                  << "n (unit u) = " << n << '\n'
-                  << "u·r = " << d << '\n'
-                  << "u×r = " << c << '\n'
-                  << "midpoint = " << mid << '\n';		
-        
-        }
+        // --- Summary Output ------------------------------------------------
+        cout << "\n--- Summary ---\n";
+        cout << "q = " << q << "\n";
+        cout << "r = " << r << "\n";
+        cout << "u = " << u << "\n";
+        cout << "v = " << v << "\n";
+        cout << "w = " << w << "\n";
+        cout << "n = " << n << "\n";
+        cout << "u·r = " << d << "\n";
+        cout << "u×r = " << c << "\n";
+        cout << "midpoint = " << mid << "\n";
+    
+        cout << "QUATERNION Test -------------------------\n";
+
+    }
 
 }
 
