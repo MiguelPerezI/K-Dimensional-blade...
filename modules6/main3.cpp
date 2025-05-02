@@ -206,7 +206,16 @@ void Setup() {
         cout << "Scalar multiplication:           2.0 * q3                    \t→ " << qScaled << "\n";
         
         Quaternion qMul = q1 * q3;
-        cout << "Quaternion multiplication:       q1 * q3                     \t→ " << qMul << "\n";
+        cout << "Quaternion multiplication:        q1 * q3                    \t→ " << qMul << "\n";
+        
+        Quaternion Q1(1.11, Vector3D(0.121, 4.123, 1.1));
+        Quaternion Q2(1.11, Vector3D(0.121, 4.123, 1.1));
+        if (q1 == q2) {
+        cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Equal\n";
+        } else {
+        cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Distinct\n";
+        }
+
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
         // --- Compound assignment --------------------------------------------

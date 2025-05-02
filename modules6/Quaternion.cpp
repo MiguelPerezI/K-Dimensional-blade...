@@ -57,7 +57,7 @@ Quaternion& Quaternion::operator -= (const Quaternion& other)
 
 // Compound division by scalar (with exception safety)
 Quaternion& Quaternion::operator/=(double scalar) {
-    if (scalar == 0.0)
+    if (std::abs(scalar) < 1e-12)
         throw std::invalid_argument("Quaternion division by zero");
     u /= scalar;
     v /= scalar;
@@ -87,6 +87,10 @@ Quaternion operator * (const double a, const Quaternion& b) {
    return Quaternion( b.r(), a * Vector3D(b.V()) );
 }
 
+// Quaternion comparison
+bool operator==(const Quaternion& q1, const Quaternion& q2) noexcept {
+    return std::abs(q1.r() - q2.r()) < 1e-12 && q1.V() == q2.V();
+}
 
 ostream& operator << (ostream& os, const Quaternion& a) {
 

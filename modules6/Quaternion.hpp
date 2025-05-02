@@ -73,6 +73,8 @@ Quaternion operator + (const Quaternion& a, const Quaternion& b);
 Quaternion operator - (const Quaternion& a, const Quaternion& b);
 Quaternion operator * (const Quaternion& a, const Quaternion& b);
 Quaternion operator * (const double a, const Quaternion& b);
+bool operator==(const Quaternion& q1, const Quaternion& q2) noexcept;
+
 
 Quaternion Qan(double theta, const Vector3D& n);
 Quaternion cross(const Quaternion& n, const Quaternion& z);
