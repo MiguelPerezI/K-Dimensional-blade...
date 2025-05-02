@@ -32,7 +32,9 @@ class Quaternion {
          
         /* ---------- main constructors  ------------------------------------------ */
         explicit Quaternion(double s, const Vector3D& vv = Vector3D{});// body in .cpp
-
+        /* pure-vector constructor: q = (0 , a⃗) */
+        Quaternion(const Vector3D& a) : u{0.0}, v{a} {}
+        
         /*--- element-style access ------------------------------------------------ */
         /*  k == 0  → vector part   (reference / copy)
             k == 1  → scalar broadcast (u,u,u)
@@ -62,9 +64,6 @@ class Quaternion {
         /*----- Utilities ----------------------------------------------------------*/
         Quaternion conjugate() const noexcept                // u  −v⃗
         { return Quaternion{ u, -v }; }
-
-        /* pure-vector constructor: q = (0 , a⃗) */
-        Quaternion(const Vector3D& a) : u{0.0}, v{a} {}
 
 /*----- free-function operators (declared below) ------------------------*/
 };

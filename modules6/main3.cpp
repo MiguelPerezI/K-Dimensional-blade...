@@ -4,6 +4,7 @@
 #include <math.h>
 #include <GL/glut.h>
 #include "Vector3D.cpp"
+#include "Vector4D.cpp"
 #include "Quaternion.cpp"
 
 //////////////////////////////////////
@@ -149,7 +150,95 @@ void Setup() {
         cout << "u×r = " << c << "\n";
         cout << "midpoint = " << mid << "\n";
     
-        cout << "QUATERNION Test -------------------------\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "|- Testing Quaternion Class————————————————————————————————————————————\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Construction ---------------------------------------------------
+        cout << "- List of constructors ————————————————————————————————————————————————\n";
+        Quaternion q0;  // default constructor
+        cout << "Default constructor:             Quaternion q0;              \t→ q0 = " << q0 << "\n";
+        
+        Vector3D v1{1.0, 2.0, 3.0};
+        cout << "- Let v1 = " << v1 << "\n";
+        Quaternion q1(5.0, v1);  // scalar-vector constructor
+        cout << "Parameterized constructor:        Quaternion(5, v1)          \t→ q1 = " << q1 << "\n";
+        
+        Quaternion q2 = q1;  // copy constructor
+        cout << "Copy constructor:                 Quaternion q2 = q1         \t→ q2 = " << q2 << "\n";
+        
+        Vector3D v2{0.1, 0.2, 0.3};
+        cout << "- Let v2 = " << v2 << "\n";
+        Quaternion q3(Vector3D{0.1, 0.2, 0.3});  // pure-vector constructor
+        cout << "Pure-vector constructor:          Quaternion(v2)             \t→ q3 = " << q3 << "\n";
+        
+        Quaternion q4(3.1415169265358979);  // pure-scalar constructor
+        cout << "Pure-scalar constructor:        Quaternion(3.1415...)        \t→ q4 = " << q4 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+        // --- Element Access -------------------------------------------------
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "Element access q1[0]:             q1[0] (vector part)        \t→ " << q1[0] << "\n";
+        //cout << "Element access q1[1]:             q1[1] (scalar part)         \t→ " << q1[1] << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+        
+        // --- Inspectors -----------------------------------------------------
+        cout << "- Inspectors ——————————————————————————————————————————————————————————\n";
+        cout << "Scalar (r) part of q1:            q1.r()                      \t→ " << q1.r() << "\n";
+        cout << "Vector (v) part of q1:            q1.V()                      \t→ " << q1.V() << "\n";
+        cout << "Components: i j k                 q1.i() q1.j() q1.k()        \t→ <i="
+                  << q1.i() << ", j=" << q1.j() << ", k=" << q1.k() << ">\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n"; 
+        
+        // --- Conversion -----------------------------------------------------
+        cout << "- Conversion ——————————————————————————————————————————————————————————\n";
+        cout << "Convert q1 to Vector4D:           q1.v4()                     \t→ " << q1.v4() << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Arithmetic Operators -------------------------------------------
+        cout << "- Arithmetic Operators ————————————————————————————————————————————————\n";
+        Quaternion qAdd = q1 + q3;
+        cout << "Addition:                         q1 + q3                     \t→ " << qAdd << "\n";
+        
+        Quaternion qSub = q1 - q3;
+        cout << "Subtraction:                      q1 - q3                     \t→ " << qSub << "\n";
+        
+        Quaternion qScaled = 2.0 * q3;
+        cout << "Scalar multiplication:           2.0 * q3                    \t→ " << qScaled << "\n";
+        
+        Quaternion qMul = q1 * q3;
+        cout << "Quaternion multiplication:       q1 * q3                     \t→ " << qMul << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Compound assignment --------------------------------------------
+        cout << "- Compound assignment —————————————————————————————————————————————————\n";
+        q1 += q3;
+        cout << "Compound += :                     q1 += q3                    \t→ q1 = " << q1 << "\n";
+        
+        q1 -= q3;
+        cout << "Compound -= :                     q1 -= q3                    \t→ q1 = " << q1 << "\n";
+        
+        q1 /= 2.0;
+        cout << "Compound /= :                     q1 /= 2.0                   \t→ q1 = " << q1 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+        
+        // --- Utility --------------------------------------------------------
+        cout << "- Utility —————————————————————————————————————————————————————————————\n";
+        Quaternion qc = q1.conjugate();
+        cout << "Conjugate:                        q1.conjugate()              \t→ " << qc << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Free Functions -------------------------------------------------
+        cout << "- Free Funcionts ——————————————————————————————————————————————————————\n";
+        Quaternion qRot = Qan(3.1415 / 2, Vector3D(0, 0, 1));
+        cout << "Axis-angle (Qan):                 Qan(pi/2, z-axis)           \t→ " << qRot << "\n";
+        
+        Quaternion qCross = cross(q1, q3);
+        cout << "Quaternion cross product:         cross(q1, q3)               \t→ " << qCross << "\n";
+        
+        Quaternion qRotated = rotate(q1, Vector3D(1,0,0), Vector3D(0,1,0), qRot);
+        cout << "Rotate q1 around axis:            rotate(q1, a, b, qRot)      \t→ " << qRotated << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
 
     }
 
