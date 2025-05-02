@@ -158,7 +158,7 @@ Vector3D vp = Vector3D(q1[0]);       // Returns vector part (1, 2, 3)
 
 ```cpp
 double r = q1.r();      // Scalar part → 5
-double V = q1.V();      // Vector part → (1, 2, 3)
+Vector3D w = q1.V();      // Vector part → (1, 2, 3)
 double i = q1.i();      // x-component → 1
 double j = q1.j();      // y-component → 2
 double k = q1.k();      // z-component → 3
