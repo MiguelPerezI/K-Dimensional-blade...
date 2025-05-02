@@ -45,6 +45,20 @@ Vector3D& Vector3D::operator-= (const Vector3D& a) noexcept
 {
     return *this= *this-a;
 }
+
+/* Unitary scalar / Vector ----------------------------------------------*/
+Vector3D& Vector3D::operator/= (double scalar)
+{
+    if (std::abs(scalar) < 1e-12)
+        throw std::runtime_error("Vector3D::operator/= division by zero");
+
+    u[0] /= scalar;
+    u[1] /= scalar;
+    u[2] /= scalar;
+
+    return *this;
+}
+
 /*———————————————————————————————————————————————————————————————————————*/
 
 /* Free functions ———————————————————————————————————————————————————————*/
@@ -88,6 +102,7 @@ Vector3D operator / (const Vector3D& a, const double s)
     );
 }
 
+
 /* Dot Product -----------------------------------------------------------*/
 double operator * (const Vector3D& a, const Vector3D& b) noexcept
 {
@@ -105,7 +120,7 @@ Vector3D operator % (const Vector3D& a, const Vector3D& b) noexcept
 /* Compare Vector closeness upto radius of 1E-8 --------------------------*/
 bool     operator == (const Vector3D& a, const Vector3D& b) noexcept
 {
-    return abs(a-b)<1E-8;
+    return abs(a-b)<1E-12;
 }
 
 /* Euclidean length ------------------------------------------------------*/

@@ -5,55 +5,33 @@ using namespace std;
 #include <cmath>
 #include <iomanip>
 #include <fstream>
+#include <stdexcept>
 
+/* ---------- Constructors -------------------------------------------------- */
 
-Quaternion::Quaternion(double xx, const Vector3D& w) {
+// Explicit constructor with scalar and vector parts (using initializer list)
+Quaternion::Quaternion(double scalar, const Vector3D& vector) 
+    : u(scalar), v(vector) {}
 
-	u = xx;
-	v = Vector3D(w);
-}
-
-Quaternion::Quaternion(const Quaternion& a)
-{
-	u = a.r();
-	v = a.V();
-}
-
-Quaternion::Quaternion(const Vector4D& a) {
-	
-	u = a.x();
-	v = Vector3D(a.y(), a.z(), a.t());
-}
-
-//Vector3D Quaternion::operator [] (int k) const {
-//   if (k > 1)
-//      return Vector3D(0, 0, 0);
-//   else {
-//
-//        if (k == 0 || k ==1) return v;
-//   }
-//}
-
-
-
-/*-----------------------------------------------------------
+/* ---------- Element Access ------------------------------------------------ */
+// Non-const operator[]
+/*---------------------------------------------------------------------------
  * Non-const overload (returns a reference so the caller can
  * modify v’s components directly when k == 0).
- *----------------------------------------------------------*/
+ *--------------------------------------------------------------------------- */
 Vector3D& Quaternion::operator[](int k)
 {
-    if (k == 0) {
-        return v;                       // vector part (x, y, z)
-    }
-    throw std::out_of_range("Quaternion index must be 0");  // any other index invalid
+    if (k == 0)
+        return v;  // vector part
+    throw std::out_of_range("Quaternion non-const operator[]: valid index is 0 only");
 }
 
-/*-----------------------------------------------------------
+/*---------------------------------------------------------------------------
  * Const overload (returns a value).
  *  k == 0 → vector part        (x, y, z)
  *  k == 1 → scalar broadcast   (u, u, u)
  *  else   → zero vector        (0, 0, 0)
- *----------------------------------------------------------*/
+ *--------------------------------------------------------------------------- */
 Vector3D Quaternion::operator[](int k) const
 {
     switch (k) {
@@ -63,41 +41,48 @@ Vector3D Quaternion::operator[](int k) const
     }
 }
 
+/* ---------- Mutating Operators -------------------------------------------- */
 
-Quaternion& Quaternion::operator = (const Quaternion& a)
+// Compound addition (modifies object)
+Quaternion& Quaternion::operator += (const Quaternion& other)
 {
-   u = a.r();
-   v = a.V();
-   return *this;
+   return *this= *this + other;
 }
 
-Quaternion& Quaternion::operator += (const Quaternion& a)
+// Compound addition (modifies object)
+Quaternion& Quaternion::operator -= (const Quaternion& other)
 {
-   return *this= *this + a;
+   return *this= *this - other;
 }
 
-//Quaternion& Quaternion::operator /= (double a)
-//{
-//   return *this= *this / a;
-//}
+// Compound division by scalar (with exception safety)
+Quaternion& Quaternion::operator/=(double scalar) {
+    if (scalar == 0.0)
+        throw std::invalid_argument("Quaternion division by zero");
+    u /= scalar;
+    v /= scalar;
+    return *this;
+}
 
+/* ---------- Free-function Operators --------------------------------------- */
+// Quaternion addition
 Quaternion operator + (const Quaternion& a, const Quaternion& b) {
-
-	return Quaternion( a.r()+b.r(), Vector3D(a.i()+b.i(), a.j()+b.j(), a.k()+b.k()) );
+    return Quaternion(a.r() + b.r(), a.V() + b.V());
 }
 
+// Quaternion subtraction
 Quaternion operator - (const Quaternion& a, const Quaternion& b) {
-
-        return Quaternion( a.r()-b.r(), Vector3D(a.i()-b.i(), a.j()-b.j(), a.k()-b.k()) );
+    return Quaternion(a.r() - b.r(), a.V() - b.V());
 }
 
+// Quaternion multiplication (Hamilton product)
 Quaternion operator * (const Quaternion& a, const Quaternion& b) {
-	
-	return Quaternion(
-				(a.r() * b.r()) - (a.V() * b.V()),
-		       		(a.r() * b.V())     + (b.r() * a.V()) + cruz(a.V(), b.V()));		
+    return Quaternion(
+        (a.r() * b.r()) - (a.V() * b.V()),
+        (a.r() * b.V()) + (b.r() * a.V()) + cruz(a.V(), b.V()));		
 }
 
+// Scalar multiplication
 Quaternion operator * (const double a, const Quaternion& b) {
    return Quaternion( b.r(), a * Vector3D(b.V()) );
 }
@@ -117,19 +102,22 @@ ostream& operator << (ostream& os, const Quaternion& a) {
    return os;
 }
 
-Quaternion Qan(double theta, const Vector3D& n) {
 
-                if (sqrt(theta * theta) < 1e-10)
-                        return Quaternion(0.0, n);
-                else
-                        return Quaternion(cos(0.5 * theta), sin(0.5 * theta) * unit(n));
+/* ---------- Utility and Helper Functions ---------------------------------- */
+// Quaternion from angle-axis representation
+Quaternion Qan(double theta, const Vector3D& axis) {
+    constexpr double epsilon = 1e-10;
+    if (std::abs(theta) < epsilon)
+        return Quaternion(0.0, axis);
+    else
+        return Quaternion(std::cos(0.5 * theta), std::sin(0.5 * theta) * unit(axis));
 };
 
-Quaternion cross(const Quaternion& n, const Quaternion& z) {
-
-                Vector3D m = (1.0/(n.V() * z.V())) * (n.V() % z.V());
-                return Quaternion(0.0, m);
-        }
+// Cross product as quaternion (pure vector quaternion)
+Quaternion cross(const Quaternion& a, const Quaternion& b) {
+    Vector3D result = (1.0/(a.V() * b.V())) * (a.V() % b.V());
+    return Quaternion(0.0, result);
+}
 
 int  line(const Vector3D& r, const Vector3D& a, const Vector3D& b) {
 

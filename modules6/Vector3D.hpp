@@ -37,18 +37,19 @@ class Vector3D {
         /*----- compound operator  ----------------------------------------------*/
         Vector3D& operator+=(const Vector3D& a) noexcept;
         Vector3D& operator-=(const Vector3D& rhs) noexcept;
+        Vector3D& operator/=(double scalar);
         /*----- free-function operators (declared below) ------------------------*/
 };
 
 /* —————————————————————————————— free functions ————————————————————————————————*/
-Vector3D operator+(const Vector3D& a, const Vector3D& b) noexcept; // Addition
-Vector3D operator-(const Vector3D& a, const Vector3D& b) noexcept; // Subtraction
-Vector3D operator-(const Vector3D& a) noexcept;                    // unary minus
-Vector3D operator*(double s, const Vector3D& v) noexcept;          // scalar × vector
-Vector3D operator/(const Vector3D& v, double s);          // scalat / vector 
-double   operator*(const Vector3D& a, const Vector3D& b) noexcept; // dot product
-Vector3D operator%(const Vector3D& a, const Vector3D& b) noexcept; // cross product
-bool     operator==(const Vector3D&, const Vector3D& ) noexcept; // Compare
+Vector3D  operator+(const Vector3D& a, const Vector3D& b) noexcept; // Addition
+Vector3D  operator-(const Vector3D& a, const Vector3D& b) noexcept; // Subtraction
+Vector3D  operator-(const Vector3D& a) noexcept;                    // unary minus
+Vector3D  operator*(double s, const Vector3D& v) noexcept;          // scalar × vector
+Vector3D  operator/(const Vector3D& v, double s);                   // scalar / vector 
+double    operator*(const Vector3D& a, const Vector3D& b) noexcept; // dot product
+Vector3D  operator%(const Vector3D& a, const Vector3D& b) noexcept; // cross product
+bool      operator==(const Vector3D&, const Vector3D& ) noexcept; // Compare
 
 
 

@@ -14,52 +14,54 @@ using namespace std;
  *—————————————————————————————————————————————————————————————*/
 class Quaternion {
     private:
-        /*  q = u + v⃗   where  u is scalar part,  v⃗ = (x,y,z) the vector part  */
-        double  u {};          // scalar part
-        Vector3D v;            // vector part
+        /*————————————————————————————————————————————————————————————————————————————
+         * Quaternion q = u + v⃗
+         *   where u is the scalar part, v⃗ is the 3D vector part
+         *——————————————————————————————————————————————————————————————————————————*/
+        double  u{};            // scalar part (initialized to 0)
+        Vector3D v{};           // vector part
 
     public:
-        /*--- element-style access ------------------------------------------------*/
-        /*  k == 0  → vector part   (reference / copy)  
-            k == 1  → scalar broadcast (u,u,u)  
-            else    → (0,0,0)                                               */
+        /* ---------- Rule of Zero compliant -------------------------------------- */
+        Quaternion() = default;
+        ~Quaternion() = default;
+        Quaternion(Quaternion&&) noexcept = default;
+        Quaternion& operator=(const Quaternion&) = default;
+        Quaternion& operator=(Quaternion&&) noexcept = default;
+        Quaternion(const Quaternion&) = default;
+         
+        /* ---------- main constructors  ------------------------------------------ */
+        explicit Quaternion(double s, const Vector3D& vv = Vector3D{});// body in .cpp
+
+        /*--- element-style access ------------------------------------------------ */
+        /*  k == 0  → vector part   (reference / copy)
+            k == 1  → scalar broadcast (u,u,u)
+            else    → (0,0,0)*/
         Vector3D& operator[](int k);            // non-const → reference
-        Vector3D  operator[](int k) const;      // const     → value 
+        Vector3D  operator[](int k) const;      // const     → value
 
-
-        /* ---------- constructors  ------------------------------------------ */
-        Quaternion(double s = 0.0,
-                const Vector3D& vv = Vector3D{});          // body in .cpp
-
-        Quaternion(const Vector4D& a);
-        Quaternion(const Quaternion&);
-
-
-        /*------------- simple accessors --------------------------------------*/
-        /*— 1. Inspectors ————————————————————————————————————————————*/
-        /*   (cheap, noexcept, never modify state)                           */
-        double   r() const noexcept { return u; }
-        Vector3D V() const noexcept { return v; }
-        double i() const noexcept { return v.x(); };
-	    double j() const noexcept { return v.y(); };
-	    double k() const noexcept { return v.z(); };
-        //Vector4D v4() const noexcept {return Vector4D(u, v.x(), v.y(), v.z());};
+        /*------------- inspectors -------------------------------------------------*/
+        /*   (cheap, noexcept, never modify state)                                  */
+        double      r() const noexcept { return u; }
+        Vector3D    V() const noexcept { return v; }
+        double      i() const noexcept { return v.x(); };
+	    double      j() const noexcept { return v.y(); };
+	    double      k() const noexcept { return v.z(); };
     
-        /*— 2. Conversions ————————————————————————————————————————————*/
+        /*---- Conversions ---------------------------------------------------------*/
         Vector4D v4() const noexcept {                        // (u,x,y,z)
             return { u, v.x(), v.y(), v.z() };
         }
 
-
-        /*— 3. Mutating operators ————————————————————————————————————*/
-         Quaternion& operator=(const Quaternion&);
+        /*----- Mutating operators -------------------------------------------------*/
          Quaternion& operator+=(const Quaternion&);
+         Quaternion& operator-=(const Quaternion&);
          Quaternion& operator/=(double);
 
 
-        /*— 4. Utility functions ————————————————————————————————————*/
+        /*----- Utilities ----------------------------------------------------------*/
         Quaternion conjugate() const noexcept                // u  −v⃗
-        { return { u, -v }; }
+        { return Quaternion{ u, -v }; }
 
         /* pure-vector constructor: q = (0 , a⃗) */
         Quaternion(const Vector3D& a) : u{0.0}, v{a} {}
@@ -71,11 +73,12 @@ class Quaternion {
 Quaternion operator + (const Quaternion& a, const Quaternion& b);
 Quaternion operator - (const Quaternion& a, const Quaternion& b);
 Quaternion operator * (const Quaternion& a, const Quaternion& b);
+Quaternion operator * (const double a, const Quaternion& b);
+
 Quaternion Qan(double theta, const Vector3D& n);
 Quaternion cross(const Quaternion& n, const Quaternion& z);
 Quaternion rotate(const Quaternion& p, const Quaternion& normal, const Quaternion& J);
 
-Quaternion operator * (const double a, const Quaternion& b);
 istream& operator >> (istream& is, Quaternion& a);
 ostream& operator << (ostream& os, const Quaternion& a);
 
