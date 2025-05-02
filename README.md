@@ -70,6 +70,11 @@ constexpr double epsilon = 1e-12;
 This accounts for small numerical inaccuracies common in floating-point arithmetic.
 
 ---
+## Notes
+
+* Vector3D equality uses tolerance `1e-12`
+
+---
 
 ### Building the Sample
 
@@ -126,10 +131,12 @@ Where:
 
 ```cpp
 Quaternion q0;                      // Default constructor → (0, (0, 0, 0))
+// Define a 3D vector v1
 Vector3D v1(1, 2, 3);
 Quaternion q1(5, v1);               // Parameterized constructor
 Quaternion q2 = q1;                 // Copy constructor
 Vector3D v2(0.1, 0.2, 0.3);
+// Define a 3D vector v2
 Quaternion q3(v2);                  // Pure-vector constructor (scalar=0)
 Quaternion q4(3.1415);              // Pure-scalar constructor (vector=(0,0,0))
 ```
@@ -139,8 +146,10 @@ Quaternion q4(3.1415);              // Pure-scalar constructor (vector=(0,0,0))
 ## Element Access
 
 ```cpp
-q1[0];       // Returns vector part (1, 2, 3)
-q1[1];       // Returns scalar part as (5, 5, 5)
+q1[0];
+
+// Example usage
+Vector3D vp = Vector3D(q1[0]);       // Returns vector part (1, 2, 3)
 ```
 
 ---
@@ -148,11 +157,11 @@ q1[1];       // Returns scalar part as (5, 5, 5)
 ## Inspectors
 
 ```cpp
-q1.r();      // Scalar part → 5
-q1.V();      // Vector part → (1, 2, 3)
-q1.i();      // x-component → 1
-q1.j();      // y-component → 2
-q1.k();      // z-component → 3
+double r = q1.r();      // Scalar part → 5
+double V = q1.V();      // Vector part → (1, 2, 3)
+double i = q1.i();      // x-component → 1
+double j = q1.j();      // y-component → 2
+double k = q1.k();      // z-component → 3
 ```
 
 ---
@@ -161,6 +170,9 @@ q1.k();      // z-component → 3
 
 ```cpp
 q1.v4();     // Converts to Vector4D → (5, 1, 2, 3)
+
+// Example usage:
+Vector4D vQ = Vector4D(q1.v4());
 ```
 
 ---
@@ -168,11 +180,18 @@ q1.v4();     // Converts to Vector4D → (5, 1, 2, 3)
 ## Arithmetic Operators
 
 ```cpp
-q1 + q3;     // → (5, (1.1, 2.2, 3.3))
-q1 - q3;     // → (5, (0.9, 1.8, 2.7))
-2.0 * q3;    // → (0, (0.2, 0.4, 0.6))
-q1 * q3;     // Quaternion multiplication → (-1.4, (0.5, 1, 1.5))
+// Suppose q1, q2, and q3 are Quaternions
+Quaternion qAdd = q1 + q3;     // → (5, (1.1, 2.2, 3.3))
+Quaternion qSub = q1 - q3;     // → (5, (0.9, 1.8, 2.7))
+Quaternion qScaled = 2.0 * q3;    // → (0, (0.2, 0.4, 0.6))
+Quaternion qMul = q1 * q3;     // Quaternion multiplication → (-1.4, (0.5, 1, 1.5))
 q1 == q2;    // Quaternion comparison → true if close
+
+if (q1 == q2) {
+    cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Equal\n";
+} else {
+    cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Distinct\n";
+}
 ```
 
 ---
@@ -190,7 +209,7 @@ q1 /= 2.0;
 ## Utility Methods
 
 ```cpp
-q1.conjugate();  // Returns conjugate → (scalar, -vector)
+Quaternion qc = q1.conjugate();  // Returns conjugate → (scalar, -vector)
 ```
 
 ---
@@ -198,9 +217,9 @@ q1.conjugate();  // Returns conjugate → (scalar, -vector)
 ## Free Functions
 
 ```cpp
-Qan(M_PI/2, Vector3D(0, 0, 1));  // Axis-angle quaternion
-cross(q1, q3);                   // Quaternion-like cross product
-rotate(q1, a, b, qRot);          // Rotate q1 from point a to b using qRot axis
+Quaternion qRot = Qan(M_PI/2, Vector3D(0, 0, 1));  // Axis-angle quaternion
+Quaternion qCross = cross(q1, q3);                 // Quaternion-like cross product
+Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to b using qRot axis
 ```
 
 ---
