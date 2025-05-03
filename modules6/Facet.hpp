@@ -31,7 +31,7 @@ class Facet {
 
     public:
     /*————— element access ——————————————————————————————————————————————————*/
-    /*-Element access: 0 → A, 1 → B, 2 → C ----------------------------------*/
+    /*-Element access: 0 → A, 1 → B, 2 → C, 3 → N ---------------------------*/
     Vector3D  operator [] (int k) const;
     
     /*Accessor for the normal -----------------------------------------------*/

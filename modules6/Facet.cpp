@@ -109,12 +109,25 @@ void Facet::translate(const Vector3D& offset)
 /*——————————————————————————————————————————————————————————————————————————————*/
 void Facet::crunch(double t, const Vector3D& pivot)
 {
+    // 1) Define a little helper that takes one vertex Q (as a Quaternion),
+    //    extracts its 3D point P = Q.V(), and then returns the point
+    //    you get by moving P toward (or away from) 'pivot' by factor t:
+    //
+    //      newP = pivot + t * (P - pivot)
+    //
+    //    • If t==1, newP==P (no change).
+    //    • If 0<t<1, newP is somewhere on the line segment pivot→P.
+    //    • If t>1, newP lies on the same ray beyond P (expansion).
+    //
     auto scalePoint = [&](const Quaternion& Q) {
         Vector3D P = Q.V();
         return pivot + t * (P - pivot);
     };
+    // 2) Apply that to each of our three vertices A, B, C:
     Vector3D a = scalePoint(A);
     Vector3D b = scalePoint(B);
     Vector3D c = scalePoint(C);
+    // 3) Rebuild the facet using the new, “crunched” points.
+    //    updateFacet will reset A, B, C and recompute the normal N.
     updateFacet(a, b, c);
 }

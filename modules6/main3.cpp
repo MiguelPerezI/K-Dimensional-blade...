@@ -286,6 +286,44 @@ void Setup() {
         cout << "Copy constructor:\n - Facet f3(f2) → " << f3 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
+        // --- Element Access -------------------------------------------------
+        cout << "- Element access (vertex positions) ————————————————————————————————————\n";
+        cout << "f1[0]= " << f1[0] << "\nf1[1]= " << f1[1] << "\nf1[2]= " << f1[2] << "\n";
+        cout << "(Normal) f1[3]=" << f1[3] << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Update Facet ---------------------------------------------------
+        cout << "- Update Facet ————————————————————————————————————————————————————————\n";
+        Vector3D d_u(1.0, 1.0, 0.0);
+        Vector3D e_u(2.0, 1.0, 0.0);
+        Vector3D f_u(1.0, 2.0, 0.0);
+        cout << " - Before f1 = " << f1 << "\n";
+        f1.updateFacet(d_u, e_u, f_u);
+        cout << " - After f1.updateFacet(d_u,e_u,f_u): f1 = " << f1 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Translation ----------------------------------------------------
+        cout << "- Geometric Translation  ——————————————————————————————————————————————\n";
+        Vector3D offset(0.0, 0.0, 1.0);
+        cout << "- offset: " << offset << "\n";
+        cout << " - Before translate: f1 = " << f1 << "\n";
+        f1.translate(offset);
+        cout << " - After f1.translate(offset): f1 = " << f1 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+        // --- Crunch (scale) --------------------------------------------------
+        cout << " - Crunch (scale) —————————————————————————————————————————————————————\n";
+        // Geometrically: scale the triangle's vertices by factor 0.5 about the pivot at the origin.
+        // Each vertex is pulled halfway closer to (0,0,0), shrinking the facet uniformly.
+        cout << " - Before crunch: f2 = " << f2 << "\n";
+        double factor = 0.25;
+        Vector3D origin{0,0,0}; 
+        cout << " - factor = " << factor << "        origin = " << origin << "\n";
+        f2.crunch(factor, origin);
+        cout << " - After f2.crunch(factor, origin): f2 = " << f2 << "\n";
+        // The facet's center and normal have been recomputed to match the scaled geometry.
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
     }
 
 }
