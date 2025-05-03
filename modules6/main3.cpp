@@ -6,6 +6,7 @@
 #include "Vector3D.cpp"
 #include "Vector4D.cpp"
 #include "Quaternion.cpp"
+#include "Facet.cpp"
 
 //////////////////////////////////////
 //                                  
@@ -248,6 +249,42 @@ void Setup() {
         cout << "Rotate q1 around axis:            rotate(q1, a, b, qRot)      \t→ " << qRotated << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
+
+        cout << "\n———————————————————————————————————————————————————————————————————————\n";
+        cout <<   "|- Testing Facet Class ———————————————————————————————————————————\n";
+        cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
+        cout << "               [A] _________[B]\n";
+        cout << "                  \\^========/\n";
+        cout << "                   \\^=[N]==/     \n";                                                                                                                                                                            
+        cout << "                    \\^====/\n";
+        cout << "                     \\^==/ [Facet Class]\n";
+        cout << "                      \\^/\n";
+        cout << "                      [C]\n";
+        cout << "                \n";
+        // --- Construction ---------------------------------------------------
+        cout << "- List of constructors ————————————————————————————————————————————————\n";
+        
+        Facet f0;  // Default constructor
+        cout << "Default constructor: Facet f0; → " << f0 << "\n";
+        
+        // Define three points for Vector3D-based constructor
+        Vector3D a(0.0, 0.0, 0.0);
+        Vector3D b(1.0, 0.0, 0.0);
+        Vector3D c0(0.0, 1.0, 0.0);
+        cout << "- Let a = " << a << "\n      b = " << b << "\n      c = " << c0 << "\n";
+        
+        Facet f1(a, b, c);  // Vector3D constructor
+        cout << "Vector3D constructor:\n - Facet(a, b, c) → " << f1 << "\n";
+
+        // Quaternion-based constructor
+        Quaternion q_a(0.0, a), q_b(0.0, b), q_c(0.0, c);
+        Facet f2(q_a, q_b, q_c);
+        cout << "Quaternion constructor:\n - Facet(q_a, q_b, q_c) → " << f2 << "\n";
+
+        // Copy constructor
+        Facet f3(f2);
+        cout << "Copy constructor:\n - Facet f3(f2) → " << f3 << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
     }
 

@@ -5,105 +5,116 @@ using namespace std;
 #include <cmath>
 #include <iomanip>
 #include <fstream>
-
-
-Facet::Facet() {}
-
-Facet::Facet(const Quaternion& a, const Quaternion& b, const Quaternion& c) {
-	
-	A = Quaternion(a);
-	B = Quaternion(b);
-	C = Quaternion(c);
-	N = Quaternion(0, unit( (B.V()-A.V())) % (C.V()-A.V()) );
-}
-
-Facet::Facet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
-
-        A = Quaternion(0, a);
-        B = Quaternion(0, b);
-        C = Quaternion(0, c);
-        N = Quaternion(0, unit( (b - a)) % (c - a) );
-}
-
-Facet::Facet(const Facet& facet) {
-
-        A = Quaternion(0, facet[0]);
-        B = Quaternion(0, facet[1]);
-        C = Quaternion(0, facet[2]);
-        N = Quaternion(0, facet[3]);
-}
-
-//Vector3D Facet::operator [] (int k) const {
-//   if (k > 3)
-//      return Vector3D(0, 0, 0);
-//   else {
-//   
-//   	if (k == 0) return A.V();
-//	if (k == 1) return B.V();
-//	if (k == 2) return C.V();
-//	if (k == 3) return N.V();
-//   }
-//}
-
 #include <stdexcept>
 
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Constructor: three Quaternion vertices
+/*——————————————————————————————————————————————————————————————————————————————*/
+Facet::Facet(const Quaternion& a, const Quaternion& b, const Quaternion& c)
+    : A(a), B(b), C(c)
+{
+    // Compute normalized facet normal from cross product of edges
+    Vector3D edge1 = B.V() - A.V();
+    Vector3D edge2 = C.V() - A.V();
+    Vector3D crossVec = edge1 % edge2;
+    N = Quaternion(0.0, unit(crossVec));
+}
+
+
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Constructor: three Vector3D points
+/*——————————————————————————————————————————————————————————————————————————————*/
+Facet::Facet(const Vector3D& a, const Vector3D& b, const Vector3D& c)
+    : A(0.0, a), B(0.0, b), C(0.0, c)
+{
+    Vector3D edge1 = b - a;
+    Vector3D edge2 = c - a;
+    Vector3D crossVec = edge1 % edge2;
+    N = Quaternion(0.0, unit(crossVec));
+}
+
+
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Element access: 0→A, 1→B, 2→C, 3→normal
+/*——————————————————————————————————————————————————————————————————————————————*/
 Vector3D Facet::operator[](int k) const
 {
     switch (k) {
-        case 0:  return A.V();
-        case 1:  return B.V();
-        case 2:  return C.V();
-        case 3:  return N.V();
+        case 0: return A.V();
+        case 1: return B.V();
+        case 2: return C.V();
+        case 3: return N.V();
         default: throw std::out_of_range("Facet index must be 0..3");
     }
 }
 
-void Facet::updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c) {
 
-	A = Quaternion( 0.0, a);
-	B = Quaternion( 0.0, b);
-	C = Quaternion( 0.0, c);
-	N = Quaternion( 0.0, unit( (b-a) % (c-a) ));
-
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Update facet vertices and recompute normal
+/*——————————————————————————————————————————————————————————————————————————————*/
+void Facet::updateFacet(const Vector3D& a, const Vector3D& b, const Vector3D& c)
+{
+    A = Quaternion(0.0, a);
+    B = Quaternion(0.0, b);
+    C = Quaternion(0.0, c);
+    Vector3D crossVec = (b - a) % (c - a);
+    N = Quaternion(0.0, unit(crossVec));
 }
 
-Vector3D Facet::getCenter() {
-	
-	Vector3D tmp = Vector3D(0, 0, 0);	
-	tmp = tmp + A.V() + B.V() + C.V();
-	tmp = 0.333333 * tmp;
 
-	return tmp;
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Get triangle centroid
+/*——————————————————————————————————————————————————————————————————————————————*/
+Vector3D Facet::getCenter() const
+{
+    return (A.V() + B.V() + C.V()) / 3.0;
 }
 
-ostream& operator << (ostream& os, const Facet& a) {
 
-   int w= os.width();
-   int p= os.precision();
-   os << setw(0) << "Facet[ " 
-      << setw(w) << setprecision(p) << a[0] << setw(0) << ", " 
-      << setw(w) << setprecision(p) << a[1] << setw(0) << ", " 
-      << setw(w) << setprecision(p) << a[2] << setw(0) << ", Normal("
-      << setw(w) << setprecision(p) << a[3] << setw(0) << ") ] ";
-   os.width(w);
-   os.precision(p);
-   return os;
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Output stream
+/*——————————————————————————————————————————————————————————————————————————————*/
+std::ostream& operator<<(std::ostream& os, const Facet& f)
+{
+    int w = os.width();
+    int p = os.precision();
+    os << std::fixed << std::setprecision(p)
+       << "Facet< A=" << f[0]
+       << ", B=" << f[1]
+       << ", C=" << f[2]
+       << ", N=" << f[3]
+       << ">";
+    os.width(w);
+    os.precision(p);
+    return os;
 }
 
-void Facet::translate(const Vector3D& a) {
-
-	Quaternion aa = A + Quaternion(a);
-	Quaternion bb = B + Quaternion(a);
-	Quaternion cc = C + Quaternion(a);
-
-	updateFacet(aa.V(), bb.V(), cc.V());
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Translate facet by offset vector
+/*——————————————————————————————————————————————————————————————————————————————*/
+void Facet::translate(const Vector3D& offset)
+{
+    A = A + Quaternion(0.0, offset);
+    B = B + Quaternion(0.0, offset);
+    C = C + Quaternion(0.0, offset);
+    // Recompute normal after translation
+    Vector3D edge1 = B.V() - A.V();
+    Vector3D edge2 = C.V() - A.V();
+    N = Quaternion(0.0, unit(edge1 % edge2));
 }
 
-void Facet::crunch(double t, const Vector3D& a) {
-	
-	Vector3D z0 = t * (a - A.V()) + A.V();
-	Vector3D z1 = t * (a - B.V()) + B.V();
-	Vector3D z2 = t * (a - C.V()) + C.V();
 
-	updateFacet(z0, z1, z2);
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Scale (crunch) the triangle towards point a by factor t
+/*——————————————————————————————————————————————————————————————————————————————*/
+void Facet::crunch(double t, const Vector3D& pivot)
+{
+    auto scalePoint = [&](const Quaternion& Q) {
+        Vector3D P = Q.V();
+        return pivot + t * (P - pivot);
+    };
+    Vector3D a = scalePoint(A);
+    Vector3D b = scalePoint(B);
+    Vector3D c = scalePoint(C);
+    updateFacet(a, b, c);
 }
