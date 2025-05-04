@@ -90,6 +90,22 @@ std::ostream& operator<<(std::ostream& os, const Facet& f)
 }
 
 /*——————————————————————————————————————————————————————————————————————————————*/
+// Input stream
+/*——————————————————————————————————————————————————————————————————————————————*/
+std::istream& operator>>(std::istream& is, Facet& f) {
+    Vector3D a, b, c;
+    // We expect three Vector3D's in the stream, e.g. "(x,y,z) (x,y,z) (x,y,z)"
+    if (!(is >> a >> b >> c)) {
+        // If parsing failed, just return the stream in a failed state
+        return is;
+    }
+    // Build/update the facet from those three points
+    f.updateFacet(a, b, c);
+    return is;
+}
+
+
+/*——————————————————————————————————————————————————————————————————————————————*/
 // Translate facet by offset vector
 /*——————————————————————————————————————————————————————————————————————————————*/
 void Facet::translate(const Vector3D& offset)

@@ -324,7 +324,33 @@ void Setup() {
         // The facet's center and normal have been recomputed to match the scaled geometry.
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-    }
+        /*
+         * Parsing operator>>: We have an input stream containing three
+         * 3D points in the form "(x0,y0,z0) (x1,y1,z1) (x2,y2,z2)".
+         * Each triplet defines one vertex of the triangular facet.
+         * The Facet extraction operator reads these three Vector3D values,
+         * assigns them to A, B, C respectively, and recomputes the facet's
+         * normal N as cross(B-A, C-A).
+         *
+         * Geometric interpretation:
+         *  - "(0,0,0) (1,1,0) (1,0,1)" defines a triangle whose vertices
+         *    are P0=(0,0,0), P1=(1,1,0), P2=(1,0,1).
+         *  - After parsing, f4 represents that triangle in space.
+         *  - The facet normal N is perpendicular to the plane containing
+         *    P0,P1,P2, computed via N = (P1-P0) × (P2-P0).
+         */
+        cout << "- Parsing operator>> ——————————————————————————————————————————————————\n";
+        {
+            istringstream iss("(0,0,0) (1,1,0) (1,0,1)");
+            Facet f4;
+            cout << " - Constructed default facet f4 = " << f4 << "\n";
+            iss >> f4;
+            cout << " - istringstream iss('(0,0,0) (1,1,0) (1,0,1)');\n";
+            cout << "- Parsed f4 from stream: f4 = " << f4 << "\n";
+        }
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+        
+        }
 
 }
 

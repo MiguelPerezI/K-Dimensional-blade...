@@ -249,4 +249,143 @@ std::cout << q1;  // Outputs: (scalar, (x, y, z))
 
 This documentation provides a solid foundation for anyone looking to integrate or extend quaternion support in a C++ geometry pipeline.
 
+## Facet Class Overview
+
+The `Facet` class models a triangle in 3D space using three `Quaternion` vertices: A, B, and C. It also maintains a normal vector `N` computed as the cross product of vectors (B - A) and (C - A). This structure is ideal for geometric applications, mesh processing, and graphics.
+
+```
+     [A] _________ [B]
+        \^========/
+         \^=[N]==/   [Facet]
+          \^====/
+           \^==/
+            \^/
+            [C]
+```
+
+### Constructors
+
+```cpp
+Facet f0;
+```
+
+Default constructor initializes all vertices and normal to zero.
+
+```cpp
+Vector3D a(0,0,0), b(1,0,0), c(0,1,0);
+Facet f1(a, b, c);
+```
+
+Constructs the facet using 3 `Vector3D` points.
+
+```cpp
+Quaternion qa(0, a), qb(0, b), qc(0, c);
+Facet f2(qa, qb, qc);
+```
+
+Constructs the facet from 3 `Quaternion` points.
+
+```cpp
+Facet f3(f2);
+```
+
+* **Copy constructor**: Creates a new `Facet` by duplicating the vertices and normal of an existing facet. This results in an exact geometric copy.
+
+---
+
+### Element Access
+
+```cpp
+f1[0] // returns vertex A as a Vector3D
+f1[1] // returns vertex B as a Vector3D
+f1[2] // returns vertex C as a Vector3D
+f1[3] // returns normal N as a Vector3D
+```
+
+Access vertices and the precomputed normal using `operator[]`.
+
+---
+
+### Update Facet
+
+```cpp
+f1.updateFacet(d, e, f);
+```
+
+Updates the facet's vertices and recomputes the normal.
+
+---
+
+### Translate
+
+```cpp
+Vector3D offset(0, 0, 1);
+f1.translate(offset);
+```
+
+Shifts all three vertices by a given Vector3D offset.
+
+---
+
+### Method: `crunch()`
+
+```cpp
+double factor = 0.25;
+Vector3D origin(0, 0, 0);
+f2.crunch(factor, origin);
+```
+
+**Purpose**: Scales the triangle toward or away from a pivot point.
+
+#### Explanation:
+
+* Each vertex is repositioned using the formula:
+
+  ```cpp
+  newP = pivot + t * (P - pivot);
+  ```
+* **t = 1.0** → No change
+* **0 < t < 1** → Vertex moves closer to `pivot`
+* **t > 1** → Vertex moves farther away from `pivot`
+* This uniformly scales the triangle about the `pivot`. After scaling, the triangle’s **centroid** and **normal vector** are updated to reflect the new geometry.
+
+This is especially useful in animations or mesh deformation workflows, where you need to dynamically "shrink" or "expand" triangles around a point.
+
+---
+
+### Stream Operators
+
+```cpp
+std::istringstream iss("(0,0,0) (1,1,0) (1,0,1)");
+Facet f4;
+iss >> f4;
+```
+
+**`operator>>`** reads three `(x,y,z)` coordinates to construct a facet.
+
+```cpp
+std::cout << f4;
+```
+
+**`operator<<`** outputs all three vertices.
+
+---
+
+Prints the facet in a readable format.
+
+---
+
+### Geometry Helpers
+
+* `getNormal()` → Returns the current normal vector.
+* `getCenter()` → Computes the centroid:
+
+  ```cpp
+  center = (A + B + C) / 3;
+  ```
+
+---
+
+
+This `Facet` class provides a lightweight and expressive interface for 3D triangle modeling. Combined with the `Vector3D` and `Quaternion` classes, it forms a robust foundation for geometric computation and graphics programming.
 
