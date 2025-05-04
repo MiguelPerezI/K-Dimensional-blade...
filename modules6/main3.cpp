@@ -46,8 +46,16 @@ void updateProcessingProto();
 void ProcessingProto();
 void interface();
 
+// OpenGL functions
+void drawFacet(const Facet& f, int R, int G, int Bi, float alpha);
+
 //        La variable ciclo es el número de FRAMES que lleva el sistema
 //        Inicia con 0        
+
+Vector3D d_ui(1.0, 1.0, 0.0);
+Vector3D e_ui(0.0, 1.0, 0.0);
+Vector3D f_ui(0.0, 0.0, 1.0);
+Facet f_1(d_ui, e_ui, f_ui);
 
 
 void Setup() {
@@ -359,7 +367,7 @@ void Draw() {
 
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/	
-	
+        drawFacet(f_1, 200, 10, 40, 0.75f);
 	}
 }
 
@@ -391,6 +399,51 @@ void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
         glEnd();
 }
 
+// Draws a filled, semi-transparent triangle plus its outline.
+//
+//  f     – your Facet
+//  r,g,b – color components in [0..255]
+//  alpha – [0..1] opacity (default 0.75)
+inline void drawFacet(const Facet& f,
+                      int r, int g, int b,
+                      float alpha = 0.75f)
+{
+    // 1) Fetch geometry
+    Vector3D normal = f.getNormal();   // (x,y,z)
+    Vector3D A = f[0], B = f[1], C = f[2];
+
+    // 2) Convert color to floats
+    const float Rf = r / 255.0f;
+    const float Gf = g / 255.0f;
+    const float Bf = b / 255.0f;
+
+    // 3) Preserve polygon & color state
+    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_POLYGON_BIT);
+
+    // 4) Draw filled triangle
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 1.0f);
+    glColor4f(Rf, Gf, Bf, alpha);
+    glBegin(GL_TRIANGLES);
+        glNormal3f(normal.x(), normal.y(), normal.z());
+        glVertex3f(A.x(), A.y(), A.z());
+        glVertex3f(B.x(), B.y(), B.z());
+        glVertex3f(C.x(), C.y(), C.z());
+    glEnd();
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // 5) Draw outline
+    glColor4f(0.0f, 0.0f, 0.0f, alpha);   // black lines
+    glLineWidth(1.5f);
+    glBegin(GL_LINE_LOOP);
+        glVertex3f(A.x(), A.y(), A.z());
+        glVertex3f(B.x(), B.y(), B.z());
+        glVertex3f(C.x(), C.y(), C.z());
+    glEnd();
+
+    // 6) Restore state
+    glPopAttrib();
+}
 
 /**/
 /**/

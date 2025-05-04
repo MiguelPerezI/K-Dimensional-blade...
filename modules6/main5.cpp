@@ -498,14 +498,18 @@ inline void drawFacet(const Facet& f,
 
 //-----------------------------------------------------------------------------
 // Global state for interactive camera
-//-----------------------------------------------------------------------------
+//----------------------------------------------------------------------------- 
 static float g_angleX = 20.0f, g_angleY = -30.0f; // view angles (degrees)
 static float g_zoom   = 1.0f;                    // zoom factor
+static float g_panX   = 0.0f, g_panY = 0.0f;      // camera pan offsets
 static int   g_lastX  = 0, g_lastY = 0;          // last mouse coords
-static bool  g_leftDown  = false;                // rotating
-static bool  g_rightDown = false;                // zooming
+static bool  g_leftDown   = false;               // rotating
+static bool  g_middleDown = false;               // panning
+static bool  g_rightDown  = false;               // zooming
 
-
+//-----------------------------------------------------------------------------
+// Forward declarations
+//----------------------------------------------------------------------------- 
 void initGL();
 void reshape(int w, int h);
 void display();
@@ -616,26 +620,77 @@ void display()
 //-----------------------------------------------------------------------------
 // Mouse button: track left/right for rotation/zoom, handle wheel
 //-----------------------------------------------------------------------------
+//void mouseButton(int button, int state, int x, int y)
+//{
+//    if (button == GLUT_LEFT_BUTTON) {
+//        g_leftDown = (state == GLUT_DOWN);
+//    }
+//    else if (button == GLUT_RIGHT_BUTTON) {
+//        g_rightDown = (state == GLUT_DOWN);
+//    }
+//    else if (button == 3) {           // wheel up
+//        g_zoom *= 1.05f;
+//    }
+//    else if (button == 4) {           // wheel down
+//        g_zoom /= 1.05f;
+//    }
+//    g_lastX = x; g_lastY = y;
+//    glutPostRedisplay();
+//}
+
+//-----------------------------------------------------------------------------
+// Mouse button: track left/middle/right for rotate/pan/zoom, handle wheel
+//----------------------------------------------------------------------------- 
 void mouseButton(int button, int state, int x, int y)
 {
     if (button == GLUT_LEFT_BUTTON) {
-        g_leftDown = (state == GLUT_DOWN);
+        g_leftDown   = (state == GLUT_DOWN);
+    }
+    else if (button == GLUT_MIDDLE_BUTTON) {
+        g_middleDown = (state == GLUT_DOWN);
     }
     else if (button == GLUT_RIGHT_BUTTON) {
-        g_rightDown = (state == GLUT_DOWN);
+        g_rightDown  = (state == GLUT_DOWN);
     }
     else if (button == 3) {           // wheel up
         g_zoom *= 1.05f;
+        glutPostRedisplay();
     }
     else if (button == 4) {           // wheel down
         g_zoom /= 1.05f;
+        glutPostRedisplay();
     }
     g_lastX = x; g_lastY = y;
-    glutPostRedisplay();
 }
 
 //-----------------------------------------------------------------------------
 // Mouse drag: update angles or zoom
+//-----------------------------------------------------------------------------
+//void mouseMotion(int x, int y)
+//{
+//    int dx = x - g_lastX;
+//    int dy = y - g_lastY;
+//
+//    if (g_leftDown) {
+//        g_angleY += dx * 0.5f;
+//        g_angleX += dy * 0.5f;
+//        // clamp pitch
+//        if (g_angleX >  90.0f) g_angleX =  90.0f;
+//        if (g_angleX < -90.0f) g_angleX = -90.0f;
+//    }
+//    else if (g_rightDown) {
+//        g_zoom *= 1.0f - dy * 0.005f;
+//        if (g_zoom < 0.1f) g_zoom = 0.1f;
+//        if (g_zoom > 10.0f) g_zoom = 10.0f;
+//    }
+//
+//    g_lastX = x; g_lastY = y;
+//    glutPostRedisplay();
+//}
+
+
+//-----------------------------------------------------------------------------
+// Mouse drag: update angles/pan/zoom
 //-----------------------------------------------------------------------------
 void mouseMotion(int x, int y)
 {
@@ -645,20 +700,21 @@ void mouseMotion(int x, int y)
     if (g_leftDown) {
         g_angleY += dx * 0.5f;
         g_angleX += dy * 0.5f;
-        // clamp pitch
-        if (g_angleX >  90.0f) g_angleX =  90.0f;
-        if (g_angleX < -90.0f) g_angleX = -90.0f;
+        g_angleX = fmaxf(-90.0f, fminf(90.0f, g_angleX));
+    }
+    else if (g_middleDown) {
+        // pan: move camera laterally
+        g_panX += dx * 0.01f * g_zoom;
+        g_panY -= dy * 0.01f * g_zoom;
     }
     else if (g_rightDown) {
         g_zoom *= 1.0f - dy * 0.005f;
-        if (g_zoom < 0.1f) g_zoom = 0.1f;
-        if (g_zoom > 10.0f) g_zoom = 10.0f;
+        g_zoom = fmaxf(0.1f, fminf(10.0f, g_zoom));
     }
 
     g_lastX = x; g_lastY = y;
     glutPostRedisplay();
 }
-
 
 //-----------------------------------------------------------------------------
 // Your existing menu callback for smoothing/blending
