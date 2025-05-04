@@ -1,3 +1,49 @@
+# Table of Contents
+
+- [K-Dimensional Blade](#k-dimensional-blade)
+- [Vector3D Usage Guide](#vector3d-usage-guide)
+  - [What each line demonstrates](#what-each-line-demonstrates)
+  - [Floating-Point Comparison: `operator==`](#floating-point-comparison-operator)
+  - [Building the Sample](#building-the-sample)
+  - [Next Steps](#next-steps)
+- [Quaternion Class Usage Guide](#quaternion-class-usage-guide)
+  - [Overview](#overview)
+  - [Constructors](#constructors)
+  - [Element Access](#element-access)
+  - [Inspectors](#inspectors)
+  - [Conversion](#conversion)
+  - [Arithmetic Operators](#arithmetic-operators)
+  - [Compound Assignment](#compound-assignment)
+  - [Utility Methods](#utility-methods)
+  - [Free Functions](#free-functions)
+  - [Output Streaming](#output-streaming)
+  - [Notes](#notes)
+  - [Header Dependencies](#header-dependencies)
+- [Facet Class Usage Guide](#facet-class-usage-guide)
+  - [Overview](#overview-1)
+  - [Constructors](#constructors-1)
+  - [Element Access](#element-access-1)
+  - [Method: `updateFacet()`](#method-updatefacet)
+  - [Method: `translate()`](#method-translate)
+  - [Method: `crunch()`](#method-crunch)
+  - [Stream Operators](#stream-operators)
+  - [Geometry Helpers](#geometry-helpers)
+
+---
+
+## Introduction
+
+Yes, I know you can download Blender and quickly design 3D objects. And yes, I’m aware of powerful libraries in Python o
+
+But this isn’t about that.
+
+This is my personal geometric and topological sandbox — a "coding diary" where I experiment with abstract math ideas for
+
+Like a chemist tinkering in their lab, I use this toolkit to model, test, and visualize higher-dimensional constructs. T
+
+---
+
+
 # K-Dimensional Blade
 
 A C++ geometry toolkit for exploring **3‑manifolds**, surfaces, and vectors, with ongoing work to generalize the core to **quaternions**, 3‑D simplices (Facets), and higher‑order polytopes such as dodecahedra. Quaternions serve as the common backbone, enabling easy manipulation, rotation, and composition of every geometric object.
