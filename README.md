@@ -33,13 +33,14 @@
 
 ## Introduction
 
-Yes, I know you can download Blender and quickly design 3D objects. And yes, I’m aware of powerful libraries in Python o
+Yes, I know you can download Blender and quickly design 3D objects. And yes, I’m aware of powerful libraries in Python or C++ like NumPy, SciPy, Eigen, CGAL, and OpenMesh.
 
 But this isn’t about that.
 
-This is my personal geometric and topological sandbox — a "coding diary" where I experiment with abstract math ideas for
+This is my personal geometric and topological sandbox — a "coding diary" where I experiment with abstract math ideas for fun and exploration. It’s a space for recreational mathematics: What happens when a dodecahedron moves through 3D or even 4D hyperbolic space? How can we build intuitive tools for understanding the geometry of complex surfaces?
 
-Like a chemist tinkering in their lab, I use this toolkit to model, test, and visualize higher-dimensional constructs. T
+Like a chemist tinkering in their lab, I use this toolkit to model, test, and visualize higher-dimensional constructs. The goal isn’t production code — it’s clarity, curiosity, and a deepening of geometric intuition.
+
 
 ---
 
