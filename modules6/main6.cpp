@@ -455,7 +455,7 @@ cout << "*———————————————————————�
 
         cout << "———————————————————————————————————————————————————————————————————————\n"; 
         cout << " - push method\n";
-        // 2) push(A,B,C): add a triangle (0,0,0)-(1,0,0)-(0,1,0)
+        cout << "2) push(A,B,C): add a triangle (0,0,0)-(1,0,0)-(0,1,0)";
         Vector3D A1(1,1,-1), B1(1,0,-1), C1(0,1,-1), D1(0,0,-1);
         Vector3D A2(1,1,1), B2(1,0,1), C2(0,1,1), D2(0,0,1);
         box.push(A1, B1, C1);
@@ -467,10 +467,45 @@ cout << "*———————————————————————�
 
 
         cout << "———————————————————————————————————————————————————————————————————————\n";
-        // 3) center(): compute centroid of all vertices
+        cout << "3) center(): compute centroid of all vertices\n";
         Vector3D ctr = box.center();
         std::cout << "Center of box = " << ctr << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
+    
+
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "4) translate(offset): move every facet by (0,0,1)\n";
+        Vector3D offset1(0,0,1);
+        box.translate(offset1);
+        std::cout << "After translate by " << offset1 << ": box.center() = "
+                  << box.center() << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "5) crunch(t, pivot): scale each facet toward the pivot\n";
+        cout << "   here t=0.5 (halfway) about the world origin (0,0,0)\n";
+        box.crunch(0.5, Vector3D(0,0,0));
+        std::cout << "After crunch(0.5, origin): box.center() = "
+                  << box.center() << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "6) replace(idx, A',B',C'): replace the first triangle\n";
+        Vector3D D(66,1,0), E(2,1,0), F(1,2,0);
+        box.replace(0, D, E, F);
+        std::cout << "After replace(0): new center = "
+                  << box.center() << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
+
+        cout << "———————————————————————————————————————————————————————————————————————\n";
+        cout << "7) clear(): remove all facets\n";
+        box.clear();
+        std::cout << "After clear: box.size() = " << box.size() << "\n";
+        cout << "———————————————————————————————————————————————————————————————————————\n\n";
+
     }
 
 }

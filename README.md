@@ -29,6 +29,20 @@
   - [Stream Operators](#stream-operators)
   - [Geometry Helpers](#geometry-helpers)
 
+- [FacetBox Class Usage Guide](#facetbox-class-usage-guide)
+  - [Including](#including)
+  - [Methods](#methods)
+
+   * [push](#void-pushconst-vector3d-a-const-vector3d-b-const-vector3d-c)
+   * [replace](#void-replace-size_t-idx-const-vector3d-a-const-vector3d-b-const-vector3d-c)
+   * [clear](#void-clear-noexcept)
+   * [center](#vector3d-center-const)
+   * [translate](#void-translateconst-vector3d-offset)
+   * [crunch](#void-crunchdouble-t-const-vector3d-pivot)
+  
+  - [Full Example](#full-example)
+  - [Building](#building)
+
 ---
 
 ```cpp
@@ -459,4 +473,168 @@ Prints the facet in a readable format.
 
 
 This `Facet` class provides a lightweight and expressive interface for 3D triangle modeling. Combined with the `Vector3D` and `Quaternion` classes, it forms a robust foundation for geometric computation and graphics programming.
+
+# FacetBox Usage Guide
+
+`FacetBox` is a lightweight container for managing a dynamic collection of `Facet` objects (triangles). It uses `std::vector` internally and provides convenience methods for common geometry operations.
+
+---
+
+## Including
+
+```cpp
+#include "FacetBox.hpp"
+```
+
+Make sure you also have:
+
+```cpp
+#include "Vector3D.hpp"
+#include "Quaternion.hpp"
+#include "Facet.hpp"
+```
+
+---
+
+## Methods
+
+### `void push(const Vector3D& A, const Vector3D& B, const Vector3D& C)`
+
+Appends a new `Facet` constructed from points **A**, **B**, **C**.
+
+```cpp
+FacetBox box;
+Vector3D A(0,0,0), B(1,0,0), C(0,1,0);
+box.push(A, B, C);
+// box.size() == 1, contains facet with vertices A, B, C
+```
+
+---
+
+### `void replace(size_t idx, const Vector3D& A, const Vector3D& B, const Vector3D& C)`
+
+Replaces the facet at index `idx` by a new `Facet(A,B,C)`. Throws `std::out_of_range` if `idx >= size()`.
+
+```cpp
+Vector3D D(1,1,0), E(2,1,0), F(1,2,0);
+box.replace(0, D, E, F);
+// box[0] now has vertices D, E, F
+```
+
+---
+
+### `void clear() noexcept`
+
+Removes all facets.
+
+```cpp
+box.clear();
+// box.size() == 0
+```
+
+---
+
+### `Vector3D center() const`
+
+Computes the centroid of *all* vertices across *all* stored facets:
+
+$$
+\text{center} = \frac{1}{3N} \sum_{i=0}^{N-1} \bigl(A_i + B_i + C_i\bigr)
+$$
+
+```cpp
+Vector3D ctr = box.center();
+std::cout << "Center = " << ctr << "\n";
+```
+
+---
+
+### `void translate(const Vector3D& offset)`
+
+Translates every facet by adding `offset` to each vertex.
+
+```cpp
+Vector3D offset(0,0,1);
+box.translate(offset);
+// every facet’s vertices have z–coordinate increased by 1
+```
+
+---
+
+### `void crunch(double t, const Vector3D& pivot)`
+
+Scales (“crunches”) each facet toward (or away from) `pivot` by factor `t`:
+
+$$
+P' = \text{pivot} + t\,(P - \text{pivot})
+$$
+
+* `t == 1.0`: no change
+* `0 < t < 1.0`: moves toward pivot
+* `t > 1.0`: moves away (expansion)
+
+```cpp
+box.crunch(0.5, Vector3D(0,0,0));
+// each vertex is now halfway between its old position and the origin
+```
+
+---
+
+## Full Example
+
+```cpp
+#include <iostream>
+#include "FacetBox.hpp"
+#include "Vector3D.hpp"
+
+int main() {
+    // 1) Create an empty FacetBox
+    FacetBox box;
+
+    // 2) push(A,B,C): add a triangle (0,0,0)-(1,0,0)-(0,1,0)
+    Vector3D A(0,0,0), B(1,0,0), C(0,1,0);
+    box.push(A, B, C);
+    std::cout << "After push: box.size() = " << box.size() << "\n";
+
+    // 3) center(): compute centroid of all vertices
+    Vector3D ctr = box.center();
+    std::cout << "Center of box = " << ctr << "\n";
+
+    // 4) translate(offset): move every facet by (0,0,1)
+    Vector3D offset(0,0,1);
+    box.translate(offset);
+    std::cout << "After translate by " << offset
+              << ": box.center() = " << box.center() << "\n";
+
+    // 5) crunch(t, pivot): scale each facet toward the pivot
+    box.crunch(0.5, Vector3D(0,0,0));
+    std::cout << "After crunch(0.5, origin): box.center() = "
+              << box.center() << "\n";
+
+    // 6) replace(idx, A',B',C'): replace the first triangle
+    Vector3D D(1,1,0), E(2,1,0), F(1,2,0);
+    box.replace(0, D, E, F);
+    std::cout << "After replace(0): new center = "
+              << box.center() << "\n";
+
+    // 7) clear(): remove all facets
+    box.clear();
+    std::cout << "After clear: box.size() = " << box.size() << "\n";
+
+    return 0;
+}
+```
+
+---
+
+## Building
+
+```bash
+g++ -std=c++11 -I. main.cpp \
+    Vector3D.cpp Quaternion.cpp Facet.cpp FacetBox.cpp \
+    -o facetbox_demo
+./facetbox_demo
+```
+
+This guide covers every public method of **`FacetBox`**, demonstrating how to add, replace, clear, query, and transform your collection of facets in a modern, safe C++ style.
 
