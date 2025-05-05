@@ -55,6 +55,7 @@ void drawFacet( const Facet& f,
 
 void drawSphere(const Vector3D& pos, float radius, int slices, int stacks);
 void drawAxes(float length);
+void drawText3D(const Vector3D& pos, const char* text);
 
 Vector3D d_ui(1.0, 0.0, 0.0);
 Vector3D e_ui(0.0, 1.0, 0.0);
@@ -587,9 +588,13 @@ void Draw() {
         drawSphere(f_1[1], 0.1f, 6, 6);
         drawSphere(f_1[2], 0.1f, 6, 6);
 
-        for (int i=0; i < 36; i++)
-            drawFacet(dodeca[i], 200, 10, 40, 0.75f);
-
+        for (int i=0; i < 36; i++) {
+            Vector3D pos_i(dodeca[i]);
+            drawFacet(pos_i, 200, 10, 40, 1.0f);
+            std::string s_ = std::to_string(i);
+            const char* cstr = s_.c_str();
+            drawText3D(pos_i, s_);
+       }
 	}
 }
 
@@ -699,6 +704,44 @@ inline void drawFacet(const Facet& f,
     // 6) Restore state
     glPopAttrib();
 }
+
+//---------------------------------------------------------------------------
+// Utility: draw text label at a 3D world coordinate
+//---------------------------------------------------------------------------
+void drawText3D(const Vector3D& pos, const char* text) {
+    // Project 3D point to window coordinates
+    GLint viewport[4];
+    GLdouble modelview[16], projection[16];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    GLdouble winX, winY, winZ;
+    gluProject(pos.x(), pos.y(), pos.z(), modelview, projection, viewport, &winX, &winY, &winZ);
+    // Flip Y for raster position
+    winY = viewport[3] - winY;
+
+    // Prepare for 2D overlay
+    glMatrixMode(GL_PROJECTION); glPushMatrix();
+    glLoadIdentity();
+    glOrtho(0, viewport[2], 0, viewport[3], -1, 1);
+    glMatrixMode(GL_MODELVIEW); glPushMatrix();
+    glLoadIdentity();
+
+    // Draw text
+    glRasterPos2i((int)winX, (int)winY);
+    for (const char* c = text; *c; ++c) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    // Restore matrices
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION); glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    // Restore state
+    glPopAttrib();
+}
+
 
 /**/
 /**/

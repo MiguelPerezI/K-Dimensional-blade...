@@ -3,9 +3,13 @@
 
 using namespace std;
 
-#include <iostream>
-#include "Facet.hpp"
+#include <stdexcept>
+#include <vector>
+#include <array>    // for our temporary pts list
 #include <math.h>
+#include "Vector3D.hpp"
+#include "Quaternion.hpp"
+#include "FacetBox.hpp"
 
 /**
  *  —————————————————————————————————————————————————————————————
@@ -33,6 +37,10 @@ using namespace std;
 **/
 
 class Dodecahedron {
+public:
+    // allow operator<< to access private members
+    friend std::ostream& operator<<(std::ostream& os, const Dodecahedron& dd);
+
 public:
     /* - Constructors ———————————————————————————————————————————————————————*/
     /* - Rule of Zero: default special members ------------------------------*/
@@ -74,9 +82,16 @@ public:
      * @brief Compute and return the geometric center of all vertices.
      */
     Vector3D center() const {
+        if (verts_.empty()) {
+            throw std::runtime_error("Dodecahedron::center: no vertices initialized");
+        }
         Vector3D sum{0,0,0};
-        for (auto const& q : verts_) sum += q.V();
-        return sum / static_cast<double>(verts_.size());
+        for (auto const& q : verts_) {
+            cout << "--> " << q.V();
+            sum += q.V();
+            cout << "   sum = " << sum << "\n";
+        }
+        return sum / 20.0;
     }
 
     /* - Translate by offset ————————————————————————————————————————————————*/
@@ -107,7 +122,7 @@ public:
 
 
 private:
-    std::array<Quaternion,20> verts_; ///< 20 dodecahedron vertices
+    std::vector<Quaternion> verts_; ///< 20 dodecahedron vertices
     FacetBox facets_;                ///< 36 triangular facets
 
     /* - Mesh data ——————————————————————————————————————————————————————————*/
@@ -127,25 +142,94 @@ private:
         { 0, 7, 1}, { 0, 5, 7}, { 0, 6, 5}
     };
 
+    /* - Initialize vertices ————————————————————————————————————————————————*/
+    /**
+     * @brief Compute the 20 vertex positions for a regular dodecahedron.
+     */
+    void initVertices(double r, const Vector3D& center) {
+        verts_.clear();
+        verts_.reserve(20);
+        double gold = 0.5 * (1.0 + std::sqrt(5.0));
+        double g1 = 1.0 / gold;
+        double g2 = 1.0 / (gold * gold);
+        // explicit 20 vertices:
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g2*r, center.y() + 0.0*r, center.z() + 1.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g2*r, center.y() + 0.0*r, center.z() + 1.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g1*r, center.y() +  g1*r, center.z() +  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  0.0*r, center.y() + 1.0*r, center.z() +  g2*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g1*r, center.y() +  g1*r, center.z() +  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  0.0*r, center.y() - 1.0*r, center.z() +  g2*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g1*r, center.y() -  g1*r, center.z() +  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g1*r, center.y() -  g1*r, center.z() +  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g2*r, center.y() + 0.0*r, center.z() - 1.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g2*r, center.y() + 0.0*r, center.z() - 1.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g1*r, center.y() -  g1*r, center.z() -  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  0.0*r, center.y() - 1.0*r, center.z() -  g2*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g1*r, center.y() -  g1*r, center.z() -  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  g1*r, center.y() +  g1*r, center.z() -  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() +  0.0*r, center.y() + 1.0*r, center.z() -  g2*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() -  g1*r, center.y() +  g1*r, center.z() -  g1*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() + 1.0*r, center.y() -  g2*r, center.z() +  0.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() - 1.0*r, center.y() +  g2*r, center.z() +  0.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() - 1.0*r, center.y() -  g2*r, center.z() +  0.0*r));
+        verts_.emplace_back(0.0, Vector3D(center.x() + 1.0*r, center.y() +  g2*r, center.z() +  0.0*r));
+ 
+    }
+
+    /* - Build Mesh —————————————————————————————————————————————————————————*/
+    /**
+     * @brief Rebuilds the FacetBox from current vertices.
+     */
+    void buildFacets() {
+        facets_.clear();
+        for (int i = 0; i < 36; ++i) {
+            auto const& t = tri_[i];
+                    // Construct each triangular face explicitly
+        Facet face( verts_[t[0]], verts_[t[1]], verts_[t[2]] );
+        facets_.push(face);
+        }
+    }
 };
 
-class Torus {
 
-	private:
-		QuaternionBox q;
-		int n;
-		FacetBox f;
-	public:
-		Torus(double R, double r, const Vector3D& c, int N);
-		int getN() const;
-		Facet  operator [] (int k) const;
-		double G1(double u, double v, double R, double r);
-        	double G2(double u, double v, double R, double r);
-        	double G3(double u, double v, double R, double r);
-		int getBoxSize() const;	
-};
 
-istream& operator >> (istream& is, Facet& a);
-ostream& operator << (ostream& os, const Facet& a);
+//-----------------------------------------------------------------------------
+// Stream output for Dodecahedron
+//-----------------------------------------------------------------------------
+/**
+ * @brief Print all vertices and facets of a dodecahedron.
+ */
+inline std::ostream& operator<<(std::ostream& os, const Dodecahedron& dd) {
+    // Output vertices
+    os << "--- Dodecahedron Vertices ---\n";
+    for (size_t i = 0; i < dd.verts_.size(); ++i) {
+        os << "  [" << i << "] " << dd.verts_[i].V() << "\n";
+    }
+    // Output facets
+    os << "--- Dodecahedron Facets (" << dd.facets_.size() << " triangles) ---\n";
+    for (size_t i = 0; i < dd.facets_.size(); ++i) {
+        os << "  Face " << i << ": " << dd.facets_[i] << "\n";
+    }
+    return os;
+}
 
-#endif
+//class Torus {
+//
+//	private:
+//		QuaternionBox q;
+//		int n;
+//		FacetBox f;
+//	public:
+//		Torus(double R, double r, const Vector3D& c, int N);
+//		int getN() const;
+//		Facet  operator [] (int k) const;
+//		double G1(double u, double v, double R, double r);
+//        	double G2(double u, double v, double R, double r);
+//        	double G3(double u, double v, double R, double r);
+//		int getBoxSize() const;	
+//};
+//
+//istream& operator >> (istream& is, Facet& a);
+//ostream& operator << (ostream& os, const Facet& a);
+
+#endif // DODECAHEDRON_H

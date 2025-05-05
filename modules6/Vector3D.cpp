@@ -93,7 +93,7 @@ Vector3D operator * (const double s, const Vector3D& b) noexcept
 /* Scalar / Vector -------------------------------------------------------*/
 Vector3D operator / (const Vector3D& a, const double s)
 {
-    if (abs(a) < 1e-12)
+    if (abs(s) < 1e-12)
         throw std::runtime_error("Vector3D::operator/ division by zero");
     return Vector3D(
         a.x() / s, 
