@@ -28,18 +28,15 @@
   - [Method: `crunch()`](#method-crunch)
   - [Stream Operators](#stream-operators)
   - [Geometry Helpers](#geometry-helpers)
-
 - [FacetBox Usage Guide](#facetbox-class-usage-guide)
   - [Including](#including)
   - [Methods](#methods)
-
    * [push](#void-pushconst-vector3d-a-const-vector3d-b-const-vector3d-c)
    * [replace](#void-replace-size_t-idx-const-vector3d-a-const-vector3d-b-const-vector3d-c)
    * [clear](#void-clear-noexcept)
    * [center](#vector3d-center-const)
    * [translate](#void-translateconst-vector3d-offset)
    * [crunch](#void-crunchdouble-t-const-vector3d-pivot)
-  
   - [Full Example](#full-example)
   - [Building](#building)
 
