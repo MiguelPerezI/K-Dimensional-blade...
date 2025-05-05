@@ -29,7 +29,7 @@
   - [Stream Operators](#stream-operators)
   - [Geometry Helpers](#geometry-helpers)
 
-- [FacetBox Class Usage Guide](#facetbox-class-usage-guide)
+- [FacetBox Usage Guide](#facetbox-class-usage-guide)
   - [Including](#including)
   - [Methods](#methods)
 
