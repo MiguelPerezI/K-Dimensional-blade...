@@ -63,6 +63,28 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 Dodecahedron dodeca(2.0, Vector3D{0,0,0});;
+FacetBox box_sum;
+
+
+// Helper: convert HSV→RGB (all in [0,1])                                                  
+struct Color { float r, g, b; };
+Color hsv2rgb(float h, float s, float v) {
+    h = fmodf(h, 360.0f) / 60.0f;
+    int i = int(floor(h));
+    float f = h - i;
+    float p = v * (1 - s);
+    float q = v * (1 - s * f);
+    float t = v * (1 - s * (1 - f));
+    switch(i) {
+      case 0: return {v, t, p};
+      case 1: return {q, v, p};
+      case 2: return {p, v, t};
+      case 3: return {p, q, v};
+      case 4: return {t, p, v};
+      default:return {v, p, q};
+    }
+}
+
 
 void Setup() {
 
@@ -572,6 +594,22 @@ void Setup() {
         cout << " 5) scale(s, pivot): scale shape about pivot\n";
         dodec.scale(0.5, Vector3D{0,0,0});
         std::cout << "Scaled center = " << dodec.center() << "\n";
+
+
+
+
+
+
+        // for each facet in dodec, subdivide it around its centroid,
+        //    then append the three new sub-facets to box_sum
+        for (int i = 0; i < 36; i++) {
+            const Facet& f_ = dodec[i];
+            // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
+            FacetBox tiny = FacetBox::fromFacet(f_);
+            box_sum += tiny; 
+        }
+
+
     }
 
 }
@@ -588,13 +626,30 @@ void Draw() {
         drawSphere(f_1[1], 0.1f, 6, 6);
         drawSphere(f_1[2], 0.1f, 6, 6);
 
-        for (int i=0; i < 36; i++) {
-            Vector3D pos_i(dodeca[i]);
-            drawFacet(pos_i, 200, 10, 40, 1.0f);
-            std::string s_ = std::to_string(i);
-            const char* cstr = s_.c_str();
-            drawText3D(pos_i, s_);
-       }
+        //for (int i=0; i < 36*3; i++) {
+        //    //Vector3D pos_i(dodeca[i]);
+        //    drawFacet(box_sum[i], 200, 10, 40, 1.0f);
+        //    //std::string s_ = std::to_string(i);
+        //    //const char* cstr = s_.c_str();
+        //    //drawText3D(pos_i, s_);
+        //}
+
+
+
+// In your draw‐all loop:
+size_t total = box_sum.size();      // e.g. 36*3
+for(size_t i = 0; i < total; ++i) {
+    // pick hue from 0°→360° across the range
+    float hue = float(i) / float(total) * 360.0f;
+    Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+    // convert to 0–255 ints
+    int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+    drawFacet(box_sum[i], R, G, B, 1.0f);
+}
+
+
+
+
 	}
 }
 
@@ -666,7 +721,7 @@ void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
 //  alpha – [0..1] opacity (default 0.75)
 inline void drawFacet(const Facet& f,
                       int r, int g, int b,
-                      float alpha = 0.75f)
+                      float alpha)
 {
     // 1) Fetch geometry
     Vector3D normal = f.getNormal();   // (x,y,z)

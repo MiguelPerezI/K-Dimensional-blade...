@@ -32,6 +32,26 @@ using namespace std;
 
 class FacetBox {
 public:
+    /* - From Facet method ——————————————————————————————————————————————————*/
+    /**
+     * @brief Subdivide a single Facet about its centroid into three smaller facets.
+     *
+     * Given Facet f with vertices A,B,C and centroid D=f.getCenter(),
+     * returns a FacetBox containing triangles (D,A,B), (D,B,C), and (D,C,A).
+     */
+    static FacetBox fromFacet(const Facet& f) {
+        FacetBox box;
+        Vector3D D = f.getCenter();
+        Vector3D A = f[0];
+        Vector3D B = f[1];
+        Vector3D C = f[2];
+        box.push(D, A, B);
+        box.push(D, B, C);
+        box.push(D, C, A);
+        return box;
+    }
+
+public:
     /* - Constructors ———————————————————————————————————————————————————————*/
     /* - Rule of Zero: let the compiler generate default special members-----*/
     FacetBox() = default;
@@ -78,6 +98,25 @@ public:
      */
     void push(const Vector3D& A, const Vector3D& B, const Vector3D& C) {
         facets_.emplace_back(A, B, C);
+    }
+
+    /* - FacetBox algebra ———————————————————————————————————————————————————*/
+    /**
+     * @brief Merge another FacetBox into this one (union of facets).
+     */
+    void merge(const FacetBox& other) {
+        facets_.reserve(facets_.size() + other.facets_.size());
+        for (auto const& f : other.facets_) {
+            facets_.push_back(f);
+        }
+    }
+
+    /**
+     * @brief Combine operator: this = this ∪ other.
+     */
+    FacetBox& operator+=(const FacetBox& other) {
+        merge(other);
+        return *this;
     }
 
 
@@ -166,6 +205,14 @@ inline std::ostream& operator<<(std::ostream& os, const FacetBox& fb) {
         os << "  [" << i << "] " << fb[i] << "\n";
     }
     return os;
+}
+
+/**
+ * @brief Free-function operator to union two FacetBoxes.
+ */
+inline FacetBox operator+(FacetBox lhs, const FacetBox& rhs) {
+    lhs += rhs;
+    return lhs;
 }
 
 #endif // FACETBOX_H
