@@ -63,7 +63,8 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 Dodecahedron dodeca(2.0, Vector3D{0,0,0});;
-FacetBox box_sum;
+FacetBox box_sum_1;
+FacetBox box_sum_2;
 
 
 // Helper: convert HSV→RGB (all in [0,1])                                                  
@@ -83,6 +84,25 @@ Color hsv2rgb(float h, float s, float v) {
       case 4: return {t, p, v};
       default:return {v, p, q};
     }
+}
+
+
+// Subdivide each triangle in `initial` n times, returning only the final mesh.
+FacetBox refine(const FacetBox& initial, int n) {
+    FacetBox curr = initial;
+    FacetBox next;
+
+    for (int pass = 0; pass < n; ++pass) {
+        next.clear();  // throw away last level
+        for (size_t i = 0; i < curr.size(); ++i) {
+            // fromFacet() returns 3 new sub-triangles around the centroid
+            FacetBox tiny = FacetBox::fromFacet(curr[i]);
+            next += tiny;  // append those three
+        }
+        std::swap(curr, next);
+    }
+
+    return curr;  // only the final, fully-refined mesh
 }
 
 
@@ -596,19 +616,30 @@ void Setup() {
         std::cout << "Scaled center = " << dodec.center() << "\n";
 
 
+        FacetBox box_sum_0(dodec.getFacets());
 
+        //// for each facet in dodec, subdivide it around its centroid,
+        ////    then append the three new sub-facets to box_sum
+        //size_t total_ = box_sum_0.size();
+        //for (int i = 0; i < total_; i++) {
+        //    const Facet& f_ = box_sum_0[i];
+        //    // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
+        //    FacetBox tiny = FacetBox::fromFacet(f_);
+        //    box_sum_1 += tiny; 
+        //}
 
+        //// for each facet in dodec, subdivide it around its centroid,
+        ////    then append the three new sub-facets to box_sum
+        //size_t total_s = box_sum_1.size(); 
+        //for (int i = 0; i < total_s; i++) {
+        //    const Facet& f_ = box_sum_1[i];
+        //    // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
+        //    FacetBox tiny = FacetBox::fromFacet(f_);
+        //    box_sum_2 += tiny; 
+        //}
 
-
-        // for each facet in dodec, subdivide it around its centroid,
-        //    then append the three new sub-facets to box_sum
-        for (int i = 0; i < 36; i++) {
-            const Facet& f_ = dodec[i];
-            // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
-            FacetBox tiny = FacetBox::fromFacet(f_);
-            box_sum += tiny; 
-        }
-
+        int levels = 5;  // or however many you like
+        box_sum_2 = refine(box_sum_0, levels);
 
     }
 
@@ -626,26 +657,16 @@ void Draw() {
         drawSphere(f_1[1], 0.1f, 6, 6);
         drawSphere(f_1[2], 0.1f, 6, 6);
 
-        //for (int i=0; i < 36*3; i++) {
-        //    //Vector3D pos_i(dodeca[i]);
-        //    drawFacet(box_sum[i], 200, 10, 40, 1.0f);
-        //    //std::string s_ = std::to_string(i);
-        //    //const char* cstr = s_.c_str();
-        //    //drawText3D(pos_i, s_);
-        //}
-
-
-
-// In your draw‐all loop:
-size_t total = box_sum.size();      // e.g. 36*3
-for(size_t i = 0; i < total; ++i) {
-    // pick hue from 0°→360° across the range
-    float hue = float(i) / float(total) * 360.0f;
-    Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
-    // convert to 0–255 ints
-    int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-    drawFacet(box_sum[i], R, G, B, 1.0f);
-}
+        // In your draw‐all loop:
+        size_t total = box_sum_2.size();      // e.g. 36*3
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_sum_2[i], R, G, B, 1.0f);
+        }
 
 
 

@@ -120,6 +120,12 @@ public:
         buildFacets();
     }
 
+    /**
+     * @brief Retrieve the underlying FacetBox of 36 facets.
+     */
+    const FacetBox& getFacets() const noexcept {
+        return facets_;
+    }
 
 private:
     std::vector<Quaternion> verts_; ///< 20 dodecahedron vertices
