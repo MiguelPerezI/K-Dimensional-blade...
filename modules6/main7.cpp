@@ -639,7 +639,7 @@ void Setup() {
         //}
 
         int levels = 5;  // or however many you like
-        box_sum_2 = refine(box_sum_0, levels);
+        box_sum_2 = box_sum_0.refine(levels);
 
     }
 

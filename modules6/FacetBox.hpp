@@ -190,6 +190,27 @@ public:
             f.crunch(t, pivot);
     }
 
+
+    /* — Refinement — subdivide all triangles n times around centroids ————————— */
+    /**
+     * @brief Return a new FacetBox with each facet subdivided n times.
+     * Each triangle is split into three around its centroid per iteration.
+     */
+    FacetBox refine(int n) const {
+        FacetBox curr = *this;
+        FacetBox next;
+        for (int pass = 0; pass < n; ++pass) {
+            next.clear();
+            for (size_t i = 0; i < curr.size(); ++i) {
+                FacetBox tiny = FacetBox::fromFacet(curr[i]);
+                next += tiny;
+            }
+            std::swap(curr, next);
+        }
+        return curr;
+    }
+
+
 private:
     std::vector<Facet> facets_;  ///< underlying storage
 
