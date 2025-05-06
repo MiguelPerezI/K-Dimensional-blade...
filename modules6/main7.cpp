@@ -638,7 +638,7 @@ void Setup() {
         //    box_sum_2 += tiny; 
         //}
 
-        int levels = 5;  // or however many you like
+        int levels = 3;  // or however many you like
         box_sum_2 = box_sum_0.refine(levels);
 
     }
