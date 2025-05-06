@@ -591,7 +591,7 @@ void Setup() {
 
         cout << " - Method usage examples ——————————————————————————————————————————————\n";
         // Construct a sample dodecahedron:
-        Dodecahedron dodec(2.0, Vector3D{0,0,0});
+        Dodecahedron dodec(2.0, Vector3D{0,0,0.0});
         
         cout << " 1) faceCount(): get number of triangular faces\n";
         size_t count = dodec.faceCount();
@@ -608,7 +608,7 @@ void Setup() {
         std::cout << "Center = " << ctr0 << "\n";
         
         cout << " 4) translate(offset): move entire shape by a vector\n";
-        dodec.translate(Vector3D{1,1,1});
+        //dodec.translate(Vector3D{1,1,1});
         std::cout << "Translated center = " << dodec.center() << "\n";
         
         cout << " 5) scale(s, pivot): scale shape about pivot\n";
@@ -639,7 +639,7 @@ void Setup() {
         //}
 
         int levels = 3;  // or however many you like
-        box_sum_2 = box_sum_0.refine(levels);
+        box_sum_2 = box_sum_0.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
 
     }
 
@@ -652,10 +652,10 @@ void Draw() {
     static int ciclo = 1;  // or however you manage visibility
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/	
-        drawFacet(f_1, 200, 10, 40, 0.75f);
-        drawSphere(f_1[0], 0.1f, 6, 6);
-        drawSphere(f_1[1], 0.1f, 6, 6);
-        drawSphere(f_1[2], 0.1f, 6, 6);
+        //drawFacet(f_1, 200, 10, 40, 0.75f);
+        //drawSphere(f_1[0], 0.1f, 6, 6);
+        //drawSphere(f_1[1], 0.1f, 6, 6);
+        //drawSphere(f_1[2], 0.1f, 6, 6);
 
         // In your draw‐all loop:
         size_t total = box_sum_2.size();      // e.g. 36*3
@@ -770,7 +770,7 @@ inline void drawFacet(const Facet& f,
 
     // 5) Draw outline
     glColor4f(0.0f, 0.0f, 0.0f, alpha);   // black lines
-    glLineWidth(1.5f);
+    glLineWidth(0.25f);
     glBegin(GL_LINE_LOOP);
         glVertex3f(A.x(), A.y(), A.z());
         glVertex3f(B.x(), B.y(), B.z());

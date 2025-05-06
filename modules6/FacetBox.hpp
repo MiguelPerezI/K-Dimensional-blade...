@@ -41,13 +41,73 @@ public:
      */
     static FacetBox fromFacet(const Facet& f) {
         FacetBox box;
+        Vector3D D = unit(f.getCenter());
+        Vector3D A = unit(f[0]);
+        Vector3D B = unit(f[1]);
+        Vector3D C = unit(f[2]);
+        box.push(D, A, B);
+        box.push(D, B, C);
+        box.push(D, C, A);
+        return box;
+    }
+
+    /* — From Facet — midpoint subdivision into 4 facets ————————————————————— */
+    /**
+     * FacetBox method that subdivides a given Facet into 4 parts by midpoints.
+     */
+    static FacetBox subdivide4(const Facet& f) {
+        FacetBox box;
+        Vector3D A = unit(f[0]);
+        Vector3D B = unit(f[1]);
+        Vector3D C = unit(f[2]);
+        Vector3D A0 = unit(line(0.5, A, B));
+        Vector3D B0 = unit(line(0.5, B, C));
+        Vector3D C0 = unit(line(0.5, C, A));
+        box.push(A, A0, C0);
+        box.push(B, B0, A0);
+        box.push(C, C0, B0);
+        box.push(A0, B0, C0);
+        return box;
+    }
+
+    /* — From Facet — midpoint subdivision into 6 facets ————————————————————— */
+    /**
+     * FacetBox method that subdivides a given Facet into 4 parts by midpoints.
+     */
+    static FacetBox subdivide6(const Facet& f) {
+        FacetBox box;
         Vector3D D = f.getCenter();
         Vector3D A = f[0];
         Vector3D B = f[1];
         Vector3D C = f[2];
-        box.push(D, A, B);
-        box.push(D, B, C);
-        box.push(D, C, A);
+        Vector3D A0 = line(0.5, A, B);
+        Vector3D B0 = line(0.5, B, C);
+        Vector3D C0 = line(0.5, C, A);
+        box.push(D,  A, A0);
+        box.push(D, A0,  B);
+        box.push(D,  B, B0);
+        box.push(D, B0,  C);
+        box.push(D,  C, C0);
+        box.push(D, C0,  A);
+        return box;
+    }
+
+    /* — From Facet — Sierpinski subdivision————————————————————————————————— */
+    /**
+     * FacetBox method that subdivides a given Facet into 4 parts by midpoints.
+     */
+    static FacetBox sierpinski(const Facet& f) {
+        FacetBox box;
+        Vector3D A = f[0];
+        Vector3D B = f[1];
+        Vector3D C = f[2];
+        Vector3D A0 = line(0.5, A, B);
+        Vector3D B0 = line(0.5, B, C);
+        Vector3D C0 = line(0.5, C, A);
+        box.push(A, A0, C0);
+        box.push(B, B0, A0);
+        box.push(C, C0, B0);
+        //box.push(A0, B0, C0);
         return box;
     }
 
@@ -193,22 +253,62 @@ public:
 
     /* — Refinement — subdivide all triangles n times around centroids ————————— */
     /**
-     * @brief Return a new FacetBox with each facet subdivided n times.
-     * Each triangle is split into three around its centroid per iteration.
+     * @brief Choose a subdivision strategy for refining.
      */
-    FacetBox refine(int n) const {
+    enum class SubdivisionMode { Centroid3, Midpoint4, Midpoint6, Sierpinski};
+
+    /**
+     * @brief Return a new FacetBox with each facet subdivided n times.
+     * @param n Number of refinement iterations
+     * @param mode Which subdivision pattern to use: Centroid3 or Midpoint4
+     */
+
+    //FacetBox refine(int n, SubdivisionMode mode = SubdivisionMode::Centroid3) const {
+    //    FacetBox curr = *this;
+    //    FacetBox next;
+    //    for (int pass = 0; pass < n; ++pass) {
+    //        next.clear();
+    //        for (auto const& f : curr.facets_) {
+    //            if (mode == SubdivisionMode::Centroid3) {
+    //                next += fromFacet(f);
+    //            } else {
+    //                next += subdivide4(f);
+    //            }
+    //        }
+    //        std::swap(curr, next);
+    //    }
+    //    return curr;
+    //}
+
+    FacetBox refine(int n, SubdivisionMode mode = SubdivisionMode::Centroid3) const {
         FacetBox curr = *this;
         FacetBox next;
         for (int pass = 0; pass < n; ++pass) {
             next.clear();
-            for (size_t i = 0; i < curr.size(); ++i) {
-                FacetBox tiny = FacetBox::fromFacet(curr[i]);
-                next += tiny;
+            for (auto const& f : curr.facets_) {
+                switch(mode) {
+                    case SubdivisionMode::Centroid3:
+                        next += fromFacet(f);
+                        break;
+                    case SubdivisionMode::Midpoint4:
+                        next += subdivide4(f);
+                        break;
+                    case SubdivisionMode::Midpoint6:
+                        next += subdivide6(f);
+                        break;
+                    case SubdivisionMode::Sierpinski:
+                        next += sierpinski(f);
+                        break;
+                }
             }
             std::swap(curr, next);
         }
         return curr;
     }
+
+    /* - Example usage */
+    // mesh3 = box.refine(2, FacetBox::SubdivisionMode::Centroid3);
+    // mesh4 = box.refine(2, FacetBox::SubdivisionMode::Midpoint4);
 
 
 private:
