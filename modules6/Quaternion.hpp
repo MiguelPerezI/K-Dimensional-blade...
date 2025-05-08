@@ -65,6 +65,7 @@ class Quaternion {
         Quaternion conjugate() const noexcept                // u  −v⃗
         { return Quaternion{ u, -v }; }
 
+        Quaternion toHyperboloid() const;
 /*----- free-function operators (declared below) ------------------------*/
 };
 

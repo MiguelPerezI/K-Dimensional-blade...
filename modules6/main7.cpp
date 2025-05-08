@@ -63,8 +63,10 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 Dodecahedron dodeca(2.0, Vector3D{0,0,0});;
-FacetBox box_sum_1;
-FacetBox box_sum_2;
+FacetBox box_out_0;
+FacetBox box_out_1;
+FacetBox box_out_2;
+FacetBox box_out_3;
 
 
 // Helper: convert HSV→RGB (all in [0,1])                                                  
@@ -616,30 +618,22 @@ void Setup() {
         std::cout << "Scaled center = " << dodec.center() << "\n";
 
 
-        FacetBox box_sum_0(dodec.getFacets());
+        /* - Declare a set of dodecahedrons ————————————————————————————————————————————*/
+        Dodecahedron dodec_0(1.0, Vector3D{ 0,0,0.0});
+        Dodecahedron dodec_1(1.0, Vector3D{ 2.2,0.0});
+        Dodecahedron dodec_2(1.0, Vector3D{-2.2,0.0});
+        Dodecahedron dodec_3(1.0, Vector3D{ 4.2,0.0});
 
-        //// for each facet in dodec, subdivide it around its centroid,
-        ////    then append the three new sub-facets to box_sum
-        //size_t total_ = box_sum_0.size();
-        //for (int i = 0; i < total_; i++) {
-        //    const Facet& f_ = box_sum_0[i];
-        //    // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
-        //    FacetBox tiny = FacetBox::fromFacet(f_);
-        //    box_sum_1 += tiny; 
-        //}
+        FacetBox box_sum_0(dodec_0.getFacets());
+        FacetBox box_sum_1(dodec_1.getFacets());
+        FacetBox box_sum_2(dodec_2.getFacets());
+        FacetBox box_sum_3(dodec_3.getFacets());
 
-        //// for each facet in dodec, subdivide it around its centroid,
-        ////    then append the three new sub-facets to box_sum
-        //size_t total_s = box_sum_1.size(); 
-        //for (int i = 0; i < total_s; i++) {
-        //    const Facet& f_ = box_sum_1[i];
-        //    // fromFacet() returns a FacetBox of exactly 3 facets (D,A,B),(D,B,C),(D,C,A)
-        //    FacetBox tiny = FacetBox::fromFacet(f_);
-        //    box_sum_2 += tiny; 
-        //}
-
-        int levels = 3;  // or however many you like
-        box_sum_2 = box_sum_0.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        int levels = 4;  // or however many you like
+        box_out_0 = box_sum_0.refine(levels, FacetBox::SubdivisionMode::Centroid3);
+        box_out_1 = box_sum_1.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        box_out_2 = box_sum_2.refine(levels, FacetBox::SubdivisionMode::Midpoint6);
+        box_out_3 = box_sum_3.refine(levels, FacetBox::SubdivisionMode::Sierpinski);
 
     }
 
@@ -658,17 +652,47 @@ void Draw() {
         //drawSphere(f_1[2], 0.1f, 6, 6);
 
         // In your draw‐all loop:
-        size_t total = box_sum_2.size();      // e.g. 36*3
+        size_t total = box_out_0.size();      // e.g. 36*3
         for(size_t i = 0; i < total; ++i) {
             // pick hue from 0°→360° across the range
             float hue = float(i) / float(total) * 360.0f;
             Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
             // convert to 0–255 ints
             int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-            drawFacet(box_sum_2[i], R, G, B, 1.0f);
+            drawFacet(box_out_0[i], R, G, B, 1.0f);
         }
 
 
+        total = box_out_1.size();      // e.g. 36*3
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_out_1[i], R, G, B, 1.0f);
+        }
+
+        total = box_out_2.size();      // e.g. 36*3
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_out_2[i], R, G, B, 1.0f);                                                                                                                                           
+        }
+
+
+        total = box_out_3.size();      // e.g. 36*3
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_out_3[i], R, G, B, 1.0f);                                                                                                                                           
+        }
 
 
 	}

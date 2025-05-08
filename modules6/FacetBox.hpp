@@ -41,10 +41,10 @@ public:
      */
     static FacetBox fromFacet(const Facet& f) {
         FacetBox box;
-        Vector3D D = unit(f.getCenter());
-        Vector3D A = unit(f[0]);
-        Vector3D B = unit(f[1]);
-        Vector3D C = unit(f[2]);
+        Vector3D D = f.getCenter();
+        Vector3D A = f[0];
+        Vector3D B = f[1];
+        Vector3D C = f[2];
         box.push(D, A, B);
         box.push(D, B, C);
         box.push(D, C, A);
@@ -57,12 +57,12 @@ public:
      */
     static FacetBox subdivide4(const Facet& f) {
         FacetBox box;
-        Vector3D A = unit(f[0]);
-        Vector3D B = unit(f[1]);
-        Vector3D C = unit(f[2]);
-        Vector3D A0 = unit(line(0.5, A, B));
-        Vector3D B0 = unit(line(0.5, B, C));
-        Vector3D C0 = unit(line(0.5, C, A));
+        Vector3D A =  f[0];
+        Vector3D B =  f[1];
+        Vector3D C =  f[2];
+        Vector3D A0 = line(0.5, A, B);
+        Vector3D B0 = line(0.5, B, C);
+        Vector3D C0 = line(0.5, C, A);
         box.push(A, A0, C0);
         box.push(B, B0, A0);
         box.push(C, C0, B0);
@@ -76,10 +76,10 @@ public:
      */
     static FacetBox subdivide6(const Facet& f) {
         FacetBox box;
-        Vector3D D = f.getCenter();
-        Vector3D A = f[0];
-        Vector3D B = f[1];
-        Vector3D C = f[2];
+        Vector3D D =  f.getCenter();
+        Vector3D A =  f[0];
+        Vector3D B =  f[1];
+        Vector3D C =  f[2];
         Vector3D A0 = line(0.5, A, B);
         Vector3D B0 = line(0.5, B, C);
         Vector3D C0 = line(0.5, C, A);
@@ -250,6 +250,15 @@ public:
             f.crunch(t, pivot);
     }
 
+    /* Hyperbolic on entire mesh ———————————————————————————————————————————*/
+    void applyHyperboloid() {
+        for(auto& f: facets_) f.applyHyperboloid();
+    }
+    FacetBox hyperboloid() const {
+        FacetBox out = *this;
+        out.applyHyperboloid();
+        return out;
+    }
 
     /* — Refinement — subdivide all triangles n times around centroids ————————— */
     /**
@@ -262,23 +271,6 @@ public:
      * @param n Number of refinement iterations
      * @param mode Which subdivision pattern to use: Centroid3 or Midpoint4
      */
-
-    //FacetBox refine(int n, SubdivisionMode mode = SubdivisionMode::Centroid3) const {
-    //    FacetBox curr = *this;
-    //    FacetBox next;
-    //    for (int pass = 0; pass < n; ++pass) {
-    //        next.clear();
-    //        for (auto const& f : curr.facets_) {
-    //            if (mode == SubdivisionMode::Centroid3) {
-    //                next += fromFacet(f);
-    //            } else {
-    //                next += subdivide4(f);
-    //            }
-    //        }
-    //        std::swap(curr, next);
-    //    }
-    //    return curr;
-    //}
 
     FacetBox refine(int n, SubdivisionMode mode = SubdivisionMode::Centroid3) const {
         FacetBox curr = *this;

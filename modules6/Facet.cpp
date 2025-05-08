@@ -70,6 +70,27 @@ Vector3D Facet::getCenter() const
     return (A.V() + B.V() + C.V()) / 3.0;
 }
 
+/*—————————————————————————————————————————————————————————————————————————————*/
+// Hyperbolic support
+/*—————————————————————————————————————————————————————————————————————————————*/
+/**
+ * Mutate in-place: project each vertex via Quaternion::toHyperboloid().
+ * @throws std::domain_error if any vertex lies outside unit ball
+ */
+void Facet::applyHyperboloid() {
+    Quaternion aH = A.toHyperboloid();
+    Quaternion bH = B.toHyperboloid();
+    Quaternion cH = C.toHyperboloid();
+    updateFacet(aH.V(), bH.V(), cH.V());
+}
+/**
+ * Return a new Facet with hyperbolic projection applied.
+ */
+Facet Facet::hyperboloid() const {
+    Facet tmp = *this;
+    tmp.applyHyperboloid();
+    return tmp;
+}
 
 /*——————————————————————————————————————————————————————————————————————————————*/
 // Output stream

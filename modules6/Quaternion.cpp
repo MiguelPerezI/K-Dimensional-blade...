@@ -64,6 +64,22 @@ Quaternion& Quaternion::operator/=(double scalar) {
     return *this;
 }
 
+/*----- Hyperbolic projection ——————————————————————————————————————————*/
+    /*----- Hyperbolic projection — subgroup toHyperboloid ----------------------
+     * Project a pure-vector quaternion (r()==0) from the unit ball into
+     * the hyperboloid model via µ(x) = (1/√(1−‖x‖²), x/√(1−‖x‖²)),
+     * then re-project to the gnomic disk: (0, x') where x' = x/(1+u').
+     * @throws std::domain_error if ‖x‖ ≥ 1
+     */
+    Quaternion Quaternion::toHyperboloid() const {
+        double sq = v * v;  // squared norm of vector part
+        if (sq >= 1.0) throw std::domain_error("toHyperboloid: vector norm must be < 1");
+        double s = 1.0 / std::sqrt(1.0 - sq);
+        Quaternion ret{ s, s * v };
+        // final gnomic re-projection
+        return Quaternion{ 0.0, (1.0 / (1.0 + ret.r())) * ret.V() };
+    }
+
 /* ---------- Free-function Operators --------------------------------------- */
 // Quaternion addition
 Quaternion operator + (const Quaternion& a, const Quaternion& b) {

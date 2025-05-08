@@ -65,6 +65,10 @@ class Facet {
     /* Scale (crunch) the triangle with respect to a point -------------------*/
     void crunch(double t, const Vector3D& a);
 
+    /* Hyperbolic support*/
+    void applyHyperboloid();
+    Facet hyperboloid() const;
+
 };
 
 istream& operator >> (istream& is, Facet& a);
