@@ -141,7 +141,7 @@ std::cout << "u = " << u << '\n'
 The equality comparison operator `==` for `Vector3D` objects uses a tolerance-based approach inspired by a result from **real analysis**:
 
 > **Theorem (Bartle & Sherbert, _Introduction to Real Analysis_):**  
-> $Let a\in\mathbb{R}\text{ and for each }\epsilon>0\text{ define }V_\epsilon(a)={\,x\in\mathbb{R}:\;|x-a|<\epsilon}.\text{ If }x\in V_\epsilon(a)\quad\text{for every }\epsilon>0,\text{ then }x=a.$
+> $Let a\in\mathbb{R}\text{ and for each }\epsilon>0\text{ define }V_\epsilon(a)=\\{\,x\in\mathbb{R}:\;|x-a|<\epsilon\\}.\text{ If }x\in V_\epsilon(a)\quad\text{for every }\epsilon>0,\text{ then }x=a.$
 
 This guides the implementation of `operator==` using a neighborhood epsilon approach. In `Vector3D`, two vectors `a` and `b` are considered equal if their Euclidean distance is less than a small epsilon:
 
