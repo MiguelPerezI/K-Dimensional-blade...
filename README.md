@@ -134,6 +134,9 @@ std::cout << "u = " << u << '\n'
 | **Geometry Helpers**      | Linear interpolation                                   | `line()`                                               |
 | **Output**                | Streaming to `std::ostream`                            | `operator<<`                                           |
 | **Vector Length**         | Euclidean norm in $\mathrm{R}^3$                       | `abs()`                                                |
+| **Inifity Norm**          | Euclidean inifinty norm in $\mathrm{R}^3$              | `infty()`                                              |
+| **Normal**                | Mapping to $B^n = \\{\,x \in \mathbb{R}^3 : \|x\| < 1\\}$| `unit()`                                              |
+
 
 ---
 
