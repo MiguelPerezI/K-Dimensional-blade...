@@ -738,6 +738,72 @@ box.crunch(0.5, Vector3D(0,0,0));
 // each vertex is now halfway between its old position and the origin
 ```
 
+## FacetBox “Algebra” Methods
+
+`FacetBox` provides a simple way to **merge** two collections of triangular facets.  These operations treat each `FacetBox` as a set of triangles and perform a union (concatenation) of their contents.
+
+---
+
+## `void merge(const FacetBox& other)`
+
+```cpp
+/**
+ * @brief Append all facets from `other` into *this*.
+ *
+ * Equivalent to the set‐union (multiset) of triangles:
+ *   this ← this ∪ other
+ *
+ * @param other  The FacetBox whose facets will be appended.
+ */
+void FacetBox::merge(const FacetBox& other);
+```
+
+```cpp
+FacetBox boxA, boxB;
+// ... fill boxA and boxB ...
+boxA.merge(boxB);
+// Now boxA contains its original facets followed by those from boxB.
+
+
+/**
+ * @brief In‐place union of two FacetBoxes.
+ *
+ * Equivalent to:
+ *   this.merge(other);
+ *   return *this;
+ *
+ * Allows chaining:
+ *   box1 += box2 += box3;
+ */
+FacetBox& FacetBox::operator+=(const FacetBox& other);
+
+```
+
+### Usage
+
+```cpp
+FacetBox a, b, c;
+// ... fill a, b, c ...
+a += b;        // a now contains facets from a then b
+a += c;        // a now also contains facets from c
+
+
+FacetBox x, y, z;
+x += y += z;   // y becomes y∪z, then x becomes x∪y∪z
+
+```
+
+### Notes
+
+
+
+>   1. These operations do not eliminate duplicates: if the same triangle appears in both boxes, it will appear twice after merging.
+
+>   2. If you need set‐like behavior (no duplicates), you must post‐process facets_ (e.g., sort + std::unique or use a std::unordered_set of hashable facets).
+
+>   3. The order of facets is preserved: first all facets of the left‐hand operand, then those of the right‐hand operand.
+
+
 ---
 
 ## Full Example
