@@ -370,7 +370,9 @@ The *Lorentzian inner product* in $\mathbb{R}^{n+1}$ is defined as
 $\langle x, y \rangle = -x_{n+1}y_{n+1} + \sum_{i=1}^{n} x_{i}y_{i}$.
 
 Denote $\mathbb{R}^n$ as $\mathbb{R}^n \bigcup \\{0\\}$. Let $x \in D^{n}=\\{x \in \mathbb{R}^{n} : \|x\| < 1\\}$
+and $e_{n+1} \in \mathbb{R}^{n+1}$, thus $x+e_{n+1} \in \mathbb{R}^{n+1}$.
 
+Since $x=(x_1, x_2, \cdots, x_n. 0)$, lets define $\bar{x} = (x_1, x_2, \cdots, x_n)$.
 ## Output Streaming
 
 ```cpp
