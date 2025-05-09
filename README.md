@@ -627,6 +627,7 @@ Facet Facet::hyperboloid() const {
     copy.applyHyperboloid(); // mutate it
     return copy;             // return the result
 }
+```
 
 ---
 
