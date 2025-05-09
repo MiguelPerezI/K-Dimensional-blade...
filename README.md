@@ -378,8 +378,18 @@ then:
 2.  Since $x \in D^{n}$ by definition $x$ is time-like and thus $\Vert x + e_{n+1}\Vert \in \mathbb{C}$.
     Then, $\vert\Vert x+e_{n+1} \vert\Vert = \Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}$.
 
-3.  Now we can define the Gnomonic projection $\mu:D^n \mapsto \mathbb{H}^n$:
+3.  Now we can define the **Gnomonic projection** $\mu:D^n \mapsto \mathbb{H}^n$:
     Whis is given by $\mu (x) = \tfrac{x+e_{n+1}}{\vert\Vert x + e_{n+1} \Vert\vert} = \tfrac{1}{\Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}}\Bigl(x + e_{n+1}\Bigr)$. 
+
+4.  **The stereographic project $\psi$** of the open unit ball $B^n$ onto hyperbolic space $\mathbb{H}^n$ is defined by:
+    
+    Projection $x \in B^n$ away from $-e_{n+1}$ until ir meets with $\mathbb{H}^{n}$ is the unique point $\lambda (x)$. A $\lambda (x)$ is on the line passing
+    through $x$ in the direction of $x + e_{n+1}$, there is a scalar $s$ such that: $\lambda (x) = x + s(x + e_{n+1})$.
+    The condition $\Vert \lambda (x) \Vert^{2} = -1$, leads to the value $s = \tfrac{1+|x|^2}{1-|x|^2}$.
+    And $\lambda (x) = \Bigl(\frac{2x_1}{1-|x|^2}, \cdots, \frac{2x_n}{1-|x|^2}, \frac{1+|x|^2}{1-|x|^2}\Bigr)$.
+    The map $\lambda (x)$ is a bijection of $B^n$ onto $\mathbb{H}^n$. The inverse of $\lambda (x)$ is given by:
+    $\lambda^{-1}(x) = \Bigl(\frac{y_1}{1+y_{n+1}}, \cdots, \frac{y_n}{1+y_{n+1}}\Bigr)$
+
 ## Output Streaming
 
 ```cpp
