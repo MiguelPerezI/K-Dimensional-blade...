@@ -390,9 +390,9 @@ then:
     The map $\lambda (x)$ is a bijection of $B^n$ onto $\mathbb{H}^n$. The inverse of $\lambda (x)$ is given by:
     $\lambda^{-1}(x) = \Bigl(\frac{y_1}{1+y_{n+1}}, \cdots, \frac{y_n}{1+y_{n+1}}\Bigr)$
 
-5.  **Composition: \(\lambda \circ \mu\)**  
+5.  **Composition: $\lambda \circ \mu$**  
    The method implemented in `Quaternion::toHyperboloid()` is exactly
-   the composition $D^n \xrightarrow{\mu} H^n \xrightarrow{\lambda} B^n$.
+   the composition $D^n \xrightarrow{\mu} H^n$  $\xrightarrow{\lambda} B^n$.
    - First, **$\mu$** lifts $x\in B^n$ up to the hyperboloid via
      $\mu(x) = \frac{x + e_{n+1}}{\sqrt{\,1-\|x\|^2\,}} = \Bigl(u', \mathbf x'\Bigr)$, $\quad u' = \tfrac1{\sqrt{1-\|x\|^2}},\$; $\mathbf x' = \tfrac{x}{\sqrt{1-\|x\|^2}}$.
    - Then, **$\lambda$** (the gnomic projection) sends $\mu(x)$ back into the unit ball by
