@@ -601,6 +601,35 @@ Prints the facet in a readable format.
 
 ---
 
+### Hyperbolic Support
+
+```cpp
+/**
+ * @brief Mutate this Facet in-place by hyperbolic projection.
+ * Each vertex \(A,B,C\) is replaced by \(\lambda(\mu(A))\), etc.
+ * @throws std::domain_error If any vertex lies on or outside the unit sphere.
+ */
+void Facet::applyHyperboloid() {
+    // 1) Lift and re-project each vertex quaternion
+    Quaternion Ah = A.toHyperboloid();  // (0,A)->Hyperboloid->disk
+    Quaternion Bh = B.toHyperboloid();
+    Quaternion Ch = C.toHyperboloid();
+    // 2) Extract their Vector3D parts and rebuild facet (recomputes N)
+    updateFacet( Ah.V(), Bh.V(), Ch.V() );
+}
+
+/**
+ * @brief Functional version: returns a new hyperbolically projected Facet,
+ * leaving *this unmodified.
+ */
+Facet Facet::hyperboloid() const {
+    Facet copy = *this;      // make a local copy
+    copy.applyHyperboloid(); // mutate it
+    return copy;             // return the result
+}
+
+---
+
 
 This `Facet` class provides a lightweight and expressive interface for 3D triangle modeling. Combined with the `Vector3D` and `Quaternion` classes, it forms a robust foundation for geometric computation and graphics programming.
 
