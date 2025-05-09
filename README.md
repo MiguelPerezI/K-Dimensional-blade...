@@ -322,16 +322,16 @@ then:
 
 3. Apply that rotation to `p`:  
    
-   $$
-   p_1 = Q\,p\,Q^{-1}
-   $$
+    $$
+    p_1 = Q\,p\,Q^{-1}
+    $$
 
 4. Finally translate `p_1` so that it’s moved from origin‐centered coordinates back to
    “around point `b`” in world space:
    
-   $$
-   p_{\mathrm{out}} = p_1 + (0, \mathbf{b})
-   $$
+    $$
+    p_{\mathrm{out}} = p_1 + (0, \mathbf{b})
+    $$
 
 ---
 
