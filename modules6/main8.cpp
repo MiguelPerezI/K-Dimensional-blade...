@@ -130,9 +130,9 @@ void Setup() {
         cout << "     \"-_\\_______/;;'        ~[Hyperbolic Dodecahedron Class]\n\n";
 
         // 1) Build your initial mesh (e.g. from a dodecahedron) 
-        Dodecahedron d1(0.9, Vector3D(0, 0, 0));
+        Dodecahedron d1(0.93, Vector3D(0, 0, 0), FaceMode::Pentagons);
         FacetBox box_sum_1(d1.getFacets());
-        int levels = 4;  // or however many you like
+        int levels = 5;  // or however many you like
         box_out_1 = box_sum_1.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
 
         // 2) Mutate in-place: project every triangle into hyperbolic space

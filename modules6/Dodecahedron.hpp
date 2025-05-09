@@ -55,11 +55,28 @@ public:
      * @brief Construct a dodecahedron of given radius centered at 'center'.
      * @param radius Distance from center to each vertex.
      * @param center Geometric center of the dodecahedron.
+     * Triangular version (36 facets)
      */
     Dodecahedron(double radius, const Vector3D& center) {
         initVertices(radius, center);
         buildFacets();
     }
+
+    /**
+     * @brief Construct a dodecahedron of given radius centered at 'center'.
+     * @param radius Distance from center to each vertex.
+     * @param center Geometric center of the dodecahedron.
+     * “Penta” version (12 pentagonal faces, if you implement buildFacesPenta)
+     */
+    enum class FaceMode { Triangles, Pentagons };
+    
+    Dodecahedron(double radius, const Vector3D& center, FaceMode mode) {
+        initVertices(radius, center);
+        if (mode == FaceMode::Pentagons) buildFacetsPenta();
+        else                              buildFacets();
+    }
+    // Usage: Dodecahedron d3(1.0, Vector3D{0,0,0}, FaceMode::Pentagons);
+
 
     /* - Face Count —————————————————————————————————————————————————————————*/
     /**
@@ -147,7 +164,18 @@ private:
         {14, 15, 17},   {3, 14, 17},    {2, 3, 17},
         {7, 18, 10},    {5, 7, 10},     {11, 5, 10},
         {14, 3, 4},     {13, 14, 4},    {19, 13, 4}
-};
+    };
+
+    // Indices of vertices forming each of the 36 triangles                                                                                                                             
+    static constexpr int penta_[12][5] = {
+        { 7, 18, 10, 11,  5}, {14, 15, 17,  2,  3},
+        {14,  3,  4, 19, 13}, {11, 12, 16,  6,  5},
+        { 9, 15, 14, 13,  8}, { 1,  7,  5,  6,  0},
+        {12,  8, 13, 19, 16}, {17, 18,  7,  1,  2},
+        {17, 15,  9, 10, 18}, { 0,  6, 16, 19,  4},
+        {11, 10,  9,  8, 12}, { 1,  0,  4,  3,  2}
+    };
+
 
     /* - Initialize vertices ————————————————————————————————————————————————*/
     /**
@@ -191,11 +219,53 @@ private:
         facets_.clear();
         for (int i = 0; i < 36; ++i) {
             auto const& t = tri_[i];
-                    // Construct each triangular face explicitly
-        Facet face( verts_[t[0]], verts_[t[1]], verts_[t[2]] );
-        facets_.push(face);
+            // Construct each triangular face explicitly
+            Facet face( verts_[t[0]], verts_[t[1]], verts_[t[2]] );
+            facets_.push(face);
         }
     }
+
+    /* - Build Mesh from Pentagons ——————————————————————————————————————————*/
+    /**
+     * @brief Rebuilds the FacetBox from current vertices and centroid.
+     */
+    void buildFacetsPenta() {
+        facets_.clear();
+    
+        // For each of the 12 pentagon index‐tuples in penta_…
+        for (auto const& idxs : penta_) {
+            // Unpack the five vertex‐indices:
+            auto [i0,i1,i2,i3,i4] = idxs;
+    
+            // Grab each point only once:
+            const Vector3D P0 = verts_[i0].V();
+            const Vector3D P1 = verts_[i1].V();
+            const Vector3D P2 = verts_[i2].V();
+            const Vector3D P3 = verts_[i3].V();
+            const Vector3D P4 = verts_[i4].V();
+    
+            // 1) Midpoint of edge P0→P1
+            Vector3D midpoint01 = line(0.5, P0, P1);
+    
+            // 2) “Weighted centroid”: 50% of the way from midpoint01 towards P3
+            double weight = 1.25;
+            Vector3D centroid = weight*line(0.5, P3, midpoint01);
+    
+            // Helper to push the triangle (centroid, A, B)
+            auto pushEdge = [&](const Vector3D& A, const Vector3D& B) {
+                facets_.push(centroid, A, B);
+            };
+    
+            // Build the 5 triangular facets around the pentagon
+            pushEdge(P0, P1);
+            pushEdge(P1, P2);
+            pushEdge(P2, P3);
+            pushEdge(P3, P4);
+            pushEdge(P4, P0);
+        }
+    }
+
+
 };
 
 
@@ -219,6 +289,8 @@ inline std::ostream& operator<<(std::ostream& os, const Dodecahedron& dd) {
     }
     return os;
 }
+
+using FaceMode = Dodecahedron::FaceMode;
 
 //class Torus {
 //

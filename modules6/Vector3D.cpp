@@ -153,7 +153,7 @@ Vector3D unit(const Vector3D& v)
 }
 
 /* helper for linear interpolation on a segment -------------------------*/
-Vector3D line(double t, Vector3D& b, Vector3D& e) noexcept
+Vector3D line(double t, const Vector3D& b, const Vector3D& e) noexcept
 {
    return b + t * (e-b);
 }
