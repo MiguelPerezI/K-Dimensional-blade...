@@ -304,8 +304,8 @@ Quaternion qCross = cross(q1, q3);                 // Quaternion-like cross prod
 Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to b using qRot axis
 ```
 
-### rotate() - explanation
 ---
+### rotate() - explanation
 
 Rotate a point‐quaternion `p` from position `a` to position `b` around a given axis.
 We treat `p` as a “point” in 3D space encoded as a pure‐vector quaternion,
@@ -333,7 +333,6 @@ then:
     $$
 ---
 
----
 
 ## Output Streaming
 
