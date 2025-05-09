@@ -407,6 +407,37 @@ then:
      ```
    - Hence **$toHyperboloid()$** = $\lambda\bigl(\mu(x)\bigr)$.
 
+### Hyperbolic Projection: `Quaternion::toHyperboloid()`
+
+```cpp
+/**
+ * @brief Project a pure-vector quaternion (real part zero) from the unit ball
+ *        into the hyperboloid model, then re-project back into the gnomic disk.
+ *
+ * The mapping is:
+ *   1. Lift x ∈ Bⁿ (‖x‖<1) to the hyperboloid Hⁿ via
+ *      μ(x) = (u′, x′) where
+ *        u′ = 1/√(1 − ‖x‖²), 
+ *        x′ = x / √(1 − ‖x‖²).
+ *   2. Project (u′, x′) back to the “gnomic” disk by
+ *      p(u′,x′) = x′ / (1 + u′),
+ *      yielding a pure-vector quaternion (0, y).
+ *
+ * @throws std::domain_error if ‖x‖ ≥ 1.
+ */
+Quaternion Quaternion::toHyperboloid() const {
+    // 1) Compute squared norm of vector part ‖x‖²
+    double sq = v * v;
+    if (sq >= 1.0)
+        throw std::domain_error("toHyperboloid: vector norm must be < 1");
+
+    // 2) Hyperboloid lift: u′ = 1/√(1−‖x‖²), x′ = x/√(1−‖x‖²)
+    double s = 1.0 / std::sqrt(1.0 - sq);
+    Quaternion ret{ s, s * v };  // ret.r()==u′, ret.V()==x′
+
+    // 3) Gnomic re-projection: y = x′/(1+u′)
+    return Quaternion{ 0.0, (1.0 / (1.0 + ret.r())) * ret.V() };
+}
 
 ## Output Streaming
 
