@@ -312,7 +312,7 @@ We treat `p` as a “point” in 3D space encoded as a pure‐vector quaternion,
 then:
 
 1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
-   onto the global “up” direction (0, 0, 1).
+   onto the global “up” direction (0, 0, 1). 
 2. Build the corresponding rotation quaternion  
    
    $$ 
