@@ -315,10 +315,7 @@ then:
    onto the global “up” direction (0, 0, 1). 
 2. Build the corresponding rotation quaternion  
    
-   $$ 
-   Q = Q_{\mathrm{an}}(\varphi,\tau)
-     = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)
-   $$
+   $Q = Q_{\mathrm{an}}(\varphi,\tau) = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)$
 
 3. Apply that rotation to `p`:
 
@@ -326,9 +323,8 @@ then:
 
 4. Finally translate `p₁` so it’s moved back to “around point `b`”:
 
-    $$
-    p_{\mathrm{out}} = p_1 + (0,\mathbf{b})
-    $$
+    $p_{\mathrm{out}} = p_1 + (0,\mathbf{b})$
+
 ---
 
 
