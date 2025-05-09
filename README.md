@@ -133,6 +133,7 @@ std::cout << "u = " << u << '\n'
 | **Dot & Cross**           | Inner and outer products                               | `operator*` (dot), `operator%` (cross)                 |
 | **Geometry Helpers**      | Linear interpolation                                   | `line()`                                               |
 | **Output**                | Streaming to `std::ostream`                            | `operator<<`                                           |
+| **Vector Length**         | Euclidean norm in $\mathrm{R}^3$                       | `abs()`                                                |
 
 ---
 
