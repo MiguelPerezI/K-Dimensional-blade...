@@ -133,9 +133,9 @@ std::cout << "u = " << u << '\n'
 | **Dot & Cross**           | Inner and outer products                               | `operator*` (dot), `operator%` (cross)                 |
 | **Geometry Helpers**      | Linear interpolation                                   | `line()`                                               |
 | **Output**                | Streaming to `std::ostream`                            | `operator<<`                                           |
-| **Vector Length**         | Euclidean norm in $\mathrm{R}^3$                       | `abs()`                                                |
-| **Inifity Norm**          | Euclidean inifinty norm in $\mathrm{R}^3$              | `infty()`                                              |
-| **Normal**                | Mapping to $B^n = \\{\,x \in \mathbb{R}^3 : \|x\| < 1\\}$| `unit()`                                              |
+| **Vector Length**         | Euclidean norm in $\mathbb{R}^3$                       | `abs()`                                                |
+| **Inifity Norm**          | Euclidean inifinty norm in $\mathbb{R}^3$              | `infty()`                                              |
+| **Normal**                | Mapping to $B^3 = \\{\,x \in \mathbb{R}^3 : \|x\| < 1\\}$| `unit()`                                             |
 
 
 ---
@@ -316,16 +316,30 @@ We treat `p` as a “point” in 3D space encoded as a pure‐vector quaternion,
 then:
 
 1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
-   onto the global “up” direction (0, 0, 1). 
-2. Build the corresponding rotation quaternion  
+   onto the global “up” direction $(0, 0, 1)$.
+
+2. **Colinearity check**: does $a-b$ already align with *z-axis*?
+
+3. Compute the rotation axis $/tau = normalize(normal × difference)$:
+    - normal.V(): axis we want to rotate around (as Vector3D)
+    - difference.V(): direction to align with $z$.
+
+4. Compute the rotation angle $\phi$ between the normal and difference:
+    - $\phi?arccps(normal-difference)$
+
+5. Build the unit quaternion representing rotation of φ about τ:
+    - $Q_{\mathrm{an}} = (cos(φ/2),  sin(φ/2)\tau)$
+    - $\tau$ = eigenvector for space
+
+3. Build the corresponding rotation quaternion  
    
    $Q = Q_{\mathrm{an}}(\varphi,\tau) = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)$
 
-3. Apply that rotation to `p`:
+4. Apply that rotation to `p`:
 
     $p_1 = Q\,p\,Q^{-1}$
 
-4. Finally translate `p₁` so it’s moved back to “around point `b`”:
+5. Finally translate `p₁` so it’s moved back to “around point `b`”:
 
     $p_{\mathrm{out}} = p_1 + (0,\mathbf{b})$
 
