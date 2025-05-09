@@ -392,9 +392,9 @@ then:
 
 5.  **Composition: \(\lambda \circ \mu\)**  
    The method implemented in `Quaternion::toHyperboloid()` is exactly
-   the composition $B^n \xrightarrow{\mu} H^n \xrightarrow{\lambda} B^n_{\text{gnomic}}$.
+   the composition $D^n \xrightarrow{\mu} H^n \xrightarrow{\lambda} B^n$.
    - First, **$\mu$** lifts $x\in B^n$ up to the hyperboloid via
-     $\mu(x) = \frac{x + e_{n+1}}{\sqrt{\,1-\|x\|^2\,}} = \Bigl(u',\,\mathbf x'\Bigr)$, $\quad u' = \tfrac1{\sqrt{1-\|x\|^2}},\$; $\mathbf x' = \tfrac{x}{\sqrt{1-\|x\|^2}}$.
+     $\mu(x) = \frac{x + e_{n+1}}{\sqrt{\,1-\|x\|^2\,}} = \Bigl(u', \mathbf x'\Bigr)$, $\quad u' = \tfrac1{\sqrt{1-\|x\|^2}},\$; $\mathbf x' = \tfrac{x}{\sqrt{1-\|x\|^2}}$.
    - Then, **$\lambda$** (the gnomic projection) sends $\mu(x)$ back into the unit ball by
      $\lambda\bigl(u',\mathbf x'\bigr) = \frac{\mathbf x'}{1 + u'}$.
    - Concretely, the code does exactly
