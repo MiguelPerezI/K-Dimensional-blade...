@@ -307,8 +307,8 @@ Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to 
 ### rotate() - explanation
 ---
 
-Rotate a point‐quaternion \(p\) from position \(a\) to position \(b\) around a given axis.
-We treat \(p\) as a “point” in \(E^3\) space encoded as a pure‐vector quaternion,
+Rotate a point‐quaternion `p` from position `a` to position `b` around a given axis.
+We treat `p` as a “point” in 3D space encoded as a pure‐vector quaternion,
 then:
 
 1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
@@ -321,11 +321,14 @@ then:
    $$
 
 3. Apply that rotation to `p`:  
+   
    $$
    p_1 = Q\,p\,Q^{-1}
    $$
-4. Finally translate \( p_1 \) so that it’s moved from origin‐centered coordinates back to
+
+4. Finally translate `p_1` so that it’s moved from origin‐centered coordinates back to
    “around point `b`” in world space:
+   
    $$
    p_{\mathrm{out}} = p_1 + (0, \mathbf{b})
    $$
