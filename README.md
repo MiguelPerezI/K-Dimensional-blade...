@@ -373,13 +373,13 @@ then:
     and $e_{n+1} \in \mathbb{R}^{n+1}$, thus $x+e_{n+1} \in \mathbb{R}^{n+1}$.
 
     Since $x=(x_{1}, x_{2}, \cdots, x_{n}. 0)$, lets define $\bar{x} = (x_{1}, x_{2}, \cdots, x_{n})$. With this notation
-    the *Lorentzian norm* in $\mathbb{R}^{n+1}$ is defined as $\|\|x\|\|= \langle x, y \rangle^{\tfrac12}= \bigl(-x_{n+1} + \sum_{i=1}^{n} x_i^2 \bigr)^{\tfrac12}= \bigl(-x_{n+1} + \|\bar x\|^{2}\bigr)^{\tfrac12}$.
+    the *Lorentzian norm* in $\mathbb{R}^{n+1}$ is defined as $\Vertx\Vert= \langle x, y \rangle^{\tfrac12}= \bigl(-x_{n+1} + \sum_{i=1}^{n} x_i^2 \bigr)^{\tfrac12}= \bigl(-x_{n+1} + \|\bar x\|^{2}\bigr)^{\tfrac12}$.
 
-2.  Since $x \in D^{n}$ by definition $x$ is time-like and thus $\vert\vert x + e_{n+1}\vert\vert \in \mathbb{C}$.
-    Then, $\vert\Vert x+e_{n+1} \vert\Vert = \Bigl( 1 - \|x\|^2 \Bigr)^{\tfrac{1}{2}}$.
+2.  Since $x \in D^{n}$ by definition $x$ is time-like and thus $\Vert x + e_{n+1}\Vert \in \mathbb{C}$.
+    Then, $\vert\Vert x+e_{n+1} \vert\Vert = \Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}$.
 
 3.  Now we can define the Gnomonic projection $\mu:D^n \mapsto \mathbb{H}^n$:
-    Whis is given by $\mu (x) = \tfrac{x+e_{n+1}}{\vert\Vert x + e_{n+1} \Vert\vert} = \tfrac{1}{\Bigl( 1 - \|x\|^2 \Bigr)^{\tfrac{1}{2}}}$. 
+    Whis is given by $\mu (x) = \tfrac{x+e_{n+1}}{\vert\Vert x + e_{n+1} \Vert\vert} = \tfrac{1}{\Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}}\Bigl(x + e_{n+1}\Bigr)$. 
 ## Output Streaming
 
 ```cpp
