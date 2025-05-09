@@ -322,9 +322,7 @@ then:
 
 3. Apply that rotation to `p`:
 
-    $$
-    p_1 = Q\,p\,Q^{-1}
-    $$
+    $p_1 = Q\,p\,Q^{-1}$
 
 4. Finally translate `p₁` so it’s moved back to “around point `b`”:
 
