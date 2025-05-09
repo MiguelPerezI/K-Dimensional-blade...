@@ -320,7 +320,7 @@ Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to 
 
 where
 
-    $ w = \cos\bigl(\tfrac{\theta}{2}\bigr) $
+    $$w = \cos\bigl(\tfrac{\theta}{2}\bigr)$$
 
 and
 
