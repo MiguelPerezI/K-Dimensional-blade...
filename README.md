@@ -316,11 +316,14 @@ Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to 
 **Purpose**: Construct a unit‐quaternion representing a rotation of $\theta$ radians about the given 3D `axis`.
 1. A rotation by angle θ around a unit vector **n** = $(nx, ny, nz)$ is encoded as:
     
-    $Q = \Bigl(\,\cos\tfrac\theta2,\;\sin\tfrac\theta2\,\mathbf n\Bigr) = \bigl(w,\,\mathbf v\bigr)$
+    $Q = \Bigl(\cos\tfrac\theta2,\sin\tfrac\theta2\,\mathbf n\Bigr) = \bigl(w\,\mathbf v\bigr)$
 
 where
 
     $w = \cos(\tfrac\theta2)$
+
+and
+
     $\mathbf v = \sin(\tfrac\theta2)\,\mathbf n$
 
 ---
