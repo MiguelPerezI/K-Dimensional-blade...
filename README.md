@@ -372,7 +372,10 @@ $\langle x, y \rangle = -x_{n+1}y_{n+1} + \sum_{i=1}^{n} x_{i}y_{i}$.
 Denote $\mathbb{R}^n$ as $\mathbb{R}^n \bigcup \\{0\\}$. Let $x \in D^{n}=\\{x \in \mathbb{R}^{n} : \|x\| < 1\\}$
 and $e_{n+1} \in \mathbb{R}^{n+1}$, thus $x+e_{n+1} \in \mathbb{R}^{n+1}$.
 
-Since $x=(x_1, x_2, \cdots, x_n. 0)$, lets define $\bar{x} = (x_1, x_2, \cdots, x_n)$.
+Since $x=(x_{1}, x_{2}, \cdots, x_{n}. 0)$, lets define $\bar{x} = (x_{1}, x_{2}, \cdots, x_{n})$. With this notation
+the *Lorentzian norm* in $\mathbb{R}^{n+1}$ is defined as
+$\||x\|| = \langle x, y \rangle_^{/tfracc{1}{2}} = \Bigl(-x_{n+1} + \sum_{i=1}^{n}x_{i}^2 \Bigr)^{/tfracc{1}{2}} = \Bigl(-x_{n+1} + \|\bar{x}\| \Bigr)^{\tfracc{1}{2}}$.
+
 ## Output Streaming
 
 ```cpp
