@@ -304,6 +304,32 @@ Quaternion qCross = cross(q1, q3);                 // Quaternion-like cross prod
 Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to b using qRot axis
 ```
 
+### rotate() - explanation
+---
+
+Rotate a point‐quaternion \(p\) from position \(a\) to position \(b\) around a given axis.
+We treat \(p\) as a “point” in \(E^3\) space encoded as a pure‐vector quaternion,
+then:
+
+1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
+   onto the global “up” direction (0, 0, 1).
+2. Build the corresponding rotation quaternion  
+   $$ 
+   Q = Q_{\mathrm{an}}(\varphi,\tau)
+     = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)
+   $$
+3. Apply that rotation to `p`:  
+   $$
+   p_1 = Q\,p\,Q^{-1}
+   $$
+4. Finally translate \( p_1 \) so that it’s moved from origin‐centered coordinates back to
+   “around point `b`” in world space:
+   $$
+   p_{\mathrm{out}} = p_1 + (0, \mathbf{b})
+   $$
+
+---
+
 ---
 
 ## Output Streaming

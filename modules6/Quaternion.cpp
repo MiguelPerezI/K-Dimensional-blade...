@@ -152,28 +152,39 @@ Quaternion rotate(
 
 	// 1) Compute unit direction from b to a as a pure-vector quaternion:
     //    difference = (0, normalize(a - b))
-	Quaternion difference = Quaternion( 0.0, unit(a-b));
+	Quaternion difference{ 0.0, unit(a-b) };
 
     // 2) Quick colinearity check: does (a - b) already align with the z-axis?
     //    If line(...) returns 1, the vector (a-b) lies in the z-direction.
-	int ll = areColinear(unit(a-b), Vector3D(0, 0, 1), Vector3D(0, 0, 0));
+	int isColinearWithZ = areColinear(unit(a-b), {0, 0, 1}, {0, 0, 0});
+	if (isColinearWithZ == true) {
+        // Already aligned—no rotation needed.
+        return p;
+	}
 
-	if (ll != 1) {
-		
+    // 3) Compute the rotation axis τ = normalize(normal × difference):
+    //    - normal.V(): axis we want to rotate around (as Vector3D)
+    //    - difference.V(): direction to align with z
+    Vector3D tau = unit(unit(normal.V()) % unit(difference.V()));
 
-		Vector3D tau = unit(unit(normal.V()) % unit(difference.V()));
-		double phi =   acos(unit(normal.V()) * unit(difference.V()));
-	
-		//tau = eigenvector for space
-		Quaternion tauQ = Qan(phi, tau);
+    // 4) Compute the rotation angle φ between normal and difference:
+    //    φ = arccos( normal∙difference )
+    double phi =   acos(unit(normal.V()) * unit(difference.V()));
 
-		//Rotate p with respect to the eigenvector
-		Quaternion p1 = tauQ * p * tauQ.conjugate();
+    // 5) Build the unit quaternion representing rotation of φ about τ:
+    //    τQ = [ cos(φ/2),  sin(φ/2) * τ ]
+    //    τ = eigenvector for space
+    Quaternion tauQ = Qan(phi, tau);
+   
+    // 6) Rotate the original point-quaternion p:  p1 = τQ * p * τQ.conjugate()
+    // Rotate p with respect to the eigenvector τ
+    Quaternion p1 = tauQ * p * tauQ.conjugate();
+
+    // 7) Shift p1 so that the center moves from origin to point b:
+    //    Add pure-vector quaternion (0, b) 
+    //    i.e. translate p1
+    return  (p1 + Quaternion(0, b));
 		
-		//translate p1
-		return  (p1 + Quaternion(0, b));
-		
-	} else { return p;}
 
 
 }
