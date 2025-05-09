@@ -381,7 +381,7 @@ then:
 3.  Now we can define the **Gnomonic projection** $\mu:D^n \mapsto \mathbb{H}^n$:
     Whis is given by $\mu (x) = \tfrac{x+e_{n+1}}{\vert\Vert x + e_{n+1} \Vert\vert} = \tfrac{1}{\Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}}\Bigl(x + e_{n+1}\Bigr)$. 
 
-4.  **The stereographic project $\psi$** of the open unit ball $B^n$ onto hyperbolic space $\mathbb{H}^n$ is defined by:
+4.  **The stereographic project $\lambda$** of the open unit ball $B^n$ onto hyperbolic space $\mathbb{H}^n$ is defined by:
     
     Projection $x \in B^n$ away from $-e_{n+1}$ until ir meets with $\mathbb{H}^{n}$ is the unique point $\lambda (x)$. A $\lambda (x)$ is on the line passing
     through $x$ in the direction of $x + e_{n+1}$, there is a scalar $s$ such that: $\lambda (x) = x + s(x + e_{n+1})$.
@@ -389,6 +389,36 @@ then:
     And $\lambda (x) = \Bigl(\frac{2x_1}{1-|x|^2}, \cdots, \frac{2x_n}{1-|x|^2}, \frac{1+|x|^2}{1-|x|^2}\Bigr)$.
     The map $\lambda (x)$ is a bijection of $B^n$ onto $\mathbb{H}^n$. The inverse of $\lambda (x)$ is given by:
     $\lambda^{-1}(x) = \Bigl(\frac{y_1}{1+y_{n+1}}, \cdots, \frac{y_n}{1+y_{n+1}}\Bigr)$
+
+5.  **Composition: \(\lambda \circ \mu\)**  
+   The method implemented in `Quaternion::toHyperboloid()` is exactly the composition
+   \[
+     \lambda\bigl(\mu(x)\bigr)\;:\;B^n\;\xrightarrow{\;\mu\;} \;H^n\;\xrightarrow{\;\lambda\;} \;B^n_{\text{gnomic}}.
+   \]
+   - First, **\(\mu\)** lifts \(x\in B^n\) up to the hyperboloid via
+     \[
+       \mu(x)
+         = \frac{x + e_{n+1}}{\sqrt{\,1-\|x\|^2\,}}
+         = \Bigl(u',\,\mathbf x'\Bigr),
+       \quad
+       u' = \tfrac1{\sqrt{1-\|x\|^2}},\;
+       \mathbf x' = \tfrac{x}{\sqrt{1-\|x\|^2}}.
+     \]
+   - Then, **\(\lambda\)** (the gnomic projection) sends \(\mu(x)\) back into the unit ball by
+     \[
+       \lambda\bigl(u',\mathbf x'\bigr)
+         = \frac{\mathbf x'}{1 + u'}.
+     \]
+   - Concretely, the code does exactly
+     ```cpp
+     // lift via μ:
+     double s = 1.0/std::sqrt(1 - ‖x‖²);
+     Quaternion ret{ s, s*x };       // (u', x')
+     // project via λ:
+     return Quaternion{ 0.0, x'/(1 + u') };
+     ```
+   - Hence **\(\texttt{toHyperboloid()}\)** = \(\lambda\bigl(\mu(x)\bigr)\).
+
 
 ## Output Streaming
 
