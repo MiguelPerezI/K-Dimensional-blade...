@@ -80,6 +80,7 @@ bool operator==(const Quaternion& q1, const Quaternion& q2) noexcept;
 Quaternion Qan(double theta, const Vector3D& n);
 Quaternion cross(const Quaternion& n, const Quaternion& z);
 Quaternion rotate(const Quaternion& p, const Quaternion& normal, const Quaternion& J);
+Quaternion lerp(double t, const Quaternion& p, Quaternion& q) noexcept;
 
 istream& operator >> (istream& is, Quaternion& a);
 ostream& operator << (ostream& os, const Quaternion& a);

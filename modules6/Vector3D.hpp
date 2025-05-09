@@ -62,6 +62,13 @@ Vector3D unit  (const Vector3D& v);                       // normalized copy
 /* helper for linear interpolation on a segment */
 Vector3D line(double t, const Vector3D& p, const Vector3D& q) noexcept;
 
+/* Check if three 3D points are colinear */
+bool areColinear(
+    const Vector3D& p,
+    const Vector3D& q,
+    const Vector3D& r
+) noexcept;
+
 /* stream operators */
 std::istream& operator>>(std::istream& is, Vector3D& v);
 std::ostream& operator<<(std::ostream& os, const Vector3D& v);

@@ -64,8 +64,8 @@ Quaternion& Quaternion::operator/=(double scalar) {
     return *this;
 }
 
-/*----- Hyperbolic projection ——————————————————————————————————————————*/
-    /*----- Hyperbolic projection — subgroup toHyperboloid ----------------------
+/*----- Hyperbolic projection ———————————————————————————————————————————————*/
+    /*----- Hyperbolic projection — subgroup toHyperboloid ------------------
      * Project a pure-vector quaternion (r()==0) from the unit ball into
      * the hyperboloid model via µ(x) = (1/√(1−‖x‖²), x/√(1−‖x‖²)),
      * then re-project to the gnomic disk: (0, x') where x' = x/(1+u').
@@ -108,22 +108,8 @@ bool operator==(const Quaternion& q1, const Quaternion& q2) noexcept {
     return std::abs(q1.r() - q2.r()) < 1e-12 && q1.V() == q2.V();
 }
 
-ostream& operator << (ostream& os, const Quaternion& a) {
 
-   int w= os.width();
-   int p= os.precision();
-   os << setw(0) << "(" 
-      << setw(w) << setprecision(p) << a.r() << setw(0) << ",  (" 
-      << setw(w) << setprecision(p) << a.i() << setw(0) << ", " 
-      << setw(w) << setprecision(p) << a.j() << setw(0) << ", " 
-      << setw(w) << setprecision(p) << a.k() << setw(0) << ") )";
-   os.width(w);
-   os.precision(p);
-   return os;
-}
-
-
-/* ---------- Utility and Helper Functions ---------------------------------- */
+/* ---------- Utility and Helper Functions ----------------------------------*/
 // Quaternion from angle-axis representation
 Quaternion Qan(double theta, const Vector3D& axis) {
     constexpr double epsilon = 1e-10;
@@ -139,19 +125,38 @@ Quaternion cross(const Quaternion& a, const Quaternion& b) {
     return Quaternion(0.0, result);
 }
 
-int  line(const Vector3D& r, const Vector3D& a, const Vector3D& b) {
+/**
+ * @brief Rotate a point-quaternion p from position a to position b around a given axis.
+ *
+ * We treat p as a “point” in 3D space encoded as a pure-vector quaternion,
+ * then:
+ *   1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from b→a 
+ *      onto the global “up” direction (0,0,1).
+ *   2. Build the corresponding rotation quaternion Q = Qan(φ, τ).
+ *   3. Apply that rotation to p:  p1 = Q * p * Q⁻¹.
+ *   4. Finally translate p1 so that it’s moved from origin-centered coordinates back to
+ *      “around point b” in world space.
+ *
+ * @param p      A pure-vector Quaternion representing the point to rotate.
+ * @param a      The original 3D position (Vector3D) of the point.
+ * @param b      The target 3D position (Vector3D) to rotate around.
+ * @param normal A unit-quaternion whose vector part is the desired rotation axis.
+ * @return       A new Quaternion encoding the rotated (and translated) point.
+ */
+Quaternion rotate(
+    const Quaternion& p, 
+    const Vector3D& a, 
+    const Vector3D& b, 
+    const Quaternion& normal
+) {
 
-                        Vector3D cro = (a-r) % (b-r); 
-                        if (cro == Vector3D(0, 0, 0)) return 1;
-                        else return 0;
-}
-
-Quaternion rotate(const Quaternion& p, const Vector3D& a, const Vector3D& b, const Quaternion& normal) {
-
-	//The diference Vector = a - b;
+	// 1) Compute unit direction from b to a as a pure-vector quaternion:
+    //    difference = (0, normalize(a - b))
 	Quaternion difference = Quaternion( 0.0, unit(a-b));
 
-	int ll = line(unit(a-b), Vector3D(0, 0, 1), Vector3D(0, 0, 0));
+    // 2) Quick colinearity check: does (a - b) already align with the z-axis?
+    //    If line(...) returns 1, the vector (a-b) lies in the z-direction.
+	int ll = areColinear(unit(a-b), Vector3D(0, 0, 1), Vector3D(0, 0, 0));
 
 	if (ll != 1) {
 		
@@ -173,7 +178,36 @@ Quaternion rotate(const Quaternion& p, const Vector3D& a, const Vector3D& b, con
 
 }
 
+/*———————————————————————————————————————————————————————————————————————————
+ * @brief Linearly interpolate between two quaternions:
+ *  component-wise lerp: (1–t)*p + t*q.
+ *———————————————————————————————————————————————————————————————————————————*/
+Quaternion lerp(
+    double t,
+    const Quaternion& p,
+    const Quaternion& q
+) noexcept {
+    // lerp the real (scalar) parts
+    double u = p.r() + t * (q.r() - p.r());
+    // lerp the vector parts via the Vector3D::line helper
+    Vector3D v = line(t, p.V(), q.V());
+    return Quaternion(u, v);
+}
 
+
+ostream& operator << (ostream& os, const Quaternion& a) {
+
+   int w= os.width();
+   int p= os.precision();
+   os << setw(0) << "(" 
+      << setw(w) << setprecision(p) << a.r() << setw(0) << ",  (" 
+      << setw(w) << setprecision(p) << a.i() << setw(0) << ", " 
+      << setw(w) << setprecision(p) << a.j() << setw(0) << ", " 
+      << setw(w) << setprecision(p) << a.k() << setw(0) << ") )";
+   os.width(w);
+   os.precision(p);
+   return os;
+}
 
 
 

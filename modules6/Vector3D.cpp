@@ -158,6 +158,22 @@ Vector3D line(double t, const Vector3D& b, const Vector3D& e) noexcept
    return b + t * (e-b);
 }
 
+/*—————————————————————————————————————————————————————————-------------
+ * @brief Check if three 3D points are colinear:
+ *  returns true if (q-p)×(r-p) ≈ (0,0,0).
+ *—————————————————————————————————————————————————————————-------------*/
+bool areColinear(
+    const Vector3D& p,
+    const Vector3D& q,
+    const Vector3D& r
+) noexcept {
+    // Form the two direction vectors
+    Vector3D v1 = q - p;
+    Vector3D v2 = r - p;
+    // their cross-product is zero ⇔ they are colinear
+    return (v1 % v2) == Vector3D(0,0,0);
+}
+
 /* stream operators -----------------------------------------------------*/
 istream& operator >> (istream& is, Vector3D& a)
 {
