@@ -323,6 +323,7 @@ where $w = \cos\bigl(\tfrac{\theta}{2}\bigr)$ and $\mathbf v = \sin(\tfrac\theta
 Acting on a pure-vector quaternion $p=\bigl(0, \mathbf{p} \bigr)$, the rotated vector is $p´= QpQ_{-1}$.
 
 > **Small-Angle Shortcut**: If θ is extremely small (near zero), we skip the trigonometric calls and return the “pure‐vector” quaternion $(0,\mathbf n)$, which represents an infinitesimal rotation in the axis direction.
+> For $|\theta| << 1 $, we get $\cos \tfrac{\theta}{2} \eq 1$ and $\sin \tfrac{\theta}{2} \eq \tfrac{\theta}{2}$, so $Q \eq \bigl( 1, \tfrac{\theta}{2}\mathbf{n}\bigr)$. Dropping the scalar part altogether and returning $\bigl(0, \mathbf{n} \bigr)$ captures the axis direction without catastrophic cancellation.
 
 2. **Output**: A unit quaternion $Q=(w, \mathbf{v})$ such that rotating any pure-vector quaternion $\mathbf{p}$ via $p´= Q\mathbf{p}Q_{-q}$ applies exactly the desired rotation in $\mathbb{R}^3$.
 
