@@ -314,10 +314,12 @@ then:
 1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
    onto the global “up” direction (0, 0, 1).
 2. Build the corresponding rotation quaternion  
+   
    $$ 
    Q = Q_{\mathrm{an}}(\varphi,\tau)
      = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)
    $$
+
 3. Apply that rotation to `p`:  
    $$
    p_1 = Q\,p\,Q^{-1}
