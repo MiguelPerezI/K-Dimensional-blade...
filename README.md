@@ -314,15 +314,17 @@ Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to 
 ### Qan() - explanation
 
 **Purpose**: Construct a unit‐quaternion representing a rotation of $\theta$ radians about the given 3D `axis`.
-1. Any rotation of a vector in $\mathbb{R}^3$ by angle θ around a unit vector **n** = $(nx, ny, nz)$ is encoded as:
+1. Any rotation of a $\mathbf{p}$ in $\mathbb{R}^3$ by angle θ around a unit vector **n** = $(nx, ny, nz)$ is encoded as:
     
     $Q = \Bigl(\cos\tfrac\theta2,\sin\tfrac\theta2\,\mathbf n\Bigr) = \bigl(w\,\mathbf v\bigr)$
 
 where $w = \cos\bigl(\tfrac{\theta}{2}\bigr)$ and $\mathbf v = \sin(\tfrac\theta2)\,\mathbf n$.
 
-Acting on a pure-vector quaternion $p=\bigl(0, \mathbb{p} \bigr)$, the rotated vector is $p´= QpQ_{-1}$.
+Acting on a pure-vector quaternion $p=\bigl(0, \mathbf{p} \bigr)$, the rotated vector is $p´= QpQ_{-1}$.
 
-2. If θ is extremely small (near zero), we skip the trigonometric calls and return the “pure‐vector” quaternion $(0,\mathbf n)$, which represents an infinitesimal rotation in the axis direction.
+> **Small-Angle Shortcut**: If θ is extremely small (near zero), we skip the trigonometric calls and return the “pure‐vector” quaternion $(0,\mathbf n)$, which represents an infinitesimal rotation in the axis direction.
+
+2. **Output**: A unit quaternion $Q=(w, \mathbf{v})$ such that rotating any pure-vector quaternion $\mathbf{p}$ via $p´= Q\mathbf{p}Q_{-q}$ applies exactly the desired rotation in $\mathbb{R}^3$.
 
 ---
 ### rotate() - explanation
