@@ -320,12 +320,12 @@ then:
 
 2. **Colinearity check**: does $a-b$ already align with *z-axis*?
 
-3. Compute the rotation axis $/tau = normalize(normal × difference)$:
+3. Compute the rotation axis $\tau = normalize(normal × difference)$:
     - normal.V(): axis we want to rotate around (as Vector3D)
     - difference.V(): direction to align with $z$.
 
 4. Compute the rotation angle $\phi$ between the normal and difference:
-    - $\phi?arccps(normal-difference)$
+    - $\phi=arccos(normal-difference)$
 
 5. Build the unit quaternion representing rotation of φ about τ:
     - $Q_{\mathrm{an}} = (cos(φ/2),  sin(φ/2)\tau)$
