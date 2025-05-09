@@ -16,6 +16,7 @@
   - [Compound Assignment](#compound-assignment)
   - [Utility Methods](#utility-methods)
   - [Free Functions](#free-functions)
+   * [rotate() - explanation](#rotate-explanation)
   - [Output Streaming](#output-streaming)
   - [Notes](#notes)
   - [Header Dependencies](#header-dependencies)
