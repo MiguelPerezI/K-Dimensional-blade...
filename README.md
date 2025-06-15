@@ -1,50 +1,6 @@
-# Table of Contents
-
-- [K-Dimensional Blade](#k-dimensional-blade)
-- [Vector3D Usage Guide](#vector3d-usage-guide)
-  - [What each line demonstrates](#what-each-line-demonstrates)
-  - [Floating-Point Comparison: `operator==`](#floating-point-comparison-operator)
-  - [Building the Sample](#building-the-sample)
-  - [Next Steps](#next-steps)
-- [Quaternion Class Usage Guide](#quaternion-class-usage-guide)
-  - [Overview](#overview)
-  - [Constructors](#constructors)
-  - [Element Access](#element-access)
-  - [Inspectors](#inspectors)
-  - [Conversion](#conversion)
-  - [Arithmetic Operators](#arithmetic-operators)
-  - [Compound Assignment](#compound-assignment)
-  - [Utility Methods](#utility-methods)
-  - [Free Functions](#free-functions)
-   * [rotate() - explanation](#rotate-explanation)
-  - [Output Streaming](#output-streaming)
-  - [Notes](#notes)
-  - [Header Dependencies](#header-dependencies)
-- [Facet Class Usage Guide](#facet-class-usage-guide)
-  - [Overview](#overview-1)
-  - [Constructors](#constructors-1)
-  - [Element Access](#element-access-1)
-  - [Method: `updateFacet()`](#method-updatefacet)
-  - [Method: `translate()`](#method-translate)
-  - [Method: `crunch()`](#method-crunch)
-  - [Stream Operators](#stream-operators)
-  - [Geometry Helpers](#geometry-helpers)
-- [FacetBox Usage Guide](#facetbox-class-usage-guide)
-  - [Including](#including)
-  - [Methods](#methods)
-   * [push](#void-pushconst-vector3d-a-const-vector3d-b-const-vector3d-c)
-   * [replace](#void-replace-size_t-idx-const-vector3d-a-const-vector3d-b-const-vector3d-c)
-   * [clear](#void-clear-noexcept)
-   * [center](#vector3d-center-const)
-   * [translate](#void-translateconst-vector3d-offset)
-   * [crunch](#void-crunchdouble-t-const-vector3d-pivot)
-  - [Full Example](#full-example)
-  - [Building](#building)
-
----
+# K-Dimensional Blade: A Geometric Computation Framework
 
 ```cpp
-
 /*                          |———————————————————————————————————|
                             |          _                        | 
                             |          \`*-.                    | 
@@ -65,802 +21,616 @@
 */
 ```
 
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Project Overview](#project-overview)
+- [Mathematical Foundations](#mathematical-foundations)
+- [Core Components](#core-components)
+  - [Vector3D](#vector3d-class)
+  - [Vector4D](#vector4d-class)
+  - [Quaternion](#quaternion-class)
+  - [Facet](#facet-class)
+  - [FacetBox](#facetbox-class)
+  - [Dodecahedron](#dodecahedron-class)
+- [Advanced Features](#advanced-features)
+  - [Hyperbolic Geometry](#hyperbolic-geometry)
+  - [Mesh Refinement Algorithms](#mesh-refinement-algorithms)
+- [Usage Examples](#usage-examples)
+- [Building & Installation](#building--installation)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+
 ---
 
 ## Introduction
 
-Yes, I know you can download Blender and quickly design 3D objects. And yes, I’m aware of powerful libraries in Python or C++ like NumPy, SciPy, Eigen, CGAL, and OpenMesh.
+Yes, I know you can download Blender and quickly design 3D objects. And yes, I'm aware of powerful libraries in Python or C++ like NumPy, SciPy, Eigen, CGAL, and OpenMesh.
 
-But this isn’t about that.
+But this isn't about that.
 
-This is my personal geometric and topological sandbox — a "coding diary" where I experiment with abstract math ideas for fun and exploration. It’s a space for recreational mathematics: What happens when a dodecahedron moves through 3D or even 4D hyperbolic space? How can we build intuitive tools for understanding the geometry of complex surfaces?
+This is my personal geometric and topological sandbox — a "coding diary" where I experiment with abstract math ideas for fun and exploration. It's a space for recreational mathematics: What happens when a dodecahedron moves through 3D or even 4D hyperbolic space? How can we build intuitive tools for understanding the geometry of complex surfaces?
 
-Like a chemist tinkering in their lab, I use this toolkit to model, test, and visualize higher-dimensional constructs. The goal isn’t production code — it’s clarity, curiosity, and a deepening of geometric intuition.
-
-
----
-
-
-# K-Dimensional Blade
-
-A C++ geometry toolkit for exploring **3‑manifolds**, surfaces, and vectors, with ongoing work to generalize the core to **quaternions**, 3‑D simplices (Facets), and higher‑order polytopes such as dodecahedra. Quaternions serve as the common backbone, enabling easy manipulation, rotation, and composition of every geometric object.
+Like a chemist tinkering in their lab, I use this toolkit to model, test, and visualize higher-dimensional constructs. The goal isn't production code — it's clarity, curiosity, and a deepening of geometric intuition.
 
 ---
 
-# Vector3D Usage Guide
+## Project Overview
 
-Below is a quick reference demonstrating common ways to construct, manipulate, and inspect a `Vector3D` object. Feel free to copy‑paste the snippet into `main.cpp` and explore the output.
+**K-Dimensional Blade** is a C++ geometry toolkit for exploring **3-manifolds**, surfaces, and vectors, with ongoing work to generalize the core to **quaternions**, 3-D simplices (Facets), and higher-order polytopes such as dodecahedra. Quaternions serve as the common backbone, enabling easy manipulation, rotation, and composition of every geometric object.
+
+### Key Features
+
+- **Multi-dimensional Vector Algebra**: Complete implementations for 3D and 4D vector spaces
+- **Quaternion Mathematics**: Full quaternion algebra for rotations and transformations
+- **Mesh Generation**: Triangle-based mesh system with multiple subdivision algorithms
+- **Hyperbolic Geometry**: Support for hyperbolic space transformations
+- **Interactive Visualization**: Real-time OpenGL rendering with intuitive controls
+- **Geometric Primitives**: Regular polyhedra with configurable tessellation
+
+---
+
+## Mathematical Foundations
+
+### Vector Spaces
+
+The framework implements vector spaces $\mathbb{R}^3$ and $\mathbb{R}^4$ with complete algebraic operations.
+
+#### 3D Vector Operations
+
+For vectors $\vec{v}, \vec{w} \in \mathbb{R}^3$:
+
+- **Dot Product**: $\vec{v} \cdot \vec{w} = \sum_{i=1}^{3} v_i w_i$
+- **Cross Product**: $\vec{v} \times \vec{w} = (v_2w_3 - v_3w_2, v_3w_1 - v_1w_3, v_1w_2 - v_2w_1)$
+- **Euclidean Norm**: $\|\vec{v}\|_2 = \sqrt{\sum_{i=1}^{3} v_i^2}$
+- **Infinity Norm**: $\|\vec{v}\|_\infty = \max_{i \in \{1,2,3\}} |v_i|$
+
+#### 4D Vector Extension
+
+The 4D cross product requires three vectors $\vec{a}, \vec{b}, \vec{c} \in \mathbb{R}^4$ to produce a vector orthogonal to all three:
+
+$$\text{Cross}(\vec{a}, \vec{b}, \vec{c}) = \vec{d} \text{ where } \vec{d} \perp \vec{a}, \vec{b}, \vec{c}$$
+
+### Quaternion Algebra
+
+Quaternions extend complex numbers to four dimensions, represented as:
+
+$$q = s + x\mathbf{i} + y\mathbf{j} + z\mathbf{k}$$
+
+where $\mathbf{i}^2 = \mathbf{j}^2 = \mathbf{k}^2 = \mathbf{ijk} = -1$.
+
+#### Quaternion Multiplication
+
+For $q_1 = s_1 + \vec{v}_1$ and $q_2 = s_2 + \vec{v}_2$:
+
+$$q_1 q_2 = (s_1 s_2 - \vec{v}_1 \cdot \vec{v}_2) + (s_1 \vec{v}_2 + s_2 \vec{v}_1 + \vec{v}_1 \times \vec{v}_2)$$
+
+#### Rotation Representation
+
+A rotation by angle $\theta$ around unit axis $\hat{n}$ is represented as:
+
+$$q = \cos\left(\frac{\theta}{2}\right) + \sin\left(\frac{\theta}{2}\right)\hat{n}$$
+
+To rotate a vector $\vec{v}$, we compute: $\vec{v}' = q\vec{v}q^{-1}$
+
+---
+
+## Core Components
+
+### Vector3D Class
+
+The `Vector3D` class provides a complete implementation of 3-dimensional vector algebra.
+
+#### Key Features
+
+- **Constructors**: Default, parameterized, copy, and brace initialization
+- **Operators**: Element access, arithmetic operations, compound assignments
+- **Geometric Operations**: Dot product, cross product, normalization
+- **Utilities**: Linear interpolation, collinearity testing, centroid calculations
+
+#### Mathematical Operations
 
 ```cpp
-// --- Construction ---------------------------------------------------
-Vector3D p;                       // (0,0,0)
-Vector3D q(1.0, 2.0, 3.0);        // explicit components
-Vector3D r = q;                   // copy constructor
-Vector3D w{0,0,0};                // brace initialization
-
-// --- Access & modification -----------------------------------------
-q[0] = 4.0;                       // write via operator[]
-double zy = q[2];                 // read via operator[]
-r += Vector3D(1,1,1);             // compound addition
-r -= Vector3D(0.5,0.5,0.5);       // compound subtraction
-
-// --- Arithmetic -----------------------------------------------------
-Vector3D u = q + r;               // vector addition
-Vector3D v = r - q;               // subtraction
-Vector3D s = 2.5 * u;             // scalar multiplication
-Vector3D n = unit(s);             // normalization
-
-double d  = u * r;                // dot product
-Vector3D c = u % r;               // cross product
-
-// --- Geometry helpers ----------------------------------------------
-Vector3D mid = line(0.5, q, r);   // midpoint of segment
-
-// --- Output ---------------------------------------------------------
-std::cout << "u = " << u << '\n'
-          << "n (unit s) = " << n << '\n'
-          << "u·r = " << d << '\n'
-          << "u×r = " << c << '\n'
-          << "midpoint = " << mid << '\n';
+Vector3D a(1, 2, 3), b(4, 5, 6);
+double dot = a * b;              // Dot product: a·b
+Vector3D cross = a % b;          // Cross product: a×b
+Vector3D normalized = unit(a);   // Unit vector: a/|a|
+double length = abs(a);          // Euclidean norm: |a|
 ```
 
-## What each line demonstrates
+#### Floating-Point Comparison
 
-| Section                   | Purpose                                                | Key Functionality                                      |
-| ------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| **Construction**          | Default, parameterized, copy, and brace initialization | Constructors                                           |
-| **Access & Modification** | Indexed assignment and compound operations             | `operator[]`, `operator+=`, `operator-=`               |
-| **Arithmetic**            | Vector math (add, subtract, scale, normalize)          | `operator+`, `operator-`, scalar `operator*`, `unit()` |
-| **Dot & Cross**           | Inner and outer products                               | `operator*` (dot), `operator%` (cross)                 |
-| **Geometry Helpers**      | Linear interpolation                                   | `line()`                                               |
-| **Output**                | Streaming to `std::ostream`                            | `operator<<`                                           |
-| **Vector Length**         | Euclidean norm in $\mathbb{R}^3$                       | `abs()`                                                |
-| **Inifity Norm**          | Euclidean inifinty norm in $\mathbb{R}^3$              | `infty()`                                              |
-| **Normal**                | Mapping to $B^3 = \\{\,x \in \mathbb{R}^3 : \|x\| < 1\\}$| `unit()`                                             |
+The equality operator uses tolerance-based comparison inspired by real analysis:
 
+> **Theorem**: Let $a \in \mathbb{R}$ and for each $\epsilon > 0$ define $V_\epsilon(a) = \{x \in \mathbb{R} : |x-a| < \epsilon\}$. If $x \in V_\epsilon(a)$ for every $\epsilon > 0$, then $x = a$.
 
----
+Implementation uses $\epsilon = 10^{-12}$ for numerical stability.
 
-### Floating-Point Comparison: `operator==`
+### Vector4D Class
 
-The equality comparison operator `==` for `Vector3D` objects uses a tolerance-based approach inspired by a result from **real analysis**:
-
-> **Theorem (Bartle & Sherbert, _Introduction to Real Analysis_):**  
-> $Let a\in\mathbb{R}\text{ and for each }\epsilon>0\text{ define }V_\epsilon(a)=\\{\,x\in\mathbb{R}:\;|x-a|<\epsilon\\}.\text{ If }x\in V_\epsilon(a)\quad\text{for every }\epsilon>0,\text{ then }x=a.$
-
-This guides the implementation of `operator==` using a neighborhood epsilon approach. In `Vector3D`, two vectors `a` and `b` are considered equal if their Euclidean distance is less than a small epsilon:
+Extends 3D operations to 4-dimensional space with additional functionality for 4D cross products and transformations.
 
 ```cpp
-constexpr double epsilon = 1e-12;
+Vector4D v(1, 2, 3, 4);
+Vector4D a(1,0,0,0), b(0,1,0,0), c(0,0,1,0);
+Vector4D orthogonal = Cross(a, b, c);  // 4D cross product
 ```
 
-This accounts for small numerical inaccuracies common in floating-point arithmetic.
+### Quaternion Class
 
----
-## Notes
+Implements Hamilton's quaternions for 3D rotations and hyperbolic transformations.
 
-* Vector3D equality uses tolerance `1e-12`
+#### Representation
 
----
+A quaternion $q = u + \vec{v}$ where:
+- $u$ is the scalar part (real component)
+- $\vec{v}$ is the vector part (imaginary components)
 
-### Building the Sample
-
-Assuming all sources are in the current directory:
-
-```bash
-g++ -std=c++11 -I. main.cpp Vector3D.cpp -o vector_demo
-./vector_demo
-```
-
-You should see something like:
-
-```
-u = (5.0, 5.0, 6.0)
-n (unit s) = (0.57, 0.57, 0.68)
-u·r = 43
-u×r = (-3, 6, -5)
-midpoint = (2.5, 3.5, 3.5)
-```
-
-*(Exact numbers may vary depending on your edits.)*
-
----
-
-### Next Steps
-
-- Explore additional helper functions like `centerM4`, `cPenta`, `centerM8`, and `cDodeca`.
-- Integrate `Vector3D` into your geometry pipeline or simulation projects.
-- Consider migrating storage to `std::array<double,3>` for built-in bounds checking or extended operator overloads.
-
-
-# Quaternion Class Usage Guide
-
-This guide documents the `Quaternion` class provided in the C++ geometry module. It demonstrates the class's core functionality and showcases usage with clear examples.
-
----
-
-## Overview
-
-A quaternion is represented as:
-
-```
-q = u + v
-```
-
-Where:
-
-* `u` is the **scalar** part (a `double`)
-* `v` is the **vector** part (a `Vector3D`)
-
----
-
-## Constructors
+#### Key Operations
 
 ```cpp
-Quaternion q0;                      // Default constructor → (0, (0, 0, 0))
-// Define a 3D vector v1
-Vector3D v1(1, 2, 3);
-Quaternion q1(5, v1);               // Parameterized constructor
-Quaternion q2 = q1;                 // Copy constructor
-Vector3D v2(0.1, 0.2, 0.3);
-// Define a 3D vector v2
-Quaternion q3(v2);                  // Pure-vector constructor (scalar=0)
-Quaternion q4(3.1415);              // Pure-scalar constructor (vector=(0,0,0))
+// Rotation quaternion: 90° around z-axis
+Quaternion q = Qan(M_PI/2, Vector3D(0, 0, 1));
+
+// Quaternion multiplication
+Quaternion q1(1, Vector3D(1,2,3));
+Quaternion q2(2, Vector3D(4,5,6));
+Quaternion product = q1 * q2;
+
+// Conjugate: q* = u - v
+Quaternion conj = q1.conjugate();
 ```
 
----
+#### Rotation Function
 
-## Element Access
+The `rotate()` function implements rotation of a point around an arbitrary axis:
 
-```cpp
-q1[0];
+1. Translate point to origin relative to axis
+2. Apply quaternion rotation: $p' = qpq^{-1}$
+3. Translate back to original position
 
-// Example usage
-Vector3D vp = Vector3D(q1[0]);       // Returns vector part (1, 2, 3)
-```
+### Facet Class
 
----
+Represents a triangular face in 3D space with vertices and normal vector.
 
-## Inspectors
-
-```cpp
-double r = q1.r();      // Scalar part → 5
-Vector3D w = q1.V();      // Vector part → (1, 2, 3)
-double i = q1.i();      // x-component → 1
-double j = q1.j();      // y-component → 2
-double k = q1.k();      // z-component → 3
-```
-
----
-
-## Conversion
-
-```cpp
-q1.v4();     // Converts to Vector4D → (5, 1, 2, 3)
-
-// Example usage:
-Vector4D vQ = Vector4D(q1.v4());
-```
-
----
-
-## Arithmetic Operators
-
-```cpp
-// Suppose q1, q2, and q3 are Quaternions
-Quaternion qAdd = q1 + q3;     // → (5, (1.1, 2.2, 3.3))
-Quaternion qSub = q1 - q3;     // → (5, (0.9, 1.8, 2.7))
-Quaternion qScaled = 2.0 * q3;    // → (0, (0.2, 0.4, 0.6))
-Quaternion qMul = q1 * q3;     // Quaternion multiplication → (-1.4, (0.5, 1, 1.5))
-q1 == q2;    // Quaternion comparison → true if close
-
-if (q1 == q2) {
-    cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Equal\n";
-} else {
-    cout << "Quaternion comparison:             Q1==Q2                    \t→  Are Distinct\n";
-}
-```
-
----
-
-## Compound Assignment
-
-```cpp
-q1 += q3;    // q1 modified in-place
-q1 -= q3;
-q1 /= 2.0;
-```
-
----
-
-## Utility Methods
-
-```cpp
-Quaternion qc = q1.conjugate();  // Returns conjugate → (scalar, -vector)
-```
-
----
-
-## Free Functions
-
-```cpp
-Quaternion qRot = Qan(M_PI/2, Vector3D(0, 0, 1));  // Axis-angle quaternion
-Quaternion qCross = cross(q1, q3);                 // Quaternion-like cross product
-Quaternion qRotated = rotate(q1, a, b, qRot);      // Rotate q1 from point a to b using qRot axis
-```
-
----
-
-### Qan() - explanation
-
-**Purpose**: Construct a unit‐quaternion representing a rotation of $\theta$ radians about the given 3D `axis`.
-1. Any rotation of a $\mathbf{p}$ in $\mathbb{R}^3$ by angle θ around a unit vector **n** = $(nx, ny, nz)$ is encoded as:
-    
-    $Q = \Bigl(\cos\tfrac\theta2,\sin\tfrac\theta2\,\mathbf n\Bigr) = \bigl(w\,\mathbf v\bigr)$
-
-where $w = \cos\bigl(\tfrac{\theta}{2}\bigr)$ and $\mathbf v = \sin(\tfrac\theta2)\,\mathbf n$.
-
-Acting on a pure-vector quaternion $p=\bigl(0, \mathbf{p} \bigr)$, the rotated vector is $p´= QpQ_{-1}$.
-
-> **Small-Angle Shortcut**: If θ is extremely small (near zero), we skip the trigonometric calls and return the “pure‐vector” quaternion $(0,\mathbf n)$, which represents an infinitesimal rotation in the axis direction.
-> For $|\theta| << 1 $, we get $\cos \tfrac{\theta}{2} \approx 1$ and $\sin \tfrac{\theta}{2} \approx \tfrac{\theta}{2}$, so $Q \approx \bigl( 1, \tfrac{\theta}{2}\mathbf{n}\bigr)$. Dropping the scalar part altogether and returning $\bigl(0, \mathbf{n} \bigr)$ captures the axis direction without catastrophic cancellation.
-
-2. **Output**: A unit quaternion $Q=(w, \mathbf{v})$ such that rotating any pure-vector quaternion $\mathbf{p}$ via $p´= Q\mathbf{p}Q_{-q}$ applies exactly the desired rotation in $\mathbb{R}^3$.
-
----
-### rotate() - explanation
-
-Rotate a point‐quaternion `p` from position `a` to position `b` around a given axis.
-We treat `p` as a “point” in 3D space encoded as a pure‐vector quaternion,
-then:
-
-1. Determine the rotation axis (τ) and angle (φ) needed to turn the ray from **b → a** 
-   onto the global “up” direction $(0, 0, 1)$.
-
-2. **Colinearity check**: does $a-b$ already align with *z-axis*?
-
-3. Compute the rotation axis $\tau = normalize(normal × difference)$:
-    - normal.V(): axis we want to rotate around (as Vector3D)
-    - difference.V(): direction to align with $z$.
-
-4. Compute the rotation angle $\phi$ between the normal and difference:
-    - $\phi=arccos(normal-difference)$
-
-5. Build the unit quaternion representing rotation of φ about τ:
-    - $Q_{\mathrm{an}} = (cos(φ/2),  sin(φ/2)\tau)$
-    - $\tau$ = eigenvector for space
-
-3. Build the corresponding rotation quaternion  
-   
-   $Q = Q_{\mathrm{an}}(\varphi,\tau) = \left(\cos\frac{\varphi}{2},\, \sin\frac{\varphi}{2}\,\tau\right)$
-
-4. Apply that rotation to `p`:
-
-    $p_1 = Q\,p\,Q^{-1}$
-
-5. Finally translate `p₁` so it’s moved back to “around point `b`”:
-
-    $p_{\mathrm{out}} = p_1 + (0,\mathbf{b})$
-
----
-
-## Hyperbolic $n-space$ - $\mathbb{H}^n$
-
-1.  The *Lorentzian inner product* in $\mathbb{R}^{n+1}$ is defined as
-    $\langle x, y \rangle = -x_{n+1}y_{n+1} + \sum_{i=1}^{n} x_{i}y_{i}$.
-
-    Denote $\mathbb{R}^n$ as $\mathbb{R}^n \bigcup \\{0\\}$. Let $x \in D^{n}=\\{x \in \mathbb{R}^{n} : \|x\| < 1\\}$
-    and $e_{n+1} \in \mathbb{R}^{n+1}$, thus $x+e_{n+1} \in \mathbb{R}^{n+1}$.
-
-    Since $x=(x_{1}, x_{2}, \cdots, x_{n}. 0)$, lets define $\bar{x} = (x_{1}, x_{2}, \cdots, x_{n})$. With this notation
-    the *Lorentzian norm* in $\mathbb{R}^{n+1}$ is defined as $\Vert x \Vert= \langle x, y \rangle^{\tfrac12}= \bigl(-x_{n+1} + \sum_{i=1}^{n} x_i^2 \bigr)^{\tfrac12}= \bigl(-x_{n+1} + \|\bar x\|^{2}\bigr)^{\tfrac12}$.
-
-2.  Since $x \in D^{n}$ by definition $x$ is time-like and thus $\Vert x + e_{n+1}\Vert \in \mathbb{C}$.
-    Then, $\vert\Vert x+e_{n+1} \vert\Vert = \Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}$.
-
-3.  Now we can define the **Gnomonic projection** $\mu:D^n \mapsto \mathbb{H}^n$:
-    Whis is given by $\mu (x) = \tfrac{x+e_{n+1}}{\vert\Vert x + e_{n+1} \Vert\vert} = \tfrac{1}{\Bigl( 1 - \|\bar{x}\|^2 \Bigr)^{\tfrac{1}{2}}}\Bigl(x + e_{n+1}\Bigr)$. 
-
-4.  **The stereographic project $\lambda$** of the open unit ball $B^n$ onto hyperbolic space $\mathbb{H}^n$ is defined by:
-    
-    Projection $x \in B^n$ away from $-e_{n+1}$ until ir meets with $\mathbb{H}^{n}$ is the unique point $\lambda (x)$. A $\lambda (x)$ is on the line passing
-    through $x$ in the direction of $x + e_{n+1}$, there is a scalar $s$ such that: $\lambda (x) = x + s(x + e_{n+1})$.
-    The condition $\Vert \lambda (x) \Vert^{2} = -1$, leads to the value $s = \tfrac{1+|x|^2}{1-|x|^2}$.
-    And $\lambda (x) = \Bigl(\frac{2x_1}{1-|x|^2}, \cdots, \frac{2x_n}{1-|x|^2}, \frac{1+|x|^2}{1-|x|^2}\Bigr)$.
-    The map $\lambda (x)$ is a bijection of $B^n$ onto $\mathbb{H}^n$. The inverse of $\lambda (x)$ is given by:
-    $\lambda^{-1}(x) = \Bigl(\frac{y_1}{1+y_{n+1}}, \cdots, \frac{y_n}{1+y_{n+1}}\Bigr)$
-
-5.  **Composition: $\lambda \circ \mu$**  
-   The method implemented in `Quaternion::toHyperboloid()` is exactly
-    $D^n \xrightarrow{\mu} H^n \xrightarrow{\lambda} B^n$.
-   - First, **$\mu$** lifts $x\in B^n$ up to the hyperboloid via
-     $\mu(x) = \frac{x + e_{n+1}}{\sqrt{\,1-\|x\|^2\,}} = \Bigl(u', \mathbf x'\Bigr)$, $\quad u' = \tfrac1{\sqrt{1-\|x\|^2}},\$; $\mathbf x' = \tfrac{x}{\sqrt{1-\|x\|^2}}$.
-   - Then, **$\lambda$** (the gnomic projection) sends $\mu(x)$ back into the unit ball by
-     $\lambda\bigl(u',\mathbf x'\bigr) = \frac{\mathbf x'}{1 + u'}$.
-   - Concretely, the code does exactly
-     ```cpp
-     // lift via μ:
-     double s = 1.0/std::sqrt(1 - ‖x‖²);
-     Quaternion ret{ s, s*x };       // (u', x')
-     // project via λ:
-     return Quaternion{ 0.0, x'/(1 + u') };
-     ```
-   - Hence **$toHyperboloid()$** = $\lambda\bigl(\mu(x)\bigr)$.
-
-### Hyperbolic Projection: `Quaternion::toHyperboloid()`
-
-```cpp
-/**
- * @brief Project a pure-vector quaternion (real part zero) from the unit ball
- *        into the hyperboloid model, then re-project back into the gnomic disk.
- *
- * The mapping is:
- *   1. Lift x ∈ Bⁿ (‖x‖<1) to the hyperboloid Hⁿ via
- *      μ(x) = (u′, x′) where
- *        u′ = 1/√(1 − ‖x‖²), 
- *        x′ = x / √(1 − ‖x‖²).
- *   2. Project (u′, x′) back to the “gnomic” disk by
- *      p(u′,x′) = x′ / (1 + u′),
- *      yielding a pure-vector quaternion (0, y).
- *
- * @throws std::domain_error if ‖x‖ ≥ 1.
- */
-Quaternion Quaternion::toHyperboloid() const {
-    // 1) Compute squared norm of vector part ‖x‖²
-    double sq = v * v;
-    if (sq >= 1.0)
-        throw std::domain_error("toHyperboloid: vector norm must be < 1");
-
-    // 2) Hyperboloid lift: u′ = 1/√(1−‖x‖²), x′ = x/√(1−‖x‖²)
-    double s = 1.0 / std::sqrt(1.0 - sq);
-    Quaternion ret{ s, s * v };  // ret.r()==u′, ret.V()==x′
-
-    // 3) Gnomic re-projection: y = x′/(1+u′)
-    return Quaternion{ 0.0, (1.0 / (1.0 + ret.r())) * ret.V() };
-}
-
-## Output Streaming
-
-```cpp
-std::cout << q1;  // Outputs: (scalar, (x, y, z))
-```
-
----
-
-## Notes
-
-* Scalar equality uses tolerance `1e-12`
-* Vector equality uses `Vector3D::operator==`
-* Designed to follow C++ Rule of Zero with noexcept-safe operations
-
----
-
-## Header Dependencies
-
-* Requires: `Vector3D.hpp`, `Vector4D.hpp`
-* No external dependencies
-
----
-
-This documentation provides a solid foundation for anyone looking to integrate or extend quaternion support in a C++ geometry pipeline.
-
-## Facet Class Overview
-
-The `Facet` class models a triangle in 3D space using three `Quaternion` vertices: A, B, and C. It also maintains a normal vector `N` computed as the cross product of vectors (B - A) and (C - A). This structure is ideal for geometric applications, mesh processing, and graphics.
+#### Structure
 
 ```
      [A] _________ [B]
         \^========/
-         \^=[N]==/   [Facet]
+         \^=[N]==/   
           \^====/
            \^==/
             \^/
             [C]
 ```
 
-### Constructors
+#### Mathematical Definition
+
+For vertices $A, B, C \in \mathbb{R}^3$, the normal vector is:
+
+$$\vec{N} = \frac{(B - A) \times (C - A)}{|(B - A) \times (C - A)|}$$
+
+#### Transformations
+
+- **Translation**: $T(\vec{v}): P \mapsto P + \vec{v}$
+- **Scaling**: $S(t, \vec{p}): P \mapsto \vec{p} + t(P - \vec{p})$
+- **Hyperbolic Projection**: Maps to hyperboloid model
 
 ```cpp
-Facet f0;
+Facet triangle(Vector3D(0,0,0), Vector3D(1,0,0), Vector3D(0,1,0));
+triangle.translate(Vector3D(0, 0, 1));     // Move up
+triangle.crunch(0.5, Vector3D(0,0,0));     // Scale by 50%
+triangle.applyHyperboloid();               // Project to hyperbolic space
 ```
 
-Default constructor initializes all vertices and normal to zero.
+### FacetBox Class
+
+Container for managing collections of triangular facets with advanced subdivision algorithms.
+
+#### Subdivision Modes
+
+1. **Centroid3**: Subdivides using centroid
+   $$C = \frac{A + B + C}{3}$$
+
+2. **Midpoint4**: 4-way subdivision using edge midpoints
+   $$M_{AB} = \frac{A + B}{2}, \quad M_{BC} = \frac{B + C}{2}, \quad M_{CA} = \frac{C + A}{2}$$
+
+3. **Midpoint6**: 6-way subdivision combining centroid and midpoints
+
+4. **Sierpinski**: Fractal subdivision pattern
+
+#### Operations
 
 ```cpp
-Vector3D a(0,0,0), b(1,0,0), c(0,1,0);
-Facet f1(a, b, c);
+FacetBox mesh;
+mesh.push(v1, v2, v3);                    // Add triangle
+mesh += otherMesh;                        // Merge meshes
+FacetBox refined = mesh.refine(3, FacetBox::SubdivisionMode::Midpoint4);
+refined.applyHyperboloid();               // Transform to hyperbolic space
 ```
 
-Constructs the facet using 3 `Vector3D` points.
+### Dodecahedron Class
+
+Generates regular dodecahedra with configurable triangulation.
+
+#### Mathematical Properties
+
+- **Vertices**: 20 vertices positioned using golden ratio $\phi = \frac{1 + \sqrt{5}}{2}$
+- **Faces**: 12 pentagonal faces (triangulated into 36 triangles)
+- **Edges**: 30 edges
+
+#### Vertex Coordinates
+
+Based on permutations of:
+- $(0, \pm\frac{1}{\phi}, \pm\phi)$
+- $(\pm 1, \pm 1, \pm 1)$
+- $(\pm\frac{1}{\phi}, \pm\phi, 0)$
 
 ```cpp
-Quaternion qa(0, a), qb(0, b), qc(0, c);
-Facet f2(qa, qb, qc);
+Dodecahedron dodec(2.0, Vector3D(0,0,0), FaceMode::Pentagons);
+FacetBox faces = dodec.getFacets();
 ```
-
-Constructs the facet from 3 `Quaternion` points.
-
-```cpp
-Facet f3(f2);
-```
-
-* **Copy constructor**: Creates a new `Facet` by duplicating the vertices and normal of an existing facet. This results in an exact geometric copy.
 
 ---
 
-### Element Access
+## Advanced Features
+
+### Hyperbolic Geometry
+
+The framework implements the hyperboloid model of hyperbolic $n$-space $\mathbb{H}^n$.
+
+#### Lorentzian Geometry
+
+The Lorentzian inner product in $\mathbb{R}^{n+1}$ is defined as:
+
+$$\langle x, y \rangle = -x_{n+1}y_{n+1} + \sum_{i=1}^{n} x_i y_i$$
+
+#### Projections
+
+1. **Gnomonic Projection** $\mu: D^n \to \mathbb{H}^n$:
+   $$\mu(x) = \frac{x + e_{n+1}}{\sqrt{1 - \|x\|^2}}$$
+
+2. **Stereographic Projection** $\lambda: \mathbb{H}^n \to B^n$:
+   $$\lambda(x) = \left(\frac{2x_1}{1-|x|^2}, \ldots, \frac{2x_n}{1-|x|^2}, \frac{1+|x|^2}{1-|x|^2}\right)$$
+
+#### Implementation
+
+The `toHyperboloid()` method implements the composition $\lambda \circ \mu$:
 
 ```cpp
-f1[0] // returns vertex A as a Vector3D
-f1[1] // returns vertex B as a Vector3D
-f1[2] // returns vertex C as a Vector3D
-f1[3] // returns normal N as a Vector3D
-```
-
-Access vertices and the precomputed normal using `operator[]`.
-
----
-
-### Update Facet
-
-```cpp
-f1.updateFacet(d, e, f);
-```
-
-Updates the facet's vertices and recomputes the normal.
-
----
-
-### Translate
-
-```cpp
-Vector3D offset(0, 0, 1);
-f1.translate(offset);
-```
-
-Shifts all three vertices by a given Vector3D offset.
-
----
-
-### Method: `crunch()`
-
-```cpp
-double factor = 0.25;
-Vector3D origin(0, 0, 0);
-f2.crunch(factor, origin);
-```
-
-**Purpose**: Scales the triangle toward or away from a pivot point.
-
-#### Explanation:
-
-* Each vertex is repositioned using the formula:
-
-  ```cpp
-  newP = pivot + t * (P - pivot);
-  ```
-* **t = 1.0** → No change
-* **0 < t < 1** → Vertex moves closer to `pivot`
-* **t > 1** → Vertex moves farther away from `pivot`
-* This uniformly scales the triangle about the `pivot`. After scaling, the triangle’s **centroid** and **normal vector** are updated to reflect the new geometry.
-
-This is especially useful in animations or mesh deformation workflows, where you need to dynamically "shrink" or "expand" triangles around a point.
-
----
-
-### Stream Operators
-
-```cpp
-std::istringstream iss("(0,0,0) (1,1,0) (1,0,1)");
-Facet f4;
-iss >> f4;
-```
-
-**`operator>>`** reads three `(x,y,z)` coordinates to construct a facet.
-
-```cpp
-std::cout << f4;
-```
-
-**`operator<<`** outputs all three vertices.
-
----
-
-Prints the facet in a readable format.
-
----
-
-### Geometry Helpers
-
-* `getNormal()` → Returns the current normal vector.
-* `getCenter()` → Computes the centroid:
-
-  ```cpp
-  center = (A + B + C) / 3;
-  ```
-
----
-
-### Hyperbolic Support
-
-```cpp
-/**
- * @brief Mutate this Facet in-place by hyperbolic projection.
- * Each vertex \(A,B,C\) is replaced by \(\lambda(\mu(A))\), etc.
- * @throws std::domain_error If any vertex lies on or outside the unit sphere.
- */
-void Facet::applyHyperboloid() {
-    // 1) Lift and re-project each vertex quaternion
-    Quaternion Ah = A.toHyperboloid();  // (0,A)->Hyperboloid->disk
-    Quaternion Bh = B.toHyperboloid();
-    Quaternion Ch = C.toHyperboloid();
-    // 2) Extract their Vector3D parts and rebuild facet (recomputes N)
-    updateFacet( Ah.V(), Bh.V(), Ch.V() );
+Quaternion Quaternion::toHyperboloid() const {
+    double sq = v * v;
+    if (sq >= 1.0)
+        throw std::domain_error("toHyperboloid: vector norm must be < 1");
+    
+    double s = 1.0 / std::sqrt(1.0 - sq);
+    Quaternion ret{s, s * v};
+    return Quaternion{0.0, (1.0 / (1.0 + ret.r())) * ret.V()};
 }
+```
 
-/**
- * @brief Functional version: returns a new hyperbolically projected Facet,
- * leaving *this unmodified.
- */
-Facet Facet::hyperboloid() const {
-    Facet copy = *this;      // make a local copy
-    copy.applyHyperboloid(); // mutate it
-    return copy;             // return the result
+### Mesh Refinement Algorithms
+
+The framework provides multiple subdivision schemes that preserve geometric properties while increasing resolution:
+
+- **Centroid subdivision**: Preserves area ratios
+- **Midpoint subdivision**: Maintains edge length ratios
+- **Sierpinski subdivision**: Creates self-similar fractal patterns
+
+Each algorithm can be applied iteratively:
+
+```cpp
+FacetBox mesh = dodecahedron.getFacets();
+for (int i = 0; i < levels; ++i) {
+    mesh = mesh.refine(1, FacetBox::SubdivisionMode::Sierpinski);
 }
 ```
 
 ---
 
+## Usage Examples
 
-This `Facet` class provides a lightweight and expressive interface for 3D triangle modeling. Combined with the `Vector3D` and `Quaternion` classes, it forms a robust foundation for geometric computation and graphics programming.
-
-# FacetBox Usage Guide
-
-`FacetBox` is a lightweight container for managing a dynamic collection of `Facet` objects (triangles). It uses `std::vector` internally and provides convenience methods for common geometry operations.
-
----
-
-## Including
+### Example 1: Creating and Manipulating Vectors
 
 ```cpp
-#include "FacetBox.hpp"
+// Basic vector operations
+Vector3D v1(1, 2, 3), v2(4, 5, 6);
+Vector3D sum = v1 + v2;              // (5, 7, 9)
+double dot = v1 * v2;                // 32
+Vector3D cross = v1 % v2;            // (-3, 6, -3)
+Vector3D unit_v1 = unit(v1);        // Normalized vector
+
+// Linear interpolation
+Vector3D midpoint = line(0.5, v1, v2);
 ```
 
-Make sure you also have:
+### Example 2: Quaternion Rotations
 
 ```cpp
-#include "Vector3D.hpp"
-#include "Quaternion.hpp"
-#include "Facet.hpp"
+// Create rotation quaternion: 45° around y-axis
+Quaternion rot = Qan(M_PI/4, Vector3D(0, 1, 0));
+
+// Rotate a point
+Vector3D point(1, 0, 0);
+Quaternion p_quat(point);
+Quaternion rotated = rotate(p_quat, Vector3D(0,0,0), Vector3D(0,1,0), rot);
+Vector3D result = rotated.V();
 ```
 
----
-
-## Methods
-
-### `void push(const Vector3D& A, const Vector3D& B, const Vector3D& C)`
-
-Appends a new `Facet` constructed from points **A**, **B**, **C**.
+### Example 3: Building and Refining Meshes
 
 ```cpp
-FacetBox box;
-Vector3D A(0,0,0), B(1,0,0), C(0,1,0);
-box.push(A, B, C);
-// box.size() == 1, contains facet with vertices A, B, C
+// Create dodecahedron
+Dodecahedron dodec(1.0, Vector3D(0,0,0));
+FacetBox mesh = dodec.getFacets();
+
+// Apply iterative refinement
+mesh = mesh.refine(4, FacetBox::SubdivisionMode::Midpoint4);
+
+// Transform to hyperbolic space
+mesh.applyHyperboloid();
 ```
 
----
-
-### `void replace(size_t idx, const Vector3D& A, const Vector3D& B, const Vector3D& C)`
-
-Replaces the facet at index `idx` by a new `Facet(A,B,C)`. Throws `std::out_of_range` if `idx >= size()`.
+### Example 4: Facet Manipulation
 
 ```cpp
-Vector3D D(1,1,0), E(2,1,0), F(1,2,0);
-box.replace(0, D, E, F);
-// box[0] now has vertices D, E, F
-```
+// Create and transform a triangle
+Facet triangle(
+    Vector3D(0, 0, 0),
+    Vector3D(1, 0, 0),
+    Vector3D(0, 1, 0)
+);
 
----
+// Apply transformations
+triangle.translate(Vector3D(0, 0, 1));  // Move up
+triangle.crunch(0.5, Vector3D(0,0,0));  // Scale by 50%
 
-### `void clear() noexcept`
-
-Removes all facets.
-
-```cpp
-box.clear();
-// box.size() == 0
-```
-
----
-
-### `Vector3D center() const`
-
-Computes the centroid of *all* vertices across *all* stored facets:
-
-$$
-\text{center} = \frac{1}{3N} \sum_{i=0}^{N-1} \bigl(A_i + B_i + C_i\bigr)
-$$
-
-```cpp
-Vector3D ctr = box.center();
-std::cout << "Center = " << ctr << "\n";
+// Get properties
+Vector3D normal = triangle.getNormal();
+Vector3D center = triangle.getCenter();
 ```
 
 ---
 
-### `void translate(const Vector3D& offset)`
+## Building & Installation
 
-Translates every facet by adding `offset` to each vertex.
+### Requirements
 
-```cpp
-Vector3D offset(0,0,1);
-box.translate(offset);
-// every facet’s vertices have z–coordinate increased by 1
-```
+- C++ compiler with C++11 support
+- OpenGL
+- GLUT (FreeGLUT recommended)
+- GLU
 
----
-
-### `void crunch(double t, const Vector3D& pivot)`
-
-Scales (“crunches”) each facet toward (or away from) `pivot` by factor `t`:
-
-$$
-P' = \text{pivot} + t\,(P - \text{pivot})
-$$
-
-* `t == 1.0`: no change
-* `0 < t < 1.0`: moves toward pivot
-* `t > 1.0`: moves away (expansion)
-
-```cpp
-box.crunch(0.5, Vector3D(0,0,0));
-// each vertex is now halfway between its old position and the origin
-```
-
-## FacetBox “Algebra” Methods
-
-`FacetBox` provides a simple way to **merge** two collections of triangular facets.  These operations treat each `FacetBox` as a set of triangles and perform a union (concatenation) of their contents.
-
----
-
-## `void merge(const FacetBox& other)`
-
-```cpp
-/**
- * @brief Append all facets from `other` into *this*.
- *
- * Equivalent to the set‐union (multiset) of triangles:
- *   this ← this ∪ other
- *
- * @param other  The FacetBox whose facets will be appended.
- */
-void FacetBox::merge(const FacetBox& other);
-```
-
-```cpp
-FacetBox boxA, boxB;
-// ... fill boxA and boxB ...
-boxA.merge(boxB);
-// Now boxA contains its original facets followed by those from boxB.
-
-
-/**
- * @brief In‐place union of two FacetBoxes.
- *
- * Equivalent to:
- *   this.merge(other);
- *   return *this;
- *
- * Allows chaining:
- *   box1 += box2 += box3;
- */
-FacetBox& FacetBox::operator+=(const FacetBox& other);
-
-```
-
-### Usage
-
-```cpp
-FacetBox a, b, c;
-// ... fill a, b, c ...
-a += b;        // a now contains facets from a then b
-a += c;        // a now also contains facets from c
-
-
-FacetBox x, y, z;
-x += y += z;   // y becomes y∪z, then x becomes x∪y∪z
-
-```
-
-### Notes
-
-
-
->   1. These operations do not eliminate duplicates: if the same triangle appears in both boxes, it will appear twice after merging.
-
->   2. If you need set‐like behavior (no duplicates), you must post‐process facets_ (e.g., sort + std::unique or use a std::unordered_set of hashable facets).
-
->   3. The order of facets is preserved: first all facets of the left‐hand operand, then those of the right‐hand operand.
-
-
----
-
-## Full Example
-
-```cpp
-#include <iostream>
-#include "FacetBox.hpp"
-#include "Vector3D.hpp"
-
-int main() {
-    // 1) Create an empty FacetBox
-    FacetBox box;
-
-    // 2) push(A,B,C): add a triangle (0,0,0)-(1,0,0)-(0,1,0)
-    Vector3D A(0,0,0), B(1,0,0), C(0,1,0);
-    box.push(A, B, C);
-    std::cout << "After push: box.size() = " << box.size() << "\n";
-
-    // 3) center(): compute centroid of all vertices
-    Vector3D ctr = box.center();
-    std::cout << "Center of box = " << ctr << "\n";
-
-    // 4) translate(offset): move every facet by (0,0,1)
-    Vector3D offset(0,0,1);
-    box.translate(offset);
-    std::cout << "After translate by " << offset
-              << ": box.center() = " << box.center() << "\n";
-
-    // 5) crunch(t, pivot): scale each facet toward the pivot
-    box.crunch(0.5, Vector3D(0,0,0));
-    std::cout << "After crunch(0.5, origin): box.center() = "
-              << box.center() << "\n";
-
-    // 6) replace(idx, A',B',C'): replace the first triangle
-    Vector3D D(1,1,0), E(2,1,0), F(1,2,0);
-    box.replace(0, D, E, F);
-    std::cout << "After replace(0): new center = "
-              << box.center() << "\n";
-
-    // 7) clear(): remove all facets
-    box.clear();
-    std::cout << "After clear: box.size() = " << box.size() << "\n";
-
-    return 0;
-}
-```
-
----
-
-## Building
+### Basic Build
 
 ```bash
-g++ -std=c++11 -I. main.cpp \
-    Vector3D.cpp Quaternion.cpp Facet.cpp FacetBox.cpp \
-    -o facetbox_demo
-./facetbox_demo
+# Compile a basic example
+g++ -std=c++11 main.cpp Vector3D.cpp Vector4D.cpp Quaternion.cpp \
+    Facet.cpp FacetBox.cpp Dodecahedron.cpp \
+    -o k_blade -lGL -lGLU -lglut
+
+# Run
+./k_blade
 ```
 
-This guide covers every public method of **`FacetBox`**, demonstrating how to add, replace, clear, query, and transform your collection of facets in a modern, safe C++ style.
+### Building Specific Examples
 
+The project includes multiple example programs (`main.cpp` through `main9.cpp`):
+
+```bash
+# Build the comprehensive class demonstration (main7.cpp)
+g++ -std=c++11 main7.cpp Vector3D.cpp Vector4D.cpp Quaternion.cpp \
+    Facet.cpp FacetBox.cpp Dodecahedron.cpp \
+    -o demo -lGL -lGLU -lglut
+
+# Build the hyperbolic dodecahedron demo (main8.cpp)
+g++ -std=c++11 main8.cpp Vector3D.cpp Vector4D.cpp Quaternion.cpp \
+    Facet.cpp FacetBox.cpp Dodecahedron.cpp \
+    -o hyperbolic_demo -lGL -lGLU -lglut
+```
+
+### Interactive Controls
+
+- **Left Mouse Drag**: Rotate view
+- **Middle Mouse Drag**: Pan camera
+- **Right Mouse Drag / Scroll**: Zoom
+- **H**: Toggle help display
+- **Right Click**: UI menu
+
+---
+
+## API Reference
+
+### Vector3D
+
+#### Constructors & Access
+| Method | Description | Example |
+|--------|-------------|---------|
+| `Vector3D()` | Default constructor | `Vector3D v;` → (0,0,0) |
+| `Vector3D(x,y,z)` | Component constructor | `Vector3D v(1,2,3);` |
+| `Vector3D{x,y,z}` | Brace initialization | `Vector3D v{1,2,3};` |
+| `operator[]` | Element access | `v[0]` returns x |
+| `x()`, `y()`, `z()` | Component accessors | `v.x()` returns x component |
+
+#### Operators
+| Method | Description | Mathematical Operation |
+|--------|-------------|------------------------|
+| `operator+` | Vector addition | $\vec{a} + \vec{b}$ |
+| `operator-` | Vector subtraction/negation | $\vec{a} - \vec{b}$, $-\vec{a}$ |
+| `operator*` | Dot product / Scalar multiplication | $\vec{a} \cdot \vec{b}$, $c\vec{a}$ |
+| `operator/` | Scalar division | $\vec{a}/c$ |
+| `operator%` | Cross product | $\vec{a} \times \vec{b}$ |
+| `operator+=` | Compound addition | $\vec{a} = \vec{a} + \vec{b}$ |
+| `operator-=` | Compound subtraction | $\vec{a} = \vec{a} - \vec{b}$ |
+| `operator/=` | Compound division | $\vec{a} = \vec{a}/c$ |
+| `operator==` | Equality test (with tolerance) | $\|\vec{a} - \vec{b}\| < \epsilon$ |
+| `operator<<`, `operator>>` | Stream I/O | Input/output formatting |
+
+#### Functions
+| Method | Description | Mathematical Operation |
+|--------|-------------|------------------------|
+| `abs()` | Euclidean norm | $\|\vec{v}\|_2 = \sqrt{x^2 + y^2 + z^2}$ |
+| `infty()` | Infinity norm | $\|\vec{v}\|_\infty = \max(\|x\|,\|y\|,\|z\|)$ |
+| `unit()` | Normalization | $\vec{v}/\|\vec{v}\|$ |
+| `line()` | Linear interpolation | $(1-t)\vec{a} + t\vec{b}$ |
+| `cruz()` | Cross product (function form) | $\vec{a} \times \vec{b}$ |
+| `areColinear()` | Test collinearity of 3 points | Returns true if collinear |
+| `centerM4()` | Center of 4 points | $(\vec{a}+\vec{b}+\vec{c}+\vec{d})/4$ |
+| `cPenta()` | Center of 5 points | Average of 5 vectors |
+| `cDodeca()` | Center of 20 points | Average of dodecahedron vertices |
+| `centerM8()` | Center of 8 points | Average of 8 vectors |
+
+### Vector4D
+
+#### Constructors & Access
+| Method | Description | Example |
+|--------|-------------|---------|
+| `Vector4D()` | Default constructor | `Vector4D v;` → (0,0,0,0) |
+| `Vector4D(x,y,z,t)` | Component constructor | `Vector4D v(1,2,3,4);` |
+| `operator[]` | Element access | `v[3]` returns t |
+| `x()`, `y()`, `z()`, `t()` | Component accessors | `v.t()` returns t component |
+
+#### Operators & Functions
+| Method | Description | Mathematical Operation |
+|--------|-------------|------------------------|
+| `operator+`, `-`, `*`, `/` | Arithmetic operations | Standard vector operations |
+| `operator+=`, `/=` | Compound operations | In-place modifications |
+| `operator==` | Equality test | Component-wise comparison |
+| `operator<` | Lexicographic ordering | For use in sorted containers |
+| `Cross()` | 4D cross product (3 vectors) | Produces orthogonal vector |
+| `abs()` | Euclidean norm | $\|\vec{v}\|_2$ in $\mathbb{R}^4$ |
+| `infty()` | Infinity norm | $\max(\|x\|,\|y\|,\|z\|,\|t\|)$ |
+| `unit()` | Normalization | $\vec{v}/\|\vec{v}\|$ |
+| `zero()` | Zero vector | Returns (0,0,0,0) |
+| `rect()` | Linear interpolation | $(1-t)\vec{a} + t\vec{b}$ |
+
+### Quaternion
+
+#### Constructors & Access
+| Method | Description | Example |
+|--------|-------------|---------|
+| `Quaternion()` | Default constructor | `Quaternion q;` → (0, (0,0,0)) |
+| `Quaternion(s, v)` | Scalar-vector constructor | `Quaternion q(1, Vector3D(0,0,1));` |
+| `Quaternion(v)` | Pure vector constructor | `Quaternion q(Vector3D(1,2,3));` |
+| `Quaternion(s)` | Pure scalar constructor | `Quaternion q(3.14);` |
+| `operator[]` | Access vector part | `q[0]` returns vector part |
+| `r()` | Get scalar part | Returns real component |
+| `V()` | Get vector part | Returns Vector3D |
+| `i()`, `j()`, `k()` | Component accessors | Individual vector components |
+
+#### Operations
+| Method | Description | Mathematical Operation |
+|--------|-------------|------------------------|
+| `operator+`, `-` | Addition/subtraction | Component-wise |
+| `operator*` | Quaternion/scalar multiplication | $q_1 q_2$ or $cq$ |
+| `operator/` | Scalar division | $q/c$ |
+| `operator+=`, `-=`, `/=` | Compound operations | In-place modifications |
+| `operator==` | Equality test | With tolerance |
+| `conjugate()` | Quaternion conjugate | $q^* = s - \vec{v}$ |
+| `v4()` | Convert to Vector4D | $(s, x, y, z)$ |
+| `toHyperboloid()` | Hyperbolic projection | $\lambda \circ \mu$ |
+
+#### Free Functions
+| Function | Description | Mathematical Operation |
+|----------|-------------|------------------------|
+| `Qan()` | Axis-angle to quaternion | $\cos(\theta/2) + \sin(\theta/2)\hat{n}$ |
+| `cross()` | Quaternion cross product | Special quaternion product |
+| `rotate()` | Apply rotation | $qpq^{-1}$ with translation |
+| `lerp()` | Linear interpolation | $(1-t)q_1 + tq_2$ |
+
+### Facet
+
+#### Constructors & Access
+| Method | Description |
+|--------|-------------|
+| `Facet()` | Default constructor |
+| `Facet(A,B,C)` | From three Vector3D points |
+| `Facet(qA,qB,qC)` | From three Quaternions |
+| `operator[]` | Access vertices (0=A, 1=B, 2=C, 3=N) |
+
+#### Operations
+| Method | Description |
+|--------|-------------|
+| `getNormal()` | Get face normal vector |
+| `getCenter()` | Compute triangle centroid |
+| `updateFacet()` | Update all vertices |
+| `translate()` | Apply translation |
+| `crunch()` | Scale relative to pivot |
+| `applyHyperboloid()` | In-place hyperbolic projection |
+| `hyperboloid()` | Return hyperbolic-transformed copy |
+| `operator>>`, `<<` | Stream I/O |
+
+### FacetBox
+
+#### Constructors & Factory Methods
+| Method | Description |
+|--------|-------------|
+| `FacetBox()` | Default constructor (empty) |
+| `FacetBox(facet)` | Single facet constructor |
+| `fromFacet()` | Static: subdivide facet into 3 around centroid |
+| `subdivide4()` | Static: 4-way midpoint subdivision |
+| `subdivide6()` | Static: 6-way subdivision |
+| `sierpinski()` | Static: Sierpinski pattern |
+
+#### Operations
+| Method | Description |
+|--------|-------------|
+| `operator[]` | Access facet by index |
+| `push()` | Add new facet from 3 points |
+| `replace()` | Replace facet at index |
+| `clear()` | Remove all facets |
+| `size()` | Number of facets |
+| `center()` | Compute mesh centroid |
+| `translate()` | Translate all facets |
+| `crunch()` | Scale all facets |
+| `merge()` | Append another FacetBox |
+| `operator+=` | Merge operator |
+| `operator+` | Union (creates new FacetBox) |
+| `refine()` | Apply subdivision (with mode) |
+| `applyHyperboloid()` | In-place hyperbolic transform |
+| `hyperboloid()` | Return hyperbolic copy |
+| `operator<<` | Stream output |
+
+### Dodecahedron
+
+#### Constructors
+| Method | Description |
+|--------|-------------|
+| `Dodecahedron()` | Default constructor |
+| `Dodecahedron(radius, center)` | Basic constructor |
+| `Dodecahedron(radius, center, mode)` | With face mode (Triangles/Pentagons) |
+
+#### Operations
+| Method | Description |
+|--------|-------------|
+| `faceCount()` | Number of triangular faces (36) |
+| `operator[]` | Access face by index |
+| `center()` | Compute geometric center |
+| `translate()` | Move by offset vector |
+| `scale()` | Scale relative to pivot |
+| `getFacets()` | Get underlying FacetBox |
+| `operator<<` | Stream output |
+
+---
+
+## Contributing
+
+This is a personal exploration project, but contributions that enhance mathematical clarity or add interesting geometric algorithms are welcome. Please ensure:
+
+1. Mathematical operations are clearly documented with LaTeX notation
+2. Code follows existing style conventions
+3. New features include example usage
+4. Complex algorithms include references to mathematical literature
+
+---
+
+## License
+
+[Specify your license here]
+
+---
+
+## Acknowledgments
+
+This project is inspired by the beauty of geometric algebra and the elegance of quaternion mathematics. Special thanks to the mathematical community for centuries of geometric insights.
