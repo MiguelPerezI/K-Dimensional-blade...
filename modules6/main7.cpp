@@ -1,3 +1,21 @@
+// =============================================================================
+// K-Dimensional Blade - Comprehensive Class Usage Reference (main7.cpp)
+// =============================================================================
+// This file serves as a complete reference guide demonstrating how to use
+// every major class and method in the K-Dimensional Blade geometry framework.
+// 
+// Classes covered:
+//   - Vector3D: 3D vector operations
+//   - Vector4D: 4D vector operations  
+//   - Quaternion: Rotations and transformations
+//   - Facet: Triangle representation
+//   - FacetBox: Mesh container with subdivision
+//   - Dodecahedron: Regular polyhedron generation
+//
+// Run this program to see detailed console output demonstrating each feature.
+// The visual output shows different subdivision algorithms applied to dodecahedra.
+// =============================================================================
+
 #include <vector>
 #include <iostream>
 #include <stdio.h>
@@ -12,43 +30,39 @@
 
 //////////////////////////////////////
 //                                  
-//                                  
-//  VARIABLES GLOBALES PARA EL TECLADO        
-//                                  
+//  GLOBAL VARIABLES FOR RENDERING  
 //                                  
 //////////////////////////////////////
 
-// ciclo: Frame number.
+// Frame counter - used to ensure Setup() runs only once
 int ciclo = 0;
 
-// count: Is used to measure rotating angle length.
+// Animation parameters (not used in this reference example)
 double count = 0.25 * M_PI;
 double count2 = 0.25 * 3.14159265358979;
 double count3 = 1e-2;
 
-// rad: Radius between camaera and center.
+// Camera distance from origin
 double rad = 5.0;
 
 //////////////////////////////////////
 //
+//        RENDERING PIPELINE
 //
-//        PIPELINE RENDERIZAR
-//
-//	  *Setup() := lo puedes ocupar como una función que ejecuta una sola vez (en el primer frame) dentro del render
-//	  *Update() := Se puede utilizar para actualizar algún objeto
-//	  *Draw() := lo puedes ocupar para todo y también dibujar solo que con cuidado por que se ejecuta en cada frame
-//
+//   Setup() : Runs once on first frame - demonstrates all class usage
+//   Draw()  : Renders the visual examples every frame
+//   ProcessingProto() : Main render loop entry point
 //
 //////////////////////////////////////
 
-/*Funciones para dibujar sin pensar en OpenGL*/
+// Forward declarations for rendering functions
 void Setup();
 void Draw();
 void updateProcessingProto();
 void ProcessingProto();
 void interface();
 
-// OpenGL functions
+// OpenGL rendering helper functions
 void drawFacet( const Facet& f, 
                 int R, int G, int Bi, 
                 float alpha);
@@ -57,19 +71,24 @@ void drawSphere(const Vector3D& pos, float radius, int slices, int stacks);
 void drawAxes(float length);
 void drawText3D(const Vector3D& pos, const char* text);
 
-Vector3D d_ui(1.0, 0.0, 0.0);
-Vector3D e_ui(0.0, 1.0, 0.0);
-Vector3D f_ui(0.0, 0.0, 1.0);
-Facet f_1(d_ui, e_ui, f_ui);
+// Example objects used for visual demonstration
+Vector3D d_ui(1.0, 0.0, 0.0);  // Unit vector in X direction
+Vector3D e_ui(0.0, 1.0, 0.0);  // Unit vector in Y direction
+Vector3D f_ui(0.0, 0.0, 1.0);  // Unit vector in Z direction
+Facet f_1(d_ui, e_ui, f_ui);   // Triangle from the three unit vectors
 
-Dodecahedron dodeca(2.0, Vector3D{0,0,0});;
-FacetBox box_out_0;
-FacetBox box_out_1;
-FacetBox box_out_2;
-FacetBox box_out_3;
+// Dodecahedron for visual output (not used in console examples)
+Dodecahedron dodeca(2.0, Vector3D{0,0,0});
+
+// FacetBoxes to store refined meshes for visualization
+FacetBox box_out_0;  // Will store Centroid3 subdivision
+FacetBox box_out_1;  // Will store Midpoint4 subdivision
+FacetBox box_out_2;  // Will store Midpoint6 subdivision
+FacetBox box_out_3;  // Will store Sierpinski subdivision
 
 
-// Helper: convert HSV→RGB (all in [0,1])                                                  
+// Helper function: Convert HSV color space to RGB for rainbow coloring
+// Used to give each triangle a different color based on its index                                                  
 struct Color { float r, g, b; };
 Color hsv2rgb(float h, float s, float v) {
     h = fmodf(h, 360.0f) / 60.0f;
@@ -89,7 +108,9 @@ Color hsv2rgb(float h, float s, float v) {
 }
 
 
-// Subdivide each triangle in `initial` n times, returning only the final mesh.
+// Example of iterative mesh refinement
+// This function demonstrates how to apply subdivision multiple times
+// Note: FacetBox has a built-in refine() method that's more efficient
 FacetBox refine(const FacetBox& initial, int n) {
     FacetBox curr = initial;
     FacetBox next;
@@ -132,68 +153,95 @@ void Setup() {
         cout << "|———————————————————————————————————|\n";
         cout << "\n\n";
         cout << "———————————————————————————————————————————————————————————————————————\n";
-        cout << "|- Testing Vector3D Class——————————————————————————————————————————————\n";
+        cout << "| SECTION 1: Vector3D Class - 3D Vector Operations                            |\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
         
-        // --- Construction ---------------------------------------------------
+        // =================================================================
+        // 1.1 VECTOR3D CONSTRUCTORS - Different ways to create 3D vectors
+        // =================================================================
         cout << "- List of constructors ————————————————————————————————————————————————\n";
+        
+        // Default constructor creates zero vector (0,0,0)
         Vector3D p;                       // Default constructor
         cout << "Default constructor:       Vector3D p;              → p = " << p << "\n";
         
+        // Component constructor - most common way to create vectors
         Vector3D q(1.0, 2.0, 3.0);        // Constructor with components
         cout << "Component constructor:     Vector3D q(1.0, 2.0, 3.0) → q = " << q << "\n";
         
+        // Copy constructor - creates exact copy of existing vector
         Vector3D r = q;                   // Copy constructor
         cout << "Copy constructor:          Vector3D r = q;           → r = " << r << "\n";
         
+        // Brace initialization - C++11 uniform initialization syntax
         Vector3D r1{0.1, 0.1, 0.12};      // Brace-initialized constructor
         cout << "Brace constructor:         Vector3D r1{0.1,0.1,0.12}          → r1 = " << r1 << "\n";
        
+        // Explicit copy constructor call
         Vector3D sup = Vector3D(r1);  // Copy constructor (explicit expression)
         cout << "Copy constructor (explicit):   Vector3D sup = Vector3D(r1)  → sup = " << sup << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n"; 
 
-        // --- Access & Modification -----------------------------------------
+        // =================================================================
+        // 1.2 ELEMENT ACCESS & COMPOUND OPERATIONS
+        // =================================================================
         cout << "- Access & Modification Examples ——————————————————————————————————————\n";
         cout << "";
-        q[0] = 4.0;                       // Write to q[0]
-        double zy = q[2];                 // Read from q[2]
+        
+        // operator[] provides array-like access to components (0=x, 1=y, 2=z)
+        q[0] = 4.0;                       // Modify x component
+        double zy = q[2];                 // Read z component
         cout << "After q[0] = 4.0:          q = " << q << "\n";
         cout << "Reading q[2]:              q[2] = " << zy << "\n";
         
-        r += Vector3D(2, 2, 2);           // Compound addition
+        // Compound operators modify vectors in-place (more efficient than v = v + u)
+        r += Vector3D(2, 2, 2);           // Equivalent to r = r + Vector3D(2,2,2)
         cout << "After r += Vector3D(2,2,2): r = " << r << "\n";
         
-        r -= Vector3D(0.5, 0.5, 0.5);     // Compound subtraction
+        r -= Vector3D(0.5, 0.5, 0.5);     // Equivalent to r = r - Vector3D(0.5,0.5,0.5)
         cout << "After r -= Vector3D(0.5,...): r = " << r << "\n";
         
-        r1 /= 0.5;                        // Compound scalar division
+        r1 /= 0.5;                        // Scales vector by 1/0.5 = 2.0
         cout << "After r1 /= 0.5: r1 = " << r1 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-        // --- Arithmetic -----------------------------------------------------
+        // =================================================================
+        // 1.3 VECTOR ARITHMETIC - Mathematical operations on vectors
+        // =================================================================
         cout << "- Arithmetic ——————————————————————————————————————————————————————————\n";
+        
+        // Vector addition: component-wise sum
         Vector3D u = q + r;               // Addition
         cout << "Vector addition:           u = q + r                → u = " << u << "\n";
         
+        // Vector subtraction: component-wise difference
         Vector3D v = r - q;               // Subtraction
         cout << "Vector subtraction:        v = r - q                → v = " << v << "\n";
         
+        // Scalar multiplication: scales magnitude, preserves direction
         Vector3D w = 2.5 * u;             // Scalar multiplication
         cout << "Scalar multiplication:     w = 2.5 * u              → w = " << w << "\n";
         
+        // Normalization: creates unit vector (magnitude = 1) in same direction
         Vector3D n = unit(w);             // Normalization
         cout << "Normalized vector:         n = unit(w)              → n = " << n << "\n";
         
+        // Dot product: scalar value = |u||r|cos(θ), measures similarity
         double d  = u * r;                // Dot product
         cout << "Dot product:               d = u · r                → d = " << d << "\n";
         
+        // Cross product: vector perpendicular to both u and r, |c| = |u||r|sin(θ)
         Vector3D c = u % r;               // Cross product
         cout << "Cross product:             c = u × r                → c = " << c << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
         
-        // --- Geometry helpers ----------------------------------------------
+        // =================================================================
+        // 1.4 GEOMETRY HELPERS - Utility functions for common operations
+        // =================================================================
         cout << "- Geometry helpers ————————————————————————————————————————————————————\n";
+        
+        // Linear interpolation: line(t, a, b) = (1-t)*a + t*b
+        // t=0 gives a, t=1 gives b, t=0.5 gives midpoint
         Vector3D mid = line(0.5, q, r);   // Midpoint
         cout << "Midpoint of q and r:       mid = line(0.5, q, r)    → mid = " << mid << "\n";
         
@@ -209,28 +257,36 @@ void Setup() {
         cout << "u×r = " << c << "\n";
         cout << "midpoint = " << mid << "\n";
     
-        cout << "———————————————————————————————————————————————————————————————————————\n";
-        cout << "|- Testing Quaternion Class————————————————————————————————————————————\n";
+        cout << "\n———————————————————————————————————————————————————————————————————————\n";
+        cout << "| SECTION 2: Quaternion Class - Rotations and Transformations          |\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-        // --- Construction ---------------------------------------------------
+        // =================================================================
+        // 2.1 QUATERNION CONSTRUCTORS - Creating quaternions q = s + v
+        // =================================================================
         cout << "- List of constructors ————————————————————————————————————————————————\n";
+        
+        // Default constructor: creates zero quaternion (0, (0,0,0))
         Quaternion q0;  // default constructor
         cout << "Default constructor:             Quaternion q0;              \t→ q0 = " << q0 << "\n";
         
+        // Scalar-vector constructor: most general form q = s + xi + yj + zk
         Vector3D v1{1.0, 2.0, 3.0};
         cout << "- Let v1 = " << v1 << "\n";
         Quaternion q1(5.0, v1);  // scalar-vector constructor
         cout << "Parameterized constructor:        Quaternion(5, v1)          \t→ q1 = " << q1 << "\n";
         
+        // Copy constructor: creates duplicate quaternion
         Quaternion q2 = q1;  // copy constructor
         cout << "Copy constructor:                 Quaternion q2 = q1         \t→ q2 = " << q2 << "\n";
         
+        // Pure-vector quaternion: scalar part = 0, useful for representing points
         Vector3D v2{0.1, 0.2, 0.3};
         cout << "- Let v2 = " << v2 << "\n";
         Quaternion q3(Vector3D{0.1, 0.2, 0.3});  // pure-vector constructor
         cout << "Pure-vector constructor:          Quaternion(v2)             \t→ q3 = " << q3 << "\n";
         
+        // Pure-scalar quaternion: vector part = (0,0,0), rarely used
         Quaternion q4(3.1415169265358979);  // pure-scalar constructor
         cout << "Pure-scalar constructor:        Quaternion(3.1415...)        \t→ q4 = " << q4 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
@@ -295,21 +351,29 @@ void Setup() {
         cout << "Conjugate:                        q1.conjugate()              \t→ " << qc << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-        // --- Free Functions -------------------------------------------------
-        cout << "- Free Funcionts ——————————————————————————————————————————————————————\n";
+        // =================================================================
+        // 2.4 FREE FUNCTIONS - Global functions for quaternion operations
+        // =================================================================
+        cout << "- Free Functions ——————————————————————————————————————————————————————\n";
+        
+        // Qan(angle, axis): Creates rotation quaternion from angle-axis representation
+        // This rotates by 90 degrees (π/2 radians) around the z-axis
         Quaternion qRot = Qan(3.1415 / 2, Vector3D(0, 0, 1));
         cout << "Axis-angle (Qan):                 Qan(pi/2, z-axis)           \t→ " << qRot << "\n";
         
+        // cross(): Quaternion cross product (different from vector cross product)
         Quaternion qCross = cross(q1, q3);
         cout << "Quaternion cross product:         cross(q1, q3)               \t→ " << qCross << "\n";
         
+        // rotate(): Rotates a quaternion around an axis passing through two points
+        // This rotates q1 around the axis from (1,0,0) to (0,1,0) by qRot
         Quaternion qRotated = rotate(q1, Vector3D(1,0,0), Vector3D(0,1,0), qRot);
         cout << "Rotate q1 around axis:            rotate(q1, a, b, qRot)      \t→ " << qRotated << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
 
         cout << "\n———————————————————————————————————————————————————————————————————————\n";
-        cout <<   "|- Testing Facet Class      ———————————————————————————————————————————\n";
+        cout <<   "| SECTION 3: Facet Class - Triangle Representation                     |\n";
         cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
         cout << "               [A] _________[B]\n";
         cout << "                  \\^========/\n";
@@ -319,27 +383,32 @@ void Setup() {
         cout << "                      \\^/\n";
         cout << "                      [C]\n";
         cout << "                \n";
-        // --- Construction ---------------------------------------------------
+        // =================================================================
+        // 3.1 FACET CONSTRUCTORS - Creating triangles from vertices
+        // =================================================================
         cout << "- List of constructors ————————————————————————————————————————————————\n";
         
+        // Default constructor: creates degenerate triangle at origin
         Facet f0;  // Default constructor
         cout << "Default constructor: Facet f0; → " << f0 << "\n";
         
-        // Define three points for Vector3D-based constructor
-        Vector3D a(0.0, 0.0, 0.0);
-        Vector3D b(1.0, 0.0, 0.0);
-        Vector3D c0(0.0, 1.0, 0.0);
+        // Define three points for a right triangle in XY plane
+        Vector3D a(0.0, 0.0, 0.0);   // Origin
+        Vector3D b(1.0, 0.0, 0.0);   // Point on X axis
+        Vector3D c0(0.0, 1.0, 0.0);  // Point on Y axis (renamed to avoid conflict)
         cout << "- Let a = " << a << "\n      b = " << b << "\n      c = " << c0 << "\n";
         
-        Facet f1(a, b, c);  // Vector3D constructor
+        // Vector3D constructor: most common way to create triangles
+        Facet f1(a, b, c0);  // Vector3D constructor
         cout << "Vector3D constructor:\n - Facet(a, b, c) → " << f1 << "\n";
 
-        // Quaternion-based constructor
-        Quaternion q_a(0.0, a), q_b(0.0, b), q_c(0.0, c);
+        // Quaternion constructor: useful when working with rotations
+        // Create pure-vector quaternions from the points
+        Quaternion q_a(0.0, a), q_b(0.0, b), q_c(0.0, c0);
         Facet f2(q_a, q_b, q_c);
         cout << "Quaternion constructor:\n - Facet(q_a, q_b, q_c) → " << f2 << "\n";
 
-        // Copy constructor
+        // Copy constructor: duplicates existing facet
         Facet f3(f2);
         cout << "Copy constructor:\n - Facet f3(f2) → " << f3 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
@@ -360,26 +429,34 @@ void Setup() {
         cout << " - After f1.updateFacet(d_u,e_u,f_u): f1 = " << f1 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-        // --- Translation ----------------------------------------------------
+        // =================================================================
+        // 3.3 TRANSLATION - Moving triangles in 3D space
+        // =================================================================
         cout << "- Geometric Translation  ——————————————————————————————————————————————\n";
-        Vector3D offset(0.0, 0.0, 1.0);
+        
+        // Translation adds an offset vector to all vertices
+        Vector3D offset(0.0, 0.0, 1.0);  // Move 1 unit in Z direction
         cout << "- offset: " << offset << "\n";
         cout << " - Before translate: f1 = " << f1 << "\n";
         f1.translate(offset);
         cout << " - After f1.translate(offset): f1 = " << f1 << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
-        // --- Crunch (scale) --------------------------------------------------
+        // =================================================================
+        // 3.4 CRUNCH (SCALING) - Scale triangle relative to a pivot point
+        // =================================================================
         cout << " - Crunch (scale) —————————————————————————————————————————————————————\n";
-        // Geometrically: scale the triangle's vertices by factor 0.5 about the pivot at the origin.
-        // Each vertex is pulled halfway closer to (0,0,0), shrinking the facet uniformly.
+        
+        // crunch() scales vertices relative to a pivot point
+        // factor < 1: shrinks toward pivot, factor > 1: expands away from pivot
+        // Each vertex V becomes: pivot + factor * (V - pivot)
         cout << " - Before crunch: f2 = " << f2 << "\n";
-        double factor = 0.25;
-        Vector3D origin{0,0,0}; 
+        double factor = 0.25;     // Shrink to 25% of original size
+        Vector3D origin{0,0,0};   // Use origin as pivot
         cout << " - factor = " << factor << "        origin = " << origin << "\n";
         f2.crunch(factor, origin);
         cout << " - After f2.crunch(factor, origin): f2 = " << f2 << "\n";
-        // The facet's center and normal have been recomputed to match the scaled geometry.
+        // Note: The normal vector is automatically recomputed after scaling
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
         /*
@@ -410,7 +487,7 @@ void Setup() {
     
 
         cout << "\n———————————————————————————————————————————————————————————————————————\n";
-        cout <<   "|- Testing FacetBox Class   ———————————————————————————————————————————\n";
+        cout <<   "| SECTION 4: FacetBox Class - Triangle Mesh Container                  |\n";
         cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
         cout << "*—————————————————————————————————————————————————————|*\n";
         cout << "| [A] _________[B]  [A] _________[B]   [A] _________[B]|\n";      
@@ -422,11 +499,13 @@ void Setup() {
         cout << "|        [C]               [C]                [C]      |\n";            
         cout << "*—————————————————————————————————————————————————————|*\n\n";
 
-        // --- Construction ---------------------------------------------------
+        // =================================================================
+        // 4.1 FACETBOX CONSTRUCTORS - Creating triangle mesh containers
+        // =================================================================
         cout << "- List of constructors ————————————————————————————————————————————————\n";
-        // ————————————————————————————————————————————————
+        
+        // Default constructor creates empty container
         cout << "1) Default constructor: starts empty\n";
-        // ————————————————————————————————————————————————
         FacetBox boxDefault;
         cout << "FacetBox boxDefault (default):\n" << boxDefault << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
@@ -496,19 +575,27 @@ void Setup() {
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
 
-        // 1) Create an empty FacetBox
+        // =================================================================
+        // 4.2 ADDING TRIANGLES - Building meshes triangle by triangle
+        // =================================================================
         FacetBox box;
        
-
         cout << "———————————————————————————————————————————————————————————————————————\n"; 
         cout << " - push method\n";
-        cout << "2) push(A,B,C): add a triangle (0,0,0)-(1,0,0)-(0,1,0)";
+        cout << "2) push(A,B,C): add triangles to create a simple shape\n";
+        
+        // Create vertices for two squares (top and bottom of a cube)
+        // Bottom square at z = -1
         Vector3D A1(1,1,-1), B1(1,0,-1), C1(0,1,-1), D1(0,0,-1);
+        // Top square at z = +1
         Vector3D A2(1,1,1), B2(1,0,1), C2(0,1,1), D2(0,0,1);
-        box.push(A1, B1, C1);
-        box.push(C1, D1, A1);
-        box.push(A2, B2, C2);
-        box.push(C2, D2, A2);
+        
+        // Add triangles - each square needs 2 triangles
+        box.push(A1, B1, C1);  // Bottom square triangle 1
+        box.push(C1, D1, A1);  // Bottom square triangle 2
+        box.push(A2, B2, C2);  // Top square triangle 1
+        box.push(C2, D2, A2);  // Top square triangle 2
+        
         std::cout << "After push: box.size() = " << box.size() << "\n";
         cout << "———————————————————————————————————————————————————————————————————————\n\n";
 
@@ -554,7 +641,7 @@ void Setup() {
         cout << "———————————————————————————————————————————————————————————————————————\n\n\n";
 
         cout << "\n———————————————————————————————————————————————————————————————————————\n";
-        cout <<   "|- Dodecahedron Class       ———————————————————————————————————————————\n";
+        cout <<   "| SECTION 5: Dodecahedron Class - Regular Polyhedron                   |\n";
         cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
 
         cout << "      _----------_,\n";
@@ -570,23 +657,34 @@ void Setup() {
         cout << "   '.  \\         /;;;' \n";
         cout << "     \"-_\\_______/;;'        ~[Dodecahedron Class]\n";
 
+        // =================================================================
+        // 5.1 DODECAHEDRON CONSTRUCTORS - Creating regular 12-faced polyhedra
+        // =================================================================
         cout << " - Constructors ———————————————————————————————————————————————————————\n";
-        cout << "1- Default constructor (empty dodecahedron; no vertices or facets initialized):\n\n";
+        
+        // Default constructor - creates empty structure
+        cout << "1- Default constructor (empty dodecahedron):\n\n";
         Dodecahedron d0;
         
-        cout << "2- Parameterized constructor (regular dodecahedron of radius 2.0 centered at (1,1,1)):\n";
+        // Standard constructor - creates dodecahedron with given radius and center
+        // Uses golden ratio φ = (1+√5)/2 to position 20 vertices
+        cout << "2- Parameterized constructor (radius 2.0 at (1,1,1)):\n";
         Dodecahedron d1(2.0, Vector3D(1.0, 1.0, 1.0));
 
+        // Copy constructor - creates duplicate
         cout << "3- Copy construction:\n";
         Dodecahedron d2 = d1;
 
+        // Move constructor - transfers ownership (C++11)
         cout << "4- Move construction:\n";
         Dodecahedron d3 = std::move(d1);
          
+        // Copy assignment
         cout << "5) Copy assignment:\n";
         Dodecahedron d4;
         d4 = d2;
          
+        // Move assignment
         cout << "6) Move assignment:\n";
         Dodecahedron d5;
         d5 = std::move(d2);
@@ -618,28 +716,51 @@ void Setup() {
         std::cout << "Scaled center = " << dodec.center() << "\n";
 
 
-        /* - Declare a set of dodecahedrons ————————————————————————————————————————————*/
-        Dodecahedron dodec_0(1.0, Vector3D{ 0,0,0.0});
-        Dodecahedron dodec_1(1.0, Vector3D{ 2.2,0.0});
-        Dodecahedron dodec_2(1.0, Vector3D{-2.2,0.0});
-        Dodecahedron dodec_3(1.0, Vector3D{ 4.2,0.0});
+        // =================================================================
+        // 5.3 MESH REFINEMENT DEMONSTRATION
+        // Creates 4 dodecahedra and applies different subdivision algorithms
+        // =================================================================
+        cout << "\n - Mesh Refinement Examples (see visual output) ——————————————————————\n";
+        
+        // Create 4 dodecahedra at different X positions for visual comparison
+        Dodecahedron dodec_0(1.0, Vector3D{ 0,0,0.0});    // Center
+        Dodecahedron dodec_1(1.0, Vector3D{ 2.2,0.0});    // Right
+        Dodecahedron dodec_2(1.0, Vector3D{-2.2,0.0});    // Left
+        Dodecahedron dodec_3(1.0, Vector3D{ 4.2,0.0});    // Far right
 
+        // Extract triangle meshes from each dodecahedron
         FacetBox box_sum_0(dodec_0.getFacets());
         FacetBox box_sum_1(dodec_1.getFacets());
         FacetBox box_sum_2(dodec_2.getFacets());
         FacetBox box_sum_3(dodec_3.getFacets());
 
-        int levels = 4;  // or however many you like
+        // Apply different subdivision algorithms
+        int levels = 4;  // Number of refinement iterations
+        
+        // Centroid3: Subdivides each triangle into 3 using centroid
         box_out_0 = box_sum_0.refine(levels, FacetBox::SubdivisionMode::Centroid3);
+        cout << "   - Centroid3 subdivision: " << box_out_0.size() << " triangles\n";
+        
+        // Midpoint4: Subdivides each triangle into 4 using edge midpoints
         box_out_1 = box_sum_1.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        cout << "   - Midpoint4 subdivision: " << box_out_1.size() << " triangles\n";
+        
+        // Midpoint6: Subdivides each triangle into 6 using midpoints and centroid
         box_out_2 = box_sum_2.refine(levels, FacetBox::SubdivisionMode::Midpoint6);
+        cout << "   - Midpoint6 subdivision: " << box_out_2.size() << " triangles\n";
+        
+        // Sierpinski: Creates fractal pattern
         box_out_3 = box_sum_3.refine(levels, FacetBox::SubdivisionMode::Sierpinski);
+        cout << "   - Sierpinski subdivision: " << box_out_3.size() << " triangles\n";
 
     }
 
 }
 
-///////////////////     DRAW       ///////////////////////
+// =============================================================================
+// Draw() - Renders the refined dodecahedra with rainbow coloring
+// Each subdivision mode produces a different visual result
+// =============================================================================
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere

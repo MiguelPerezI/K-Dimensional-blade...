@@ -248,7 +248,7 @@ private:
             Vector3D midpoint01 = line(0.5, P0, P1);
     
             // 2) “Weighted centroid”: 50% of the way from midpoint01 towards P3
-            double weight = 1.25;
+            double weight = 1.0;//1.25;
             Vector3D centroid = weight*line(0.5, P3, midpoint01);
     
             // Helper to push the triangle (centroid, A, B)

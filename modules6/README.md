@@ -5,6 +5,10 @@ The fourth dimensional menger sponge, enjoy...
 c++ main.cpp -o go -lGL -lGLU -lglut
 ./go
 
+// To compile and run main9.cpp (Hyperbolic Dodecahedron):
+c++ main9.cpp -o main9 -lGL -lGLU -lglut
+./main9
+
 
 
 e, E    : move camera up and down

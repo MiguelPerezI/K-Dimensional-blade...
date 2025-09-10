@@ -132,10 +132,14 @@ void Setup() {
         // 1) Build your initial mesh (e.g. from a dodecahedron) 
         Dodecahedron d1(0.93, Vector3D(0, 0, 0), FaceMode::Pentagons);
         FacetBox box_sum_1(d1.getFacets());
-        int levels = 2;  // or however many you like
-        box_out_1 = box_sum_1.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        int levels = 1;  // or however many you like
+        box_out_1 = box_sum_1.refine(levels, FacetBox::SubdivisionMode::Centroid3);
 
-        box_out_2 = box_out_1.refine(1, FacetBox::SubdivisionMode::Centroid3);
+        box_out_3 = box_out_1.refine(1, FacetBox::SubdivisionMode::Centroid3);
+
+        box_out_0 = box_out_3.refine(1, FacetBox::SubdivisionMode::Midpoint4);
+
+        box_out_2 = box_out_0.refine(1, FacetBox::SubdivisionMode::Midpoint6);
 
         // 2) Mutate in-place: project every triangle into hyperbolic space
         box_out_2.applyHyperboloid();
