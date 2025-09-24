@@ -30,6 +30,14 @@ double count3 = 1e-2;
 // rad: Radius between camaera and center.
 double rad = 5.0;
 
+// Glass transparency toggle
+bool g_glassMode = false;
+
+// UI state for plane selection
+int g_currentOrientation = 0;  // 0=XY, 1=YZ, 2=XZ
+int g_currentLayer = 4;        // Current layer within the selected orientation
+int g_maxLayers = 16;          // Maximum layers available (matches cube3 subdivision)
+
 //////////////////////////////////////
 //
 //
@@ -50,9 +58,12 @@ void ProcessingProto();
 void interface();
 
 // OpenGL functions
-void drawFacet( const Facet& f, 
-                int R, int G, int Bi, 
+void drawFacet( const Facet& f,
+                int R, int G, int Bi,
                 float alpha);
+
+// Main.c compatible triangle rendering
+void drawFacetMainCStyle(const Facet& f, int index);
 
 void drawSphere(const Vector3D& pos, float radius, int slices, int stacks);
 void drawAxes(float length);
@@ -74,7 +85,7 @@ Cube cube1(1.0, Vector3D{2.5,0,0});
 Cube cube2(0.8, Vector3D{-2.5,0,0}, 4);
 
 // Demonstration cube for advanced subdivision features
-Cube cube3(0.6, Vector3D{0, 0.0, 0}, 4);  // 3³=27 subcells for detailed examples
+Cube cube3(0.6, Vector3D{0, 0.0, 0}, 20);  // 3³=27 subcells for detailed examples
 
 // ==================== FACET STORAGE ====================
 // Storage for cube triangle collections
@@ -192,11 +203,11 @@ void Setup() {
         // 2. Plane access demo
         cout << "Demo 2: Plane Access\n";
         if (cube3.hasSubdivision()) {
-            auto xy_plane = cube3.getPlane(2, 1);  // XY plane at Z=1
+            auto xy_plane = cube3.getPlane(2, 4);  // XY plane at Z=1
             cout << "  XY plane at Z=1 contains " << xy_plane.size() << " subcells\n";
 
             // Extract all facets for this plane
-            plane_subcells = cube3.getPlaneFacets(2, 1);
+            plane_subcells = cube3.getPlaneFacets(2, 4);
             cout << "  Plane triangles: " << plane_subcells.size() << "\n";
         }
 
@@ -207,11 +218,14 @@ void Setup() {
             int disabled_count = 0;
 
             // Disable interior subcells to create hollow effect
-            for (int i = 1; i < n-1; ++i) {
-                for (int j = 1; j < n-1; ++j) {
-                    for (int k = 1; k < n-1; ++k) {
-                        cube3.setSubCellActive(i, j, k, false);
-                        disabled_count++;
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    for (int k = 0; k < n; k++) {
+
+                        if ((i%2 == 0 && j%2 == 0 && k%2 == 0) || (i%2 == 1 && j%2 == 1 && k%2 == 1)) {
+                            cube3.setSubCellActive(i, j, k, false);
+                            disabled_count++;
+                        }
                     }
                 }
             }
@@ -227,19 +241,27 @@ void Setup() {
 
         // 4. Real-time vertex manipulation demo
         cout << "Demo 4: Vertex Manipulation\n";
-        if (cube2.hasSubdivision()) {
-            // Get original position of vertex 0 in subcell (0,0,0)
-            Vector3D original_pos = cube2.getSubCell(0, 0, 0).vertices[0];
+        if (cube3.hasSubdivision()) {
+            int n = cube3.getSubdivisionLevels();
+            // Get original position of vertex (l) in subcell (i,j,k)
+            for (int i = 0; i < n; i++) 
+            for (int j = 0; j < n; j++) 
+            for (int k = 0; k < n; k++) {
 
-            // Move it upward by 0.2 units
-            Vector3D new_pos = original_pos + Vector3D(0, 0, 0.2);
-            cube2.updateSubCellVertex(0, 0, 0, 0, new_pos);
+                for (int l = 0; l < 8; l++) {
+                    Vector3D v_p = cube3.getSubCell(i, j, k).vertices[l];
 
-            cout << "  Moved vertex 0 of subcell (0,0,0) from " << original_pos << " to " << new_pos << "\n";
-
+                    // Move it upward by 0.2 units
+                    Vector3D new_pos = sigma(v_p, Vector3D(0, 0.0001, 0), 1.0);
+                    cube3.updateSubCellVertex(i, j, k, l, new_pos);
+                }
+            
+                //cout << "  Moved vertex  of subcell (0,0,0) from " << original_pos << " to " << new_pos << "\n";
+            }
             // Refresh triangulation
-            cube2.refreshTriangulation();
-            cube_facets_2 = cube2.getFacets();  // Update facets
+            cube3.refreshTriangulation();
+            //cube_facets_3 = cube3.getFacets();  // Update facets
+            plane_subcells = cube3.getPlaneFacets(2, 4);
             cout << "  Triangulation refreshed\n";
         }
 
@@ -256,49 +278,40 @@ void Draw() {
         /*Draw here with OpenGL*/	
         // ==================== CUBE RENDERING ====================
 
-//        // Draw first cube (basic cube, positioned right side)
-//        // This demonstrates the basic cube triangulation with 12 faces
-//        size_t cube1_total = cube_facets_1.size();
-//        for(size_t i = 0; i < cube1_total; ++i) {
-//            // Green-blue spectrum for cube 1 (hues from 120° to 240°)
-//            float hue = 120.0f + float(i) / float(cube1_total) * 120.0f;
-//            Color c = hsv2rgb(hue, 0.9f, 0.9f);
-//            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-//            drawFacet(cube_facets_1[i], R, G, B, 0.8f);
-//        }
-//
-//        // Draw second cube (subdivided cube with vertex manipulation, positioned left side)
-//        // This demonstrates cube subdivision with real-time vertex modification
-//        size_t cube2_total = cube_facets_2.size();
-//        for(size_t i = 0; i < cube2_total; ++i) {
-//            // Red-orange spectrum for cube 2 (hues from 0° to 60°)
-//            float hue = float(i) / float(cube2_total) * 60.0f;
-//            Color c = hsv2rgb(hue, 0.9f, 0.8f);
-//            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-//            drawFacet(cube_facets_2[i], R, G, B, 0.7f);
-//        }
-//
-//        // Draw third cube (hollow frame effect, positioned above)
-//        // This demonstrates selective subcell rendering
-//        size_t cube3_total = cube_facets_3.size();
-//        for(size_t i = 0; i < cube3_total; ++i) {
-//            // Purple-magenta spectrum for cube 3 (hues from 240° to 300°)
-//            float hue = 240.0f + float(i) / float(cube3_total) * 60.0f;
-//            Color c = hsv2rgb(hue, 0.8f, 0.9f);
-//            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-//            drawFacet(cube_facets_3[i], R, G, B, 0.6f);
-//        }
-//
-//        // ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
-//
-//        // Demo 1: Highlight single subcell (bright yellow)
-//        for(size_t i = 0; i < single_subcell.size(); ++i) {
-//            drawFacet(single_subcell[i], 255, 255, 0, 0.9f);  // Bright yellow
-//        }
+        //// Draw first cube (basic cube, positioned right side) - Main.c color scheme
+        //// This demonstrates the basic cube triangulation with 12 faces
+        //size_t cube1_total = cube_facets_1.size();
+        //for(size_t i = 0; i < cube1_total; ++i) {
+        //    drawFacetMainCStyle(cube_facets_1[i], i);
+        //}
 
-        // Demo 2: Highlight plane subcells (cyan overlay)
+        //// Draw second cube (subdivided cube with vertex manipulation, positioned left side)
+        //// This demonstrates cube subdivision with real-time vertex modification - Main.c colors
+        //size_t cube2_total = cube_facets_2.size();
+        //for(size_t i = 0; i < cube2_total; ++i) {
+        //    drawFacetMainCStyle(cube_facets_2[i], i + 100);  // Offset index for color variation
+        //}
+
+        //// Draw third cube (hollow frame effect, positioned above) - Main.c colors
+        //// This demonstrates selective subcell rendering
+        //size_t cube3_total = cube_facets_3.size();
+        //for(size_t i = 0; i < cube3_total; ++i) {
+        //    drawFacetMainCStyle(cube_facets_3[i], i + 200);  // Different offset for variety
+        //}
+
+        //// ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
+
+        //// Demo 1: Highlight single subcell using Main.c color scheme
+        //for(size_t i = 0; i < single_subcell.size(); ++i) {
+        //    drawFacetMainCStyle(single_subcell[i], i + 300);  // Different offset
+        //}
+
+        // Demo 2: Render plane subcells using Main.c color scheme
+        // Update plane_subcells based on current UI selection
+        plane_subcells = cube3.getPlaneFacets(g_currentOrientation, g_currentLayer);
+
         for(size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacet(plane_subcells[i], 0, 255, 255, 0.5f);  // Semi-transparent cyan
+            drawFacetMainCStyle(plane_subcells[i], i);  // Use Main.c color cycling
         }
 
 
@@ -319,8 +332,36 @@ void ProcessingProto() {
 void drawSphere(const Vector3D& pos, float radius = 0.05f, int slices = 12, int stacks = 12) {
     glPushMatrix();
     glTranslatef(pos.x(), pos.y(), pos.z());
-    // You can use GLUT's sphere or a display list for better performance
-    glutSolidSphere(radius, slices, stacks);
+
+    if (g_glassMode) {
+        // Glass transparency effect
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);  // Don't write to depth buffer for transparency
+
+        // Glass material properties
+        glColor4f(0.7f, 0.9f, 1.0f, 0.3f);  // Light blue tint with transparency
+
+        // Enhanced material for glass effect
+        GLfloat glass_ambient[] = {0.2f, 0.3f, 0.4f, 0.3f};
+        GLfloat glass_diffuse[] = {0.3f, 0.5f, 0.7f, 0.3f};
+        GLfloat glass_specular[] = {1.0f, 1.0f, 1.0f, 0.3f};
+        GLfloat glass_shininess[] = {100.0f};
+
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, glass_ambient);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, glass_diffuse);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, glass_specular);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, glass_shininess);
+
+        glutSolidSphere(radius, slices, stacks);
+
+        glDepthMask(GL_TRUE);  // Re-enable depth writing
+    } else {
+        // Regular solid sphere
+        glColor3f(0.8f, 0.2f, 0.2f);  // Red color for solid mode
+        glutSolidSphere(radius, slices, stacks);
+    }
+
     glPopMatrix();
 }
 
@@ -371,6 +412,50 @@ void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
 //  f     – your Facet
 //  r,g,b – color components in [0..255]
 //  alpha – [0..1] opacity (default 0.75)
+// Main.c compatible triangle drawing function - uses exact same color scheme
+void drawFacetMainCStyle(const Facet& f, int index)
+{
+    // Get triangle geometry
+    Vector3D normal = f.getNormal();
+    Vector3D A = f[0], B = f[1], C = f[2];
+
+    // Preserve polygon & color state
+    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_POLYGON_BIT);
+
+    // Draw filled triangle with polygon offset to prevent z-fighting
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 1.0f);
+
+    // Use Main.c color scheme - cycle through 4 colors based on triangle index
+    //if (index % 4 == 0) glColor3ub(200, 200, 200);  // Light gray
+    //if (index % 4 == 1) glColor3ub(200, 0, 0);      // Red
+    //if (index % 4 == 2) glColor3ub(0, 200, 0);      // Green
+    //if (index % 4 == 3) glColor3ub(0, 0, 200);      // Blue
+    glColor3ub(200, 200, 200);
+
+    // Render triangle with proper normal - same style as Main.c geometry.c
+    glBegin(GL_TRIANGLES);
+        glNormal3f(normal.x(), normal.y(), normal.z());
+        glVertex3f(A.x(), A.y(), A.z());
+        glVertex3f(B.x(), B.y(), B.z());
+        glVertex3f(C.x(), C.y(), C.z());
+    glEnd();
+    glDisable(GL_POLYGON_OFFSET_FILL);
+
+    // Draw triangle border lines
+    glColor3ub(0, 0, 0);  // Black border
+    glLineWidth(1.0f);
+    glBegin(GL_LINE_LOOP);
+        glVertex3f(A.x(), A.y(), A.z());
+        glVertex3f(B.x(), B.y(), B.z());
+        glVertex3f(C.x(), C.y(), C.z());
+    glEnd();
+
+    // Restore state
+    glPopAttrib();
+}
+
+// Keep the old function for backwards compatibility
 inline void drawFacet(const Facet& f,
                       int r, int g, int b,
                       float alpha)
@@ -523,6 +608,7 @@ void reshape(int w, int h);
 void MenuHandler(int choice);
 void createUI();
 void drawHUD();
+void keyboard(unsigned char key, int x, int y);
 
 //-----------------------------------------------------------------------------
 // Main
@@ -548,6 +634,7 @@ int main(int argc, char** argv)
     glutReshapeFunc(reshape);
     glutMouseFunc(mouseButton);
     glutMotionFunc(mouseMotion);
+    glutKeyboardFunc(keyboard);
 
     // Enter main loop
     glutMainLoop();
@@ -559,11 +646,11 @@ int main(int argc, char** argv)
 //-----------------------------------------------------------------------------
 void initGL()
 {
-    // Lighting
+    // Lighting - matching Main.c exactly
     GLfloat ambient[]  = {0.3f, 0.3f, 0.3f, 1.0f};
     GLfloat diffuse[]  = {0.7f, 0.7f, 0.7f, 1.0f};
-    GLfloat specular[] = {1, 1, 1, 1};
-    GLfloat position[] = {20, 20, 20.25f, 0};
+    GLfloat specular[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat position[] = {1.0f, 1.0f, 0.25f, 0.0f};  // Match Main.c light position
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -572,11 +659,12 @@ void initGL()
     glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
     glLightfv(GL_LIGHT0, GL_POSITION, position);
 
-    // Material
+    // Material properties - matching Main.c exactly
     glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-    GLfloat shine[] = {128.0f};
-    glMaterialfv(GL_FRONT, GL_SPECULAR, specular);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);  // Same as Main.c
+    GLfloat specref[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat shine[] = {128.0f};  // Same shininess as Main.c
+    glMaterialfv(GL_FRONT, GL_SPECULAR, specref);
     glMaterialfv(GL_FRONT, GL_SHININESS, shine);
 
     // Depth test
@@ -586,8 +674,8 @@ void initGL()
     // Normalize normals for scaled geometry
     glEnable(GL_NORMALIZE);
 
-    // Clear color
-    glClearColor(1,1,1,1);
+    // Clear color - match Main.c white background
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 //-----------------------------------------------------------------------------
@@ -612,6 +700,9 @@ void drawHUD() {
         "M-drag: Pan",
         "R-drag/Wheel: Zoom",
         "[H]: Toggle Help",
+        "[G]: Toggle Glass Mode",
+        "[O]: Cycle Orientation (XY/YZ/XZ)",
+        "[+/-]: Change Layer",
         "Right-click: UI Menu"
     };
     glMatrixMode(GL_PROJECTION); glPushMatrix();
@@ -626,6 +717,17 @@ void drawHUD() {
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12,*c);
         y -= 0.05f;
     }
+
+    // Display current plane selection status
+    y -= 0.05f;
+    char status[100];
+    const char* orientName = g_currentOrientation == 0 ? "XY" :
+                            g_currentOrientation == 1 ? "YZ" : "XZ";
+    sprintf(status, "Current: %s plane, Layer %d/%d", orientName, g_currentLayer, g_maxLayers-1);
+    glColor3f(0.8f, 0.2f, 0.2f);  // Red color for status
+    glRasterPos2f(0.02f, y);
+    for(const char* c=status; *c; ++c)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
@@ -653,6 +755,10 @@ void display()
 
 
     ProcessingProto();   // calls Setup() then Draw()
+
+    // Draw a test sphere to demonstrate glass effect
+    drawSphere(Vector3D(0, 0, 0), 1.0f, 16, 16);
+
     drawHUD();
     
     glutSwapBuffers();
@@ -711,6 +817,52 @@ void mouseMotion(int x, int y)
 
     g_lastX = x; g_lastY = y;
     glutPostRedisplay();
+}
+
+//-----------------------------------------------------------------------------
+// Keyboard handler for glass mode toggle
+//-----------------------------------------------------------------------------
+void keyboard(unsigned char key, int x, int y) {
+    switch (key) {
+        case 'g':
+        case 'G':
+            g_glassMode = !g_glassMode;
+            printf("Glass mode: %s\n", g_glassMode ? "ON" : "OFF");
+            glutPostRedisplay();
+            break;
+        case 'h':
+        case 'H':
+            g_showHelp = !g_showHelp;
+            glutPostRedisplay();
+            break;
+
+        // Plane orientation controls
+        case 'o':
+        case 'O':
+            g_currentOrientation = (g_currentOrientation + 1) % 3;
+            printf("Orientation: %s\n", g_currentOrientation == 0 ? "XY" :
+                                       g_currentOrientation == 1 ? "YZ" : "XZ");
+            glutPostRedisplay();
+            break;
+
+        // Layer controls
+        case '+':
+        case '=':
+            g_currentLayer = (g_currentLayer + 1) % g_maxLayers;
+            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
+            glutPostRedisplay();
+            break;
+        case '-':
+        case '_':
+            g_currentLayer = (g_currentLayer - 1 + g_maxLayers) % g_maxLayers;
+            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
+            glutPostRedisplay();
+            break;
+
+        case 27: // ESC key
+            exit(0);
+            break;
+    }
 }
 
 //-----------------------------------------------------------------------------

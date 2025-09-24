@@ -96,4 +96,7 @@ Vector3D centerM8(
 /* cross product as function*/
 Vector3D cruz(const Vector3D& a, const Vector3D& b) noexcept;
 
+/* sphere reflection function */
+Vector3D sigma(const Vector3D& x, const Vector3D& a, double r);
+
 #endif

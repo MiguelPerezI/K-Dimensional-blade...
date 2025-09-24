@@ -268,3 +268,18 @@ Vector3D cruz(const Vector3D& a, const Vector3D& b) noexcept
                  -a.x() * b.z() + a.z() * b.x(),
                   a.x() * b.y() - a.y() * b.x() );
 }
+
+/* sphere reflection function -------------------------------------------*/
+Vector3D sigma(const Vector3D& x, const Vector3D& a, double r)
+{
+    Vector3D diff = x - a;
+    double dist_squared = diff * diff;
+
+    if (abs(dist_squared) < 1e-12)
+        throw std::runtime_error("sigma: point coincides with sphere center");
+
+    double r_squared = r * r;
+    double factor = r_squared / dist_squared;
+
+    return a + factor * diff;
+}
