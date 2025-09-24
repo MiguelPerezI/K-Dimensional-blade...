@@ -7,6 +7,10 @@ using namespace std;
 #include <vector>
 #include <array>
 #include <functional>
+#include <tuple>
+#include <algorithm>
+#include <string>
+#include <cctype>
 #include <math.h>
 #include "Vector3D.hpp"
 #include "Quaternion.hpp"
@@ -164,6 +168,51 @@ public:
         return subdivision_built_ && !subcells_.empty();
     }
 
+    // === COORDINATE TRANSFORMATION ===
+
+    /**
+     * @brief Convert logical coordinates (centered at origin) to physical grid indices.
+     * @param x Logical X coordinate (can be negative)
+     * @param y Logical Y coordinate (can be negative)
+     * @param z Logical Z coordinate (can be negative)
+     * @returns Tuple of (i,j,k) physical grid indices
+     *
+     * For n=5: logical (0,0,0) -> physical (2,2,2), logical (2,2,2) -> physical (4,4,4)
+     * For n=4: logical (0,0,0) -> physical (2,2,2), logical (1,1,1) -> physical (3,3,3)
+     */
+    std::tuple<int,int,int> logicalToPhysical(int x, int y, int z) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::logicalToPhysical: no subdivision available");
+        }
+
+        int center = subdivision_levels_ / 2;  // Integer division gives us the center offset
+        int i = center + x;
+        int j = center + y;
+        int k = center + z;
+        
+        return std::make_tuple(i, j, k);
+    }
+
+    /**
+     * @brief Convert physical grid indices to logical coordinates (centered at origin).
+     * @param i Physical X grid index [0, n)
+     * @param j Physical Y grid index [0, n)
+     * @param k Physical Z grid index [0, n)
+     * @returns Tuple of (x,y,z) logical coordinates
+     */
+    std::tuple<int,int,int> physicalToLogical(int i, int j, int k) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::physicalToLogical: no subdivision available");
+        }
+
+        int center = subdivision_levels_ / 2;
+        int x = i - center;
+        int y = j - center;
+        int z = k - center;
+
+        return std::make_tuple(x, y, z);
+    }
+
     /**
      * @brief Get subdivision levels (n means n³ subcells).
      */
@@ -172,35 +221,67 @@ public:
     }
 
     /**
-     * @brief Access a specific subcell by 3D grid coordinates.
-     * @param i X-coordinate in grid [0, n)
-     * @param j Y-coordinate in grid [0, n)
-     * @param k Z-coordinate in grid [0, n)
+     * @brief Access a specific subcell by 3D logical coordinates (centered at origin).
+     * @param x Logical X-coordinate (can be negative, 0=center)
+     * @param y Logical Y-coordinate (can be negative, 0=center)
+     * @param z Logical Z-coordinate (can be negative, 0=center)
      * @throws std::out_of_range if coordinates invalid or no subdivision
      */
-    const SubCell& getSubCell(int i, int j, int k) const {
-        if (!hasSubdivision()) {
-            throw std::runtime_error("Cube::getSubCell: no subdivision available");
-        }
+    const SubCell& getSubCell(int x, int y, int z) const {
+        auto [i, j, k] = logicalToPhysical(x, y, z);
+
         if (i < 0 || i >= subdivision_levels_ ||
             j < 0 || j >= subdivision_levels_ ||
             k < 0 || k >= subdivision_levels_) {
-            throw std::out_of_range("Cube::getSubCell: coordinates out of range");
+            throw std::out_of_range("Cube::getSubCell: logical coordinates out of range");
         }
         return subcells_[i][j][k];
     }
 
     /**
-     * @brief Get mutable access to a subcell for modifications.
+     * @brief Access a specific subcell by physical grid indices (for internal use).
+     * @param i Physical X-coordinate in grid [0, n)
+     * @param j Physical Y-coordinate in grid [0, n)
+     * @param k Physical Z-coordinate in grid [0, n)
+     * @throws std::out_of_range if coordinates invalid or no subdivision
      */
-    SubCell& getSubCellMutable(int i, int j, int k) {
+    const SubCell& getSubCellPhysical(int i, int j, int k) const {
         if (!hasSubdivision()) {
-            throw std::runtime_error("Cube::getSubCellMutable: no subdivision available");
+            throw std::runtime_error("Cube::getSubCellPhysical: no subdivision available");
         }
         if (i < 0 || i >= subdivision_levels_ ||
             j < 0 || j >= subdivision_levels_ ||
             k < 0 || k >= subdivision_levels_) {
-            throw std::out_of_range("Cube::getSubCellMutable: coordinates out of range");
+            throw std::out_of_range("Cube::getSubCellPhysical: coordinates out of range");
+        }
+        return subcells_[i][j][k];
+    }
+
+    /**
+     * @brief Get mutable access to a subcell for modifications (using logical coordinates).
+     */
+    SubCell& getSubCellMutable(int x, int y, int z) {
+        auto [i, j, k] = logicalToPhysical(x, y, z);
+
+        if (i < 0 || i >= subdivision_levels_ ||
+            j < 0 || j >= subdivision_levels_ ||
+            k < 0 || k >= subdivision_levels_) {
+            throw std::out_of_range("Cube::getSubCellMutable: logical coordinates out of range");
+        }
+        return subcells_[i][j][k];
+    }
+
+    /**
+     * @brief Get mutable access to a subcell by physical indices (for internal use).
+     */
+    SubCell& getSubCellMutablePhysical(int i, int j, int k) {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::getSubCellMutablePhysical: no subdivision available");
+        }
+        if (i < 0 || i >= subdivision_levels_ ||
+            j < 0 || j >= subdivision_levels_ ||
+            k < 0 || k >= subdivision_levels_) {
+            throw std::out_of_range("Cube::getSubCellMutablePhysical: coordinates out of range");
         }
         return subcells_[i][j][k];
     }
@@ -224,7 +305,7 @@ public:
 
         switch (axis) {
             case 0: // YZ plane (fixed X = layer)
-                for (int j = 0; j < n; ++j) {
+                        for (int j = 0; j < n; ++j) {
                     for (int k = 0; k < n; ++k) {
                         plane.emplace_back(subcells_[layer][j][k]);
                     }
@@ -250,15 +331,15 @@ public:
 
     /**
      * @brief Update a specific vertex of a subcell and mark for retriangulation.
-     * @param i,j,k Subcell coordinates
+     * @param x,y,z Logical subcell coordinates (centered at origin)
      * @param vertex_idx Vertex index [0,7] within the subcell
      * @param new_pos New position for the vertex
      */
-    void updateSubCellVertex(int i, int j, int k, int vertex_idx, const Vector3D& new_pos) {
+    void updateSubCellVertex(int x, int y, int z, int vertex_idx, const Vector3D& new_pos) {
         if (vertex_idx < 0 || vertex_idx > 7) {
             throw std::out_of_range("Cube::updateSubCellVertex: vertex_idx must be [0,7]");
         }
-        SubCell& cell = getSubCellMutable(i, j, k);
+        SubCell& cell = getSubCellMutable(x, y, z);
         cell.vertices[vertex_idx] = new_pos;
 
         // Mark as needing retriangulation
@@ -274,7 +355,7 @@ public:
 
         facets_.clear();
 
-        // Rebuild triangles from current subcell vertices
+        // Rebuild triangles from current subcell vertices (using physical indices internally)
         for (int i = 0; i < subdivision_levels_; ++i) {
             for (int j = 0; j < subdivision_levels_; ++j) {
                 for (int k = 0; k < subdivision_levels_; ++k) {
@@ -293,10 +374,11 @@ public:
 
     /**
      * @brief Get facets for a specific subcell.
+     * @param x,y,z Logical coordinates (centered at origin)
      * @returns FacetBox containing the 12 triangles of the specified subcell
      */
-    FacetBox getSubCellFacets(int i, int j, int k) const {
-        const SubCell& cell = getSubCell(i, j, k);
+    FacetBox getSubCellFacets(int x, int y, int z) const {
+        const SubCell& cell = getSubCell(x, y, z);
         FacetBox subcell_facets;
 
         if (!cell.active) return subcell_facets; // Return empty if disabled
@@ -327,28 +409,164 @@ public:
     }
 
     /**
+     * @brief Get subcells that form a checkerboard pattern where (i+j+k)%2 == 0.
+     * @returns Vector of subcell references following the 3D checkerboard pattern
+     *
+     * This creates a 3D checkerboard pattern similar to alternating black/white squares
+     * on a 2D checkerboard, but extended to 3 dimensions. Useful for creating patterns,
+     * selective rendering, or algorithmic processing of subcells.
+     */
+    std::vector<std::reference_wrapper<const SubCell>> getCheckerboardSubcells() const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::getCheckerboardSubcells: no subdivision available");
+        }
+
+        std::vector<std::reference_wrapper<const SubCell>> checkerboard;
+        int n = subdivision_levels_;
+
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if ((i + j + k) % 4 == 0) {
+                        checkerboard.emplace_back(subcells_[i][j][k]);
+                    }
+                }
+            }
+        }
+        return checkerboard;
+    }
+
+    /**
+     * @brief Get facets for all subcells that form a checkerboard pattern where (i+j+k)%2 == 0.
+     * @returns FacetBox containing triangles for all checkerboard-pattern subcells
+     */
+    FacetBox getCheckerboardFacets() const {
+        auto checkerboard_subcells = getCheckerboardSubcells();
+        FacetBox checkerboard_facets;
+
+        for (const SubCell& cell : checkerboard_subcells) {
+            if (!cell.active) continue;
+
+            for (int t = 0; t < 12; ++t) {
+                auto const& tri = cube_triangles_[t];
+                checkerboard_facets.push(cell.vertices[tri[0]], cell.vertices[tri[1]], cell.vertices[tri[2]]);
+            }
+        }
+        return checkerboard_facets;
+    }
+
+    /**
+     * @brief Get facets for all subcells in a plane using string coordinates.
+     * @param coord1 First coordinate - either "x", "y", "z" or a numeric string like "0", "-1", "2"
+     * @param coord2 Second coordinate - either "x", "y", "z" or a numeric string like "0", "-1", "2"
+     * @param coord3 Third coordinate - either "x", "y", "z" or a numeric string like "0", "-1", "2"
+     *
+     * Examples:
+     * - getPlaneFacets("x", "y", "0") gets center XY plane (perpendicular to Z axis)
+     * - getPlaneFacets("x", "0", "z") gets center XZ plane (perpendicular to Y axis)
+     * - getPlaneFacets("0", "y", "z") gets center YZ plane (perpendicular to X axis)
+     *
+     * The numeric coordinate must be in range [-n/2, n/2] for n×n×n subdivision.
+     */
+    FacetBox getPlaneFacets(const std::string& coord1, const std::string& coord2, const std::string& coord3) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::getPlaneFacets: no subdivision available");
+        }
+
+        // Helper lambda to check if string is numeric
+        auto isNumeric = [](const std::string& str) -> bool {
+            if (str.empty()) return false;
+            size_t start = (str[0] == '-') ? 1 : 0;
+            return start < str.size() && std::all_of(str.begin() + start, str.end(), ::isdigit);
+        };
+
+        // Helper lambda to convert string to int with validation
+        auto parseCoord = [this](const std::string& str) -> int {
+            int val = std::stoi(str);
+            int max_coord = subdivision_levels_ / 2;
+            int min_coord = -max_coord;
+            if (val < min_coord || val > max_coord) {
+                throw std::out_of_range("Coordinate " + str + " out of range [" +
+                                      std::to_string(min_coord) + ", " + std::to_string(max_coord) + "]");
+            }
+            return val;
+        };
+
+        std::vector<std::string> coords = {coord1, coord2, coord3};
+        int numeric_count = 0;
+        int numeric_idx = -1;
+        int numeric_value = 0;
+
+        // Find which coordinate is numeric
+        for (int i = 0; i < 3; ++i) {
+            if (isNumeric(coords[i])) {
+                numeric_count++;
+                numeric_idx = i;
+                numeric_value = parseCoord(coords[i]);
+            }
+        }
+
+        if (numeric_count != 1) {
+            throw std::invalid_argument("Exactly one coordinate must be numeric, got " + std::to_string(numeric_count));
+        }
+
+        // Determine axis and layer
+        int axis;
+        if (numeric_idx == 0) {
+            // X is fixed, varying Y and Z -> YZ plane (axis = 0)
+            if (coords[1] != "y" || coords[2] != "z") {
+                throw std::invalid_argument("For fixed X coordinate, other coordinates must be 'y' and 'z'");
+            }
+            axis = 0;
+        } else if (numeric_idx == 1) {
+            // Y is fixed, varying X and Z -> XZ plane (axis = 1)
+            if (coords[0] != "x" || coords[2] != "z") {
+                throw std::invalid_argument("For fixed Y coordinate, other coordinates must be 'x' and 'z'");
+            }
+            axis = 1;
+        } else {
+            // Z is fixed, varying X and Y -> XY plane (axis = 2)
+            if (coords[0] != "x" || coords[1] != "y") {
+                throw std::invalid_argument("For fixed Z coordinate, other coordinates must be 'x' and 'y'");
+            }
+            axis = 2;
+        }
+
+        // Convert logical coordinate to physical layer
+        int center = subdivision_levels_ / 2;
+        int layer = center + numeric_value;
+
+        if (layer < 0 || layer >= subdivision_levels_) {
+            throw std::out_of_range("Calculated layer " + std::to_string(layer) + " out of range [0, " +
+                                  std::to_string(subdivision_levels_) + ")");
+        }
+
+        return getPlaneFacets(axis, layer);
+    }
+
+    /**
      * @brief Get the center of a specific subcell.
-     * @param i X-coordinate in grid [0, n)
-     * @param j Y-coordinate in grid [0, n)
-     * @param k Z-coordinate in grid [0, n)
+     * @param x Logical X-coordinate (0=center)
+     * @param y Logical Y-coordinate (0=center)
+     * @param z Logical Z-coordinate (0=center)
      * @returns Vector3D representing the exact center of the subcell
      * @throws std::out_of_range if coordinates invalid or no subdivision
      */
-    Vector3D getSubcellCenter(int i, int j, int k) const {
-        return getSubCell(i, j, k).center;
+    Vector3D getSubcellCenter(int x, int y, int z) const {
+        return getSubCell(x, y, z).center;
     }
 
     /**
      * @brief Get the radius of a specific subcell.
      * The radius is the distance from the center to any corner of the subcell.
-     * @param i X-coordinate in grid [0, n)
-     * @param j Y-coordinate in grid [0, n)
-     * @param k Z-coordinate in grid [0, n)
+     * @param x Logical X-coordinate (0=center)
+     * @param y Logical Y-coordinate (0=center)
+     * @param z Logical Z-coordinate (0=center)
      * @returns double representing the radius (distance from center to corner)
      * @throws std::out_of_range if coordinates invalid or no subdivision
      */
-    double getSubcellRadius(int i, int j, int k) const {
-        const SubCell& cell = getSubCell(i, j, k);
+    double getSubcellRadius(int x, int y, int z) const {
+        const SubCell& cell = getSubCell(x, y, z);
         // The radius stored is half the side length, but for distance to corner
         // we need sqrt(3) * radius for a cube
         return cell.radius * sqrt(3.0);
@@ -356,9 +574,10 @@ public:
 
     /**
      * @brief Enable/disable a specific subcell for rendering.
+     * @param x,y,z Logical coordinates (centered at origin)
      */
-    void setSubCellActive(int i, int j, int k, bool active) {
-        getSubCellMutable(i, j, k).active = active;
+    void setSubCellActive(int x, int y, int z, bool active) {
+        getSubCellMutable(x, y, z).active = active;
     }
 
 private:
