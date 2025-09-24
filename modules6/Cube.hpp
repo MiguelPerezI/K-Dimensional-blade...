@@ -327,6 +327,34 @@ public:
     }
 
     /**
+     * @brief Get the center of a specific subcell.
+     * @param i X-coordinate in grid [0, n)
+     * @param j Y-coordinate in grid [0, n)
+     * @param k Z-coordinate in grid [0, n)
+     * @returns Vector3D representing the exact center of the subcell
+     * @throws std::out_of_range if coordinates invalid or no subdivision
+     */
+    Vector3D getSubcellCenter(int i, int j, int k) const {
+        return getSubCell(i, j, k).center;
+    }
+
+    /**
+     * @brief Get the radius of a specific subcell.
+     * The radius is the distance from the center to any corner of the subcell.
+     * @param i X-coordinate in grid [0, n)
+     * @param j Y-coordinate in grid [0, n)
+     * @param k Z-coordinate in grid [0, n)
+     * @returns double representing the radius (distance from center to corner)
+     * @throws std::out_of_range if coordinates invalid or no subdivision
+     */
+    double getSubcellRadius(int i, int j, int k) const {
+        const SubCell& cell = getSubCell(i, j, k);
+        // The radius stored is half the side length, but for distance to corner
+        // we need sqrt(3) * radius for a cube
+        return cell.radius * sqrt(3.0);
+    }
+
+    /**
      * @brief Enable/disable a specific subcell for rendering.
      */
     void setSubCellActive(int i, int j, int k, bool active) {

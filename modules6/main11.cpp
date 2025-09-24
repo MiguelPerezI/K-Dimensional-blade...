@@ -99,6 +99,8 @@ FacetBox plane_subcells;     // Plane rendering demo
 FacetBox plane_subcells_2;
 FacetBox selected_subcells;  // Selective rendering demo
 
+double ra = 0.0;
+Vector3D ce = Vector3D{0,0,0};
 
 // Helper: convert HSV→RGB (all in [0,1])                                                  
 struct Color { float r, g, b; };
@@ -247,8 +249,8 @@ void Setup() {
         cout << "Demo 4: Vertex Manipulation\n";
         if (cube3.hasSubdivision()) {
             int n = cube3.getSubdivisionLevels();
-            double ra = cube2.getSubcellRadius(0, 0, 0);
-            Vector3D ce = cube2.getSubcellCenter(0, 0, 0);
+            ra = cube2.getSubcellRadius(0, 0, 0);
+            ce = cube2.getSubcellCenter(0, 0, 0);
             // Get original position of vertex (l) in subcell (i,j,k)
             for (int i = 0; i < n; i++) 
             for (int j = 0; j < n; j++) 
@@ -266,8 +268,8 @@ void Setup() {
             }
             // Refresh triangulation
             cube3.refreshTriangulation();
-            //cube_facets_3 = cube3.getFacets();  // Update facets
-            plane_subcells = cube3.getPlaneFacets(2, 4);
+            cube_facets_3 = cube3.getFacets();  // Update facets
+            //plane_subcells = cube3.getPlaneFacets(2, 4);
             cout << "  Triangulation refreshed\n";
         }
 
@@ -312,13 +314,17 @@ void Draw() {
         //    drawFacetMainCStyle(single_subcell[i], i + 300);  // Different offset
         //}
 
-        // Demo 2: Render plane subcells using Main.c color scheme
-        // Update plane_subcells based on current UI selection
-        plane_subcells = cube3.getPlaneFacets(g_currentOrientation, g_currentLayer);
+        // Draw all active subcells of cube3
+        size_t cube3_total = cube_facets_3.size();
+        for(size_t i = 0; i < cube3_total; ++i) {
+            drawFacetMainCStyle(cube_facets_3[i], i + 200);  // Different offset for variety
+        }
 
-        for(size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], i);  // Use Main.c color cycling
-            drawFacetMainCStyle(plane_subcells_2[i], i);
+        // Draw cube2 plane subcells based on current UI selection (integrated from main10.cpp)
+        plane_subcells_2 = cube2.getPlaneFacets(g_currentOrientation, g_currentLayer);
+
+        for(size_t i = 0; i < plane_subcells_2.size(); ++i) {
+            drawFacetMainCStyle(plane_subcells_2[i], i + 100);  // Offset index for color variation
         }
 
 	}
@@ -763,7 +769,7 @@ void display()
     ProcessingProto();   // calls Setup() then Draw()
 
     // Draw a test sphere to demonstrate glass effect
-    drawSphere(Vector3D(0, 0, 0), 1.0f, 16, 16);
+    drawSphere(ce, ra, 16, 16);
 
     drawHUD();
     
