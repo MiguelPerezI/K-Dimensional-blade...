@@ -1,0 +1,1579 @@
+/**
+ * @brief Comprehensive help system for Cube class methods and usage.
+ * 
+ * Provides detailed information about all available methods, their parameters,
+ * return types, usage examples, and categorization. Similar to Linux man pages
+ * but specifically designed for the Cube class API.
+ * 
+ * @param topic Optional specific topic or method name to get help for.
+ *              If empty, shows general help and available categories.
+ */
+void help(const std::string& topic = "") const {
+    if (topic.empty()) {
+        showGeneralHelp();
+        return;
+    }
+    
+    // Convert topic to lowercase for case-insensitive matching
+    std::string lower_topic = topic;
+    std::transform(lower_topic.begin(), lower_topic.end(), lower_topic.begin(), ::tolower);
+    
+    // Handle category help
+    if (lower_topic == "constructors" || lower_topic == "creation") {
+        showConstructorHelp();
+    } else if (lower_topic == "basic" || lower_topic == "geometry") {
+        showBasicOperationsHelp();
+    } else if (lower_topic == "subdivision" || lower_topic == "subdivide") {
+        showSubdivisionHelp();
+    } else if (lower_topic == "coordinates" || lower_topic == "coords") {
+        showCoordinateHelp();
+    } else if (lower_topic == "subcells" || lower_topic == "subcell") {
+        showSubcellHelp();
+    } else if (lower_topic == "vertices" || lower_topic == "vertex") {
+        showVertexHelp();
+    } else if (lower_topic == "planes" || lower_topic == "plane") {
+        showPlaneHelp();
+    } else if (lower_topic == "patterns" || lower_topic == "pattern") {
+        showPatternHelp();
+    } else if (lower_topic == "facets" || lower_topic == "faces" || lower_topic == "triangles") {
+        showFacetHelp();
+    }
+    // Handle specific method help
+    else if (lower_topic == "facecount") {
+        showMethodHelp("faceCount");
+    } else if (lower_topic == "center") {
+        showMethodHelp("center");
+    } else if (lower_topic == "translate") {
+        showMethodHelp("translate");
+    } else if (lower_topic == "scale") {
+        showMethodHelp("scale");
+    } else if (lower_topic == "subdivide") {
+        showMethodHelp("subdivide");
+    } else if (lower_topic == "hassubdivision") {
+        showMethodHelp("hasSubdivision");
+    } else if (lower_topic == "getsubcell") {
+        showMethodHelp("getSubCell");
+    } else if (lower_topic == "updatesubcellvertex") {
+        showMethodHelp("updateSubCellVertex");
+    } else if (lower_topic == "refreshtriangulation") {
+        showMethodHelp("refreshTriangulation");
+    } else if (lower_topic == "getplane") {
+        showMethodHelp("getPlane");
+    } else if (lower_topic == "getplanefacets") {
+        showMethodHelp("getPlaneFacets");
+    } else if (lower_topic == "getcheckerboardfacets") {
+        showMethodHelp("getCheckerboardFacets");
+    } else {
+        std::cout << "❌ Unknown topic: '" << topic << "'\n";
+        std::cout << "💡 Use help() with no parameters to see available topics.\n\n";
+    }
+}
+
+private:
+    void showGeneralHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           CUBE CLASS HELP SYSTEM                               │
+│                         Advanced 3D Cube with Subdivision                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+OVERVIEW:
+The Cube class represents a 3D cube that can be subdivided into smaller subcubes.
+Each cube consists of 8 vertices and 12 triangular faces. Subdivision creates
+n×n×n smaller cubes, each maintaining independent geometry and properties.
+
+HELP CATEGORIES:
+┌─────────────────────┬─────────────────────────────────────────────────────────┐
+│ CATEGORY            │ DESCRIPTION                                             │
+├─────────────────────┼─────────────────────────────────────────────────────────┤
+│ constructors        │ Object creation and initialization                      │
+│ basic               │ Basic cube operations (geometry, access)               │
+│ subdivision         │ Creating and managing subdivisions                     │
+│ coordinates         │ Coordinate system conversion                            │
+│ subcells            │ Individual subcell access and manipulation             │
+│ vertices            │ Vertex modification and geometry updates               │
+│ planes              │ 2D plane extraction from 3D subdivision               │
+│ patterns            │ Pattern-based subcell selection                        │
+│ facets              │ Triangular face generation and access                  │
+└─────────────────────┴─────────────────────────────────────────────────────────┘
+
+USAGE EXAMPLES:
+  cube.help("constructors")     // Learn about object creation
+  cube.help("subdivision")      // Learn about subdivision operations
+  cube.help("getSubCell")       // Get help for specific method
+  cube.help("coordinates")      // Learn coordinate systems
+
+QUICK START:
+  Cube cube(1.0, Vector3D(0,0,0));        // Create basic cube
+  cube.subdivide(3);                       // Create 3×3×3 = 27 subcubes
+  if (cube.hasSubdivision()) {             // Always check before subdivision ops
+    auto center = cube.getSubCell(0,0,0);  // Access center subcube
+  }
+
+)" << std::endl;
+    }
+    
+    void showConstructorHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              CONSTRUCTORS HELP                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+1. DEFAULT CONSTRUCTOR
+   Cube()
+   
+   Creates an empty cube with no geometry.
+   
+   USAGE:
+     Cube cube;                    // Create empty cube
+     // Must call initVertices manually or assign from another cube
+   
+   WHEN TO USE: When you need to create a cube object that will be initialized later.
+
+2. BASIC CUBE CONSTRUCTOR  
+   Cube(double radius, const Vector3D& center)
+   
+   Creates a cube with 8 vertices and 12 triangular faces.
+   
+   PARAMETERS:
+     radius - Half the side length (distance from center to face)
+     center - 3D position for the cube center
+   
+   USAGE:
+     Cube cube(1.0, Vector3D(0,0,0));     // Unit cube at origin
+     Cube cube(2.5, Vector3D(5,3,1));     // Larger cube at (5,3,1)
+   
+   RESULT: cube.faceCount() returns 12, hasSubdivision() returns false
+
+3. SUBDIVIDED CUBE CONSTRUCTOR
+   Cube(double radius, const Vector3D& center, int subdivisions)
+   
+   Creates a cube and immediately subdivides it into n×n×n subcubes.
+   
+   PARAMETERS:
+     radius      - Half the side length of the main cube
+     center      - 3D position for the cube center  
+     subdivisions - Number of divisions per axis (n means n³ total subcubes)
+   
+   USAGE:
+     Cube cube(1.0, Vector3D(0,0,0), 3);  // 3×3×3 = 27 subcubes
+     Cube cube(2.0, Vector3D(1,1,1), 5);  // 5×5×5 = 125 subcubes
+   
+   RESULT: cube.faceCount() returns n³×12, hasSubdivision() returns true
+
+COPY/MOVE CONSTRUCTORS (Rule of Zero):
+   Cube(const Cube& other)        // Deep copy
+   Cube(Cube&& other) noexcept    // Efficient move
+   
+   These are automatically generated and handle all internal data correctly.
+
+MEMORY MANAGEMENT:
+   All constructors use RAII principles. No manual memory management required.
+   std::vector handles all dynamic allocation internally.
+
+)" << std::endl;
+    }
+    
+    void showBasicOperationsHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           BASIC OPERATIONS HELP                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+These methods work on any cube (subdivided or not):
+
+ACCESS & QUERY METHODS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ size_t faceCount() const noexcept                                              │
+│   Returns the total number of triangular faces.                                │
+│   • Basic cube: 12 triangular faces                                            │
+│   • Subdivided cube: n³ × 12 triangular faces                                  │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     std::cout << cube.faceCount();        // Outputs: 12                       │
+│     cube.subdivide(3);                                                         │
+│     std::cout << cube.faceCount();        // Outputs: 324 (27×12)             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ const Facet& operator[](size_t k) const                                        │
+│   Access a specific triangular face by index.                                  │
+│   • k must be in range [0, faceCount())                                        │
+│   • Returns reference to triangular face                                       │
+│   • Throws std::out_of_range if k is invalid                                   │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     const Facet& face = cube[0];         // Get first triangle                 │
+│     for (size_t i = 0; i < cube.faceCount(); ++i) {                           │
+│       std::cout << cube[i] << std::endl; // Print all triangles               │
+│     }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ const FacetBox& getFacets() const noexcept                                     │
+│   Get direct access to the collection of all triangular faces.                 │
+│   • Returns const reference to internal FacetBox                               │
+│   • Useful for batch operations or rendering systems                           │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     const FacetBox& faces = cube.getFacets();                                 │
+│     // Pass to rendering system that expects FacetBox                          │
+│     renderer.draw(faces);                                                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+GEOMETRIC OPERATIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Vector3D center() const                                                         │
+│   Calculate geometric center by averaging all vertex positions.                │
+│   • For basic cubes: matches original center parameter                         │
+│   • For subdivided cubes: center of overall structure                          │
+│   • Throws std::runtime_error if no vertices initialized                       │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(5,3,1));                                          │
+│     Vector3D c = cube.center();          // c = (5,3,1)                       │
+│     cube.translate(Vector3D(2,0,0));                                           │
+│     Vector3D new_c = cube.center();      // new_c = (7,3,1)                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void translate(const Vector3D& offset)                                         │
+│   Move the entire cube by adding offset to all vertex positions.               │
+│   • Affects main vertices and subdivision data                                 │
+│   • Automatically rebuilds triangulation                                       │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     cube.translate(Vector3D(5,3,1));     // Move to (5,3,1)                   │
+│     cube.translate(Vector3D(0,0,10));    // Move up by 10 units               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void scale(double s, const Vector3D& pivot)                                    │
+│   Scale all vertices relative to a pivot point.                                │
+│   • s > 1.0: makes cube larger, s < 1.0: makes cube smaller                   │
+│   • pivot: fixed point that doesn't move during scaling                       │
+│   • Automatically rebuilds triangulation                                       │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     Vector3D center = cube.center();                                           │
+│     cube.scale(2.0, center);             // Double size around center         │
+│     cube.scale(0.5, Vector3D(0,0,0));    // Half size around origin          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showSubdivisionHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            SUBDIVISION HELP                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+CREATING SUBDIVISIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void subdivide(int n)                                                           │
+│   Divide cube into n×n×n smaller subcubes, each with 12 triangular faces.     │
+│   • Replaces simple cube with complex subdivided structure                     │
+│   • Creates n³ independent subcubes in 3D grid                                 │
+│   • Each subcube has 8 vertices and generates 12 triangular faces             │
+│   • Total triangular faces becomes n³ × 12                                     │
+│                                                                                 │
+│   PARAMETERS:                                                                   │
+│     n - Number of divisions per axis (must be > 0)                             │
+│                                                                                 │
+│   EXAMPLES:                                                                     │
+│     cube.subdivide(2);    // 2×2×2 = 8 subcubes, 96 triangular faces         │
+│     cube.subdivide(3);    // 3×3×3 = 27 subcubes, 324 triangular faces       │
+│     cube.subdivide(10);   // 10×10×10 = 1000 subcubes, 12000 faces           │
+│                                                                                 │
+│   VISUAL (n=3):                                                                │
+│     Original: 1 cube → After subdivide(3): 27 smaller cubes                   │
+│     [███████████]  →  [███│███│███]                                           │
+│                       [───┼───┼───]                                           │
+│                       [███│███│███]                                           │
+│                       [───┼───┼───]                                           │
+│                       [███│███│███]                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+CHECKING SUBDIVISION STATUS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ bool hasSubdivision() const noexcept                                           │
+│   Check if subdivision has been performed and data is available.               │
+│   • Returns true only if subdivide() was called successfully                   │
+│   • ALWAYS check this before using subdivision-specific methods                │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     if (cube.hasSubdivision()) {                                               │
+│       // This won't execute - no subdivision yet                               │
+│     }                                                                           │
+│     cube.subdivide(3);                                                         │
+│     if (cube.hasSubdivision()) {                                               │
+│       // Now this executes - subdivision exists                                │
+│       auto cell = cube.getSubCell(0,0,0);                                     │
+│     }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ int getSubdivisionLevels() const noexcept                                      │
+│   Get the current subdivision parameter (n from subdivide(n)).                 │
+│   • Returns 0 for non-subdivided cubes                                         │
+│   • Returns n for cubes with n×n×n subdivision                                 │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube cube(1.0, Vector3D(0,0,0));                                          │
+│     std::cout << cube.getSubdivisionLevels();  // Outputs: 0                  │
+│     cube.subdivide(5);                                                         │
+│     std::cout << cube.getSubdivisionLevels();  // Outputs: 5                  │
+│     int total_subcubes = std::pow(cube.getSubdivisionLevels(), 3);            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+SUBDIVISION WORKFLOW:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. Create cube:     Cube cube(radius, center);                                 │
+│ 2. Check status:    if (!cube.hasSubdivision()) { ... }                       │
+│ 3. Subdivide:       cube.subdivide(n);                                        │
+│ 4. Verify:          assert(cube.hasSubdivision());                            │
+│ 5. Use methods:     cube.getSubCell(x,y,z), cube.getPlane(), etc.            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PERFORMANCE CONSIDERATIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • Subdivision creates n³ subcubes - memory usage grows cubically               │
+│ • n=10: 1,000 subcubes, n=20: 8,000 subcubes, n=50: 125,000 subcubes        │
+│ • Each subcube stores 8 vertices + metadata                                    │
+│ • Consider using subdivision selectively for detailed areas only               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showCoordinateHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           COORDINATE SYSTEMS HELP                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+The Cube class uses two coordinate systems for subdivision access:
+
+LOGICAL COORDINATES (User-Friendly):
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • Origin (0,0,0) at the CENTER of the subdivision                              │
+│ • Negative coordinates extend toward -X, -Y, -Z                                │
+│ • Positive coordinates extend toward +X, +Y, +Z                                │
+│ • Range depends on subdivision level n                                         │
+│ • Used in all public API methods                                               │
+│                                                                                 │
+│ COORDINATE RANGES (for subdivision level n):                                   │
+│   n=3: range [-1, 1]     n=4: range [-2, 1]     n=5: range [-2, 2]           │
+│   n=6: range [-3, 2]     n=7: range [-3, 3]     n=8: range [-4, 3]           │
+│                                                                                 │
+│ VISUAL EXAMPLE (n=5, Z=0 plane):                                               │
+│   (-2,2,0) │(-1,2,0) │(0,2,0) │(1,2,0) │(2,2,0)                             │
+│   ────────┼────────┼────────┼────────┼────────                             │
+│   (-2,1,0) │(-1,1,0) │(0,1,0) │(1,1,0) │(2,1,0)                             │
+│   ────────┼────────┼────────┼────────┼────────                             │
+│   (-2,0,0) │(-1,0,0) │(0,0,0) │(1,0,0) │(2,0,0)  ← CENTER                   │
+│   ────────┼────────┼────────┼────────┼────────                             │
+│   (-2,-1,0)│(-1,-1,0)│(0,-1,0)│(1,-1,0)│(2,-1,0)                            │
+│   ────────┼────────┼────────┼────────┼────────                             │
+│   (-2,-2,0)│(-1,-2,0)│(0,-2,0)│(1,-2,0)│(2,-2,0)                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PHYSICAL COORDINATES (Internal Array Indices):
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • Origin (0,0,0) at FIRST array element                                        │
+│ • Always non-negative integers                                                 │
+│ • Range [0, n) for subdivision level n                                         │
+│ • Used for internal array indexing: subcells_[i][j][k]                        │
+│ • Rarely used in public API                                                    │
+│                                                                                 │
+│ VISUAL EXAMPLE (n=5, Z=2 plane):                                               │
+│   (0,4,2) │(1,4,2) │(2,4,2) │(3,4,2) │(4,4,2)                               │
+│   ──────┼──────┼──────┼──────┼──────                                       │
+│   (0,3,2) │(1,3,2) │(2,3,2) │(3,3,2) │(4,3,2)                               │
+│   ──────┼──────┼──────┼──────┼──────                                       │
+│   (0,2,2) │(1,2,2) │(2,2,2) │(3,2,2) │(4,2,2)  ← CENTER                     │
+│   ──────┼──────┼──────┼──────┼──────                                       │
+│   (0,1,2) │(1,1,2) │(2,1,2) │(3,1,2) │(4,1,2)                               │
+│   ──────┼──────┼──────┼──────┼──────                                       │
+│   (0,0,2) │(1,0,2) │(2,0,2) │(3,0,2) │(4,0,2)                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+CONVERSION METHODS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ std::tuple<int,int,int> logicalToPhysical(int x, int y, int z) const           │
+│   Convert user-friendly logical coordinates to internal array indices.         │
+│   • Required before subdivision operations                                     │
+│   • Throws std::runtime_error if no subdivision available                      │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(5);                                                         │
+│     auto [i,j,k] = cube.logicalToPhysical(0, 0, 0);  // Returns (2,2,2)      │
+│     auto [i,j,k] = cube.logicalToPhysical(2, 1, -1); // Returns (4,3,1)      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ std::tuple<int,int,int> physicalToLogical(int i, int j, int k) const           │
+│   Convert internal array indices back to user-friendly logical coordinates.    │
+│   • Useful for converting processing results back to user space               │
+│   • Throws std::runtime_error if no subdivision available                      │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(5);                                                         │
+│     auto [x,y,z] = cube.physicalToLogical(2, 2, 2);  // Returns (0,0,0)      │
+│     auto [x,y,z] = cube.physicalToLogical(4, 3, 1);  // Returns (2,1,-1)     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COORDINATE MAPPING TABLE (n=5):
+┌──────────────┬──────────────┐
+│ LOGICAL      │ PHYSICAL     │
+├──────────────┼──────────────┤
+│ (-2,-2,-2)   │ (0,0,0)      │
+│ (-1,-1,-1)   │ (1,1,1)      │
+│ (0,0,0)      │ (2,2,2)      │ ← CENTER
+│ (1,1,1)      │ (3,3,3)      │
+│ (2,2,2)      │ (4,4,4)      │
+└──────────────┴──────────────┘
+
+USAGE GUIDELINES:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • ALWAYS use logical coordinates in public API calls                           │
+│ • Use getSubCell(0,0,0) to access center subcube                              │
+│ • Use positive/negative values to access subcubes relative to center           │
+│ • Physical coordinates are mainly for internal implementation                  │
+│ • Conversion methods help when you need to work with both systems             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showSubcellHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              SUBCELL ACCESS HELP                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+WHAT IS A SUBCELL:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ A SubCell is a smaller cube within the subdivision with:                       │
+│ • 8 vertices (Vector3D positions)                                              │
+│ • Center position and radius                                                   │
+│ • Grid coordinates (i,j,k)                                                     │
+│ • Active/inactive state for selective rendering                                │
+│ • Capability to generate 12 triangular faces                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+READ-ONLY SUBCELL ACCESS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ const SubCell& getSubCell(int x, int y, int z) const                           │
+│   Access subcell using logical coordinates (user-friendly).                    │
+│   • (0,0,0) = center subcell                                                   │
+│   • Positive/negative values extend from center                                │
+│   • Automatic coordinate validation and conversion                             │
+│   • Throws std::out_of_range if coordinates invalid                            │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(5);                                                         │
+│     const SubCell& center = cube.getSubCell(0, 0, 0);    // Center subcell    │
+│     const SubCell& corner = cube.getSubCell(2, 2, 2);    // Corner subcell    │
+│     const SubCell& edge = cube.getSubCell(-1, 0, 1);     // Edge subcell      │
+│                                                                                 │
+│     // Access subcell properties                                               │
+│     Vector3D center_pos = center.center;                                       │
+│     double radius = center.radius;                                             │
+│     bool is_active = center.active;                                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ const SubCell& getSubCellPhysical(int i, int j, int k) const                   │
+│   Access subcell using physical array indices (for internal use).              │
+│   • i,j,k must be in range [0, n) where n = subdivision levels                │
+│   • Direct array access without coordinate conversion                          │
+│   • Mainly used for performance-critical internal operations                   │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(5);                                                         │
+│     const SubCell& center = cube.getSubCellPhysical(2, 2, 2);  // Center      │
+│     const SubCell& origin = cube.getSubCellPhysical(0, 0, 0);  // Array start │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+MODIFIABLE SUBCELL ACCESS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ SubCell& getSubCellMutable(int x, int y, int z)                                │
+│   Get modifiable access to subcell for property changes.                       │
+│   • Use for changing vertices, center, radius, or active state                │
+│   • May require refreshTriangulation() after vertex changes                   │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(3);                                                         │
+│     SubCell& cell = cube.getSubCellMutable(0, 0, 0);                          │
+│     cell.active = false;                  // Disable for rendering             │
+│     cell.vertices[0] = Vector3D(1,2,3);   // Modify vertex position           │
+│     cube.refreshTriangulation();          // Update triangular faces           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+SUBCELL PROPERTY ACCESS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Vector3D getSubcellCenter(int x, int y, int z) const                           │
+│   Get the 3D center position of a specific subcell.                           │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Vector3D center_pos = cube.getSubcellCenter(0, 0, 0);                     │
+│     Vector3D corner_pos = cube.getSubcellCenter(1, 1, 1);                     │
+│     double distance = (corner_pos - center_pos).magnitude();                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ double getSubcellRadius(int x, int y, int z) const                             │
+│   Get corner-to-center distance (3D diagonal) of a specific subcell.          │
+│   • Returns sqrt(3) * half_side_length                                         │
+│   • Useful for collision detection and bounding sphere calculations            │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     double radius = cube.getSubcellRadius(0, 0, 0);                           │
+│     // Use radius for collision detection or spatial queries                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void setSubCellActive(int x, int y, int z, bool active)                        │
+│   Enable/disable a subcell for rendering and processing.                       │
+│   • Inactive subcells are skipped during facet generation                     │
+│   • Useful for selective visualization and performance optimization            │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.setSubCellActive(0, 0, 0, false);   // Disable center subcell        │
+│     cube.setSubCellActive(1, 1, 1, true);    // Enable corner subcell         │
+│                                                                                 │
+│     // Inactive subcells won't appear in facet generation                     │
+│     FacetBox faces = cube.getSubCellFacets(0, 0, 0);  // Returns empty        │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+SUBCELL STRUCTURE DETAILS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ struct SubCell {                                                                │
+│   std::array<Vector3D, 8> vertices;  // 8 corner positions                    │
+│   Vector3D center;                    // Geometric center                      │
+│   double radius;                      // Half side length                      │
+│   int i, j, k;                       // Physical grid position                 │
+│   bool active;                       // Rendering enable flag                  │
+│ }                                                                               │
+│                                                                                 │
+│ VERTEX ORDERING (same as main cube):                                           │
+│   0: front-bottom-left    4: back-bottom-left                                  │
+│   1: front-bottom-right   5: back-bottom-right                                 │
+│   2: front-top-right      6: back-top-right                                    │
+│   3: front-top-left       7: back-top-left                                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COMMON USAGE PATTERNS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ // Iterate through all subcells                                                │
+│ int n = cube.getSubdivisionLevels();                                           │
+│ for (int x = -n/2; x <= n/2; ++x) {                                           │
+│   for (int y = -n/2; y <= n/2; ++y) {                                         │
+│     for (int z = -n/2; z <= n/2; ++z) {                                       │
+│       if (/* valid coordinates */) {                                          │
+│         const SubCell& cell = cube.getSubCell(x, y, z);                       │
+│         // Process subcell...                                                  │
+│       }                                                                        │
+│     }                                                                          │
+│   }                                                                            │
+│ }                                                                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showVertexHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            VERTEX MANIPULATION HELP                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+VERTEX MODIFICATION:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void updateSubCellVertex(int x, int y, int z, int vertex_idx,                  │
+│                          const Vector3D& new_pos)                             │
+│   Modify the position of a specific vertex within a subcell.                   │
+│   • Enables geometric deformation and custom shape creation                    │
+│   • Changes are local to the specified subcell                                │
+│   • Requires refreshTriangulation() call afterward                            │
+│                                                                                 │
+│   PARAMETERS:                                                                   │
+│     x,y,z      - Logical coordinates of target subcell                         │
+│     vertex_idx - Vertex index [0,7] within the subcell                        │
+│     new_pos    - New 3D position for the vertex                               │
+│                                                                                 │
+│   VERTEX INDEX REFERENCE:                                                       │
+│     0: front-bottom-left     4: back-bottom-left                               │
+│     1: front-bottom-right    5: back-bottom-right                              │
+│     2: front-top-right       6: back-top-right                                 │
+│     3: front-top-left        7: back-top-left                                  │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(3);                                                         │
+│     // Move vertex 0 of center subcell                                        │
+│     cube.updateSubCellVertex(0, 0, 0, 0, Vector3D(1.5, 1.5, 1.5));          │
+│     // Move vertex 7 of another subcell                                       │
+│     cube.updateSubCellVertex(1, 0, 0, 7, Vector3D(2.0, 2.0, 2.0));          │
+│     cube.refreshTriangulation();  // REQUIRED after vertex changes            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+TRIANGULATION REFRESH:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ void refreshTriangulation()                                                     │
+│   Rebuild all triangular faces after vertex modifications.                     │
+│   • Scans all subcells and regenerates their triangular faces                 │
+│   • Skips inactive subcells automatically                                     │
+│   • Expensive operation - batch vertex updates before calling                 │
+│   • MUST be called after any updateSubCellVertex() operations                 │
+│                                                                                 │
+│   USAGE PATTERN:                                                               │
+│     // Batch multiple vertex updates                                           │
+│     cube.updateSubCellVertex(0, 0, 0, 0, pos1);                              │
+│     cube.updateSubCellVertex(0, 0, 0, 1, pos2);                              │
+│     cube.updateSubCellVertex(1, 1, 1, 3, pos3);                              │
+│     // Single refresh call for all changes                                    │
+│     cube.refreshTriangulation();                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+VERTEX MANIPULATION EXAMPLES:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. SIMPLE DEFORMATION:                                                         │
+│    cube.subdivide(5);                                                          │
+│    // Pull center vertex upward                                               │
+│    Vector3D center_pos = cube.getSubcellCenter(0, 0, 0);                      │
+│    cube.updateSubCellVertex(0, 0, 0, 2, center_pos + Vector3D(0, 2, 0));     │
+│    cube.refreshTriangulation();                                                │
+│                                                                                 │
+│ 2. CREATE WAVE PATTERN:                                                        │
+│    cube.subdivide(10);                                                         │
+│    int n = cube.getSubdivisionLevels();                                        │
+│    for (int x = -n/2; x < n/2; ++x) {                                         │
+│      for (int z = -n/2; z < n/2; ++z) {                                       │
+│        double height = sin(x * 0.5) * cos(z * 0.5);                          │
+│        Vector3D offset(0, height, 0);                                          │
+│        // Modify top vertices (indices 2,3,6,7)                               │
+│        Vector3D base_pos = cube.getSubcellCenter(x, 0, z);                     │
+│        cube.updateSubCellVertex(x, 0, z, 2, base_pos + offset);               │
+│        cube.updateSubCellVertex(x, 0, z, 3, base_pos + offset);               │
+│      }                                                                         │
+│    }                                                                           │
+│    cube.refreshTriangulation();                                                │
+│                                                                                 │
+│ 3. SELECTIVE MODIFICATION:                                                     │
+│    cube.subdivide(3);                                                          │
+│    // Only modify corner subcells                                             │
+│    std::vector<std::tuple<int,int,int>> corners = {                           │
+│      {-1,-1,-1}, {1,-1,-1}, {-1,1,-1}, {1,1,-1},                            │
+│      {-1,-1,1},  {1,-1,1},  {-1,1,1},  {1,1,1}                              │
+│    };                                                                          │
+│    for (auto [x,y,z] : corners) {                                             │
+│      Vector3D center = cube.getSubcellCenter(x, y, z);                        │
+│      Vector3D expanded = center * 1.5;  // Expand from origin                 │
+│      cube.updateSubCellVertex(x, y, z, 0, expanded);                          │
+│    }                                                                           │
+│    cube.refreshTriangulation();                                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PERFORMANCE CONSIDERATIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • refreshTriangulation() complexity: O(n³) where n = subdivision levels       │
+│ • For n=10: processes 1,000 subcells × 12 triangles = 12,000 triangles       │
+│ • Batch vertex updates to minimize triangulation rebuilds                     │
+│ • Consider using setSubCellActive(false) to skip expensive subcells           │
+│ • Vertex modifications are persistent until overwritten                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+GEOMETRIC EFFECTS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ • Moving vertices creates non-cubic shapes                                     │
+│ • Triangular faces automatically adapt to new vertex positions                │
+│ • Shared vertices between subcells are independent (no automatic connection)  │
+│ • Large vertex movements may cause face intersection or inversion             │
+│ • Consider gradual modifications for smooth deformations                      │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showPlaneHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              PLANE EXTRACTION HELP                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+WHAT ARE PLANES:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Planes are 2D slices through the 3D subdivision grid:                         │
+│ • XY plane: varies X and Y, fixes Z (perpendicular to Z-axis)                 │
+│ • XZ plane: varies X and Z, fixes Y (perpendicular to Y-axis)                 │
+│ • YZ plane: varies Y and Z, fixes X (perpendicular to X-axis)                 │
+│ • Each plane contains n×n subcells for subdivision level n                    │
+│ • Useful for layer-by-layer analysis and rendering                            │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+NUMERIC PLANE ACCESS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ std::vector<std::reference_wrapper<const SubCell>>                             │
+│ getPlane(int axis, int layer) const                                            │
+│   Extract all subcells from a specific 2D plane.                              │
+│   • Returns references to subcells (not copies)                               │
+│   • Subcells maintain their original properties and state                     │
+│                                                                                 │
+│   PARAMETERS:                                                                   │
+│     axis  - Plane orientation: 0=YZ, 1=XZ, 2=XY                               │
+│     layer - Physical layer index [0, n) within the axis                       │
+│                                                                                 │
+│   AXIS MAPPING:                                                                │
+│     0 (YZ plane): fixes X coordinate, varies Y and Z                          │
+│     1 (XZ plane): fixes Y coordinate, varies X and Z                          │
+│     2 (XY plane): fixes Z coordinate, varies X and Y                          │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(5);                                                         │
+│     // Get center XY plane (Z=2 in physical coordinates)                      │
+│     auto xy_plane = cube.getPlane(2, 2);                                      │
+│     std::cout << "XY plane has " << xy_plane.size() << " subcells\n";         │
+│     // For n=5: outputs "XY plane has 25 subcells"                           │
+│                                                                                 │
+│     // Process each subcell in the plane                                      │
+│     for (const SubCell& cell : xy_plane) {                                    │
+│       std::cout << "Center: " << cell.center << std::endl;                    │
+│     }                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getPlaneFacets(int axis, int layer) const                             │
+│   Generate triangular faces for all subcells in a plane.                      │
+│   • Returns complete triangulation for the plane                              │
+│   • Skips inactive subcells automatically                                     │
+│   • Each active subcell contributes 12 triangular faces                       │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(3);                                                         │
+│     FacetBox xy_faces = cube.getPlaneFacets(2, 1);  // XY plane, layer 1     │
+│     std::cout << xy_faces.size() << " triangular faces\n";                    │
+│     // For 3×3 plane with all active: outputs "108 triangular faces"         │
+│                                                                                 │
+│     // Use for rendering specific layers                                       │
+│     renderer.drawFacets(xy_faces);                                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+STRING-BASED PLANE ACCESS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getPlaneFacets(const std::string& coord1,                             │
+│                        const std::string& coord2,                             │
+│                        const std::string& coord3) const                       │
+│   User-friendly plane specification using string coordinates.                  │
+│   • Two coordinates must be axis names: "x", "y", "z"                         │
+│   • One coordinate must be numeric: "0", "-1", "2", etc.                      │
+│   • Numeric value uses logical coordinate system                               │
+│                                                                                 │
+│   EXAMPLES:                                                                     │
+│     // Center XY plane (Z=0 in logical coordinates)                           │
+│     FacetBox xy_center = cube.getPlaneFacets("x", "y", "0");                  │
+│                                                                                 │
+│     // XZ plane above center (Y=1 in logical coordinates)                     │
+│     FacetBox xz_up = cube.getPlaneFacets("x", "1", "z");                      │
+│                                                                                 │
+│     // YZ plane to the right (X=2 in logical coordinates)                     │
+│     FacetBox yz_right = cube.getPlaneFacets("2", "y", "z");                   │
+│                                                                                 │
+│   COORDINATE VALIDATION:                                                        │
+│     ✓ Valid: ("x", "y", "0"), ("1", "y", "z"), ("x", "-1", "z")              │
+│     ✗ Invalid: ("x", "y", "z"), ("1", "2", "z"), ("", "y", "0")              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PLANE COORDINATE MAPPING:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ For subdivision level n=5:                                                     │
+│                                                                                 │
+│ LOGICAL TO PHYSICAL LAYER CONVERSION:                                           │
+│   Logical -2 → Physical 0    Logical 0 → Physical 2 (center)                  │
+│   Logical -1 → Physical 1    Logical 1 → Physical 3                           │
+│   Logical  2 → Physical 4                                                      │
+│                                                                                 │
+│ STRING COORDINATE EXAMPLES:                                                     │
+│   "x","y","0"  → XY plane at logical Z=0 → Physical layer 2                   │
+│   "x","y","-1" → XY plane at logical Z=-1 → Physical layer 1                  │
+│   "0","y","z"  → YZ plane at logical X=0 → Physical layer 2                   │
+│   "1","y","z"  → YZ plane at logical X=1 → Physical layer 3                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PLANE VISUALIZATION (n=3):
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ XY PLANES (axis=2, varying Z):          YZ PLANES (axis=0, varying X):        │
+│   Layer 0: Z=-1  Layer 1: Z=0  Layer 2: Z=1                                   │
+│   ┌─┬─┬─┐       ┌─┬─┬─┐       ┌─┬─┬─┐    ┌─┬─┬─┐ ┌─┬─┬─┐ ┌─┬─┬─┐           │
+│   │ │ │ │       │ │ │ │       │ │ │ │    │ │ │ │ │ │ │ │ │ │ │ │           │
+│   ├─┼─┼─┤       ├─┼─┼─┤       ├─┼─┼─┤    ├─┼─┼─┤ ├─┼─┼─┤ ├─┼─┼─┤           │
+│   │ │ │ │       │ │ │ │       │ │ │ │    │ │ │ │ │ │ │ │ │ │ │ │           │
+│   ├─┼─┼─┤       ├─┼─┼─┤       ├─┼─┼─┤    ├─┼─┼─┤ ├─┼─┼─┤ ├─┼─┼─┤           │
+│   │ │ │ │       │ │ │ │       │ │ │ │    │ │ │ │ │ │ │ │ │ │ │ │           │
+│   └─┴─┴─┘       └─┴─┴─┘       └─┴─┴─┘    └─┴─┴─┘ └─┴─┴─┘ └─┴─┴─┘           │
+│             Back to Front               X=-1    X=0    X=1                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COMMON USAGE PATTERNS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. LAYER-BY-LAYER PROCESSING:                                                 │
+│    cube.subdivide(5);                                                          │
+│    int n = cube.getSubdivisionLevels();                                        │
+│    for (int layer = 0; layer < n; ++layer) {                                  │
+│      auto xy_plane = cube.getPlane(2, layer);  // Get XY plane at layer      │
+│      std::cout << "Layer " << layer << " has "                                │
+│                 << xy_plane.size() << " subcells\n";                          │
+│    }                                                                           │
+│                                                                                │
+│ 2. CENTER PLANE ANALYSIS:                                                     │
+│    FacetBox center_xy = cube.getPlaneFacets("x", "y", "0");                   │
+│    FacetBox center_xz = cube.getPlaneFacets("x", "0", "z");                   │
+│    FacetBox center_yz = cube.getPlaneFacets("0", "y", "z");                   │
+│                                                                                │
+│ 3. SELECTIVE LAYER RENDERING:                                                 │
+│    for (int z = -2; z <= 2; ++z) {                                            │
+│      FacetBox layer = cube.getPlaneFacets("x", "y", std::to_string(z));       │
+│      renderer.drawLayer(layer, z);                                             │
+│    }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showPatternHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           PATTERN SELECTION HELP                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+CHECKERBOARD PATTERN:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ std::vector<std::reference_wrapper<const SubCell>>                             │
+│ getCheckerboardSubcells() const                                                │
+│   Extract subcells following a 3D checkerboard pattern.                       │
+│   • Selects subcells where (i+j+k) % 4 == 0 using physical coordinates       │
+│   • Creates spatially distributed selection similar to 2D checkerboard        │
+│   • Reduces density while maintaining even distribution                        │
+│   • Useful for sampling, performance testing, and visual effects              │
+│                                                                                 │
+│   PATTERN RULE:                                                                │
+│     Physical coordinates (i,j,k) where: (i + j + k) divisible by 4           │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(4);                                                         │
+│     auto checker_cells = cube.getCheckerboardSubcells();                      │
+│     std::cout << checker_cells.size() << " subcells selected\n";              │
+│     // For 4×4×4 cube: selects 16 out of 64 subcells                         │
+│                                                                                 │
+│     for (const SubCell& cell : checker_cells) {                               │
+│       std::cout << "Selected: (" << cell.i << "," << cell.j                   │
+│                 << "," << cell.k << ")\n";                                    │
+│     }                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getCheckerboardFacets() const                                         │
+│   Generate triangular faces for all checkerboard pattern subcells.            │
+│   • Returns complete triangulation for selected subcells only                 │
+│   • Automatically skips inactive subcells                                     │
+│   • Each selected active subcell contributes 12 triangular faces              │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(6);                                                         │
+│     FacetBox checker_faces = cube.getCheckerboardFacets();                    │
+│     std::cout << checker_faces.size() << " triangular faces\n";               │
+│                                                                                 │
+│     // Use for selective rendering                                             │
+│     renderer.setColor(RED);                                                    │
+│     renderer.drawFacets(checker_faces);                                        │
+│                                                                                 │
+│     // Compare with full cube                                                  │
+│     FacetBox all_faces = cube.getFacets();                                    │
+│     std::cout << "Checkerboard: " << checker_faces.size()                     │
+│               << " / Full: " << all_faces.size() << std::endl;                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PATTERN VISUALIZATION:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 3D CHECKERBOARD PATTERN (4×4×4 subdivision, showing XY plane at Z=0):        │
+│                                                                                 │
+│   Physical Coordinates (i,j,k):                                               │
+│   ┌─────┬─────┬─────┬─────┐  Legend:                                          │
+│   │(0,3)│(1,3)│(2,3)│(3,3)│  ■ = Selected (sum divisible by 4)               │
+│   │  □  │  ■  │  □  │  ■  │  □ = Not selected                                 │
+│   ├─────┼─────┼─────┼─────┤                                                    │
+│   │(0,2)│(1,2)│(2,2)│(3,2)│  Selected coordinates at Z=0:                    │
+│   │  ■  │  □  │  ■  │  □  │  (0,0,0): 0+0+0=0 ÷ 4 = 0 ✓                    │
+│   ├─────┼─────┼─────┼─────┤  (1,1,0): 1+1+0=2 ÷ 4 = 0.5 ✗                  │
+│   │(0,1)│(1,1)│(2,1)│(3,1)│  (2,0,0): 2+0+0=2 ÷ 4 = 0.5 ✗                  │
+│   │  □  │  ■  │  □  │  ■  │  (2,2,0): 2+2+0=4 ÷ 4 = 1 ✓                    │
+│   ├─────┼─────┼─────┼─────┤                                                    │
+│   │(0,0)│(1,0)│(2,0)│(3,0)│                                                   │
+│   │  ■  │  □  │  ■  │  □  │                                                   │
+│   └─────┴─────┴─────┴─────┘                                                    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PATTERN MATHEMATICS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Selection Rule: (i + j + k) % 4 == 0                                          │
+│                                                                                 │
+│ For subdivision level n, approximate selection ratio:                          │
+│   • n=2: ~25% of subcells (2/8 = 25%)                                         │
+│   • n=4: ~25% of subcells (16/64 = 25%)                                       │
+│   • n=8: ~25% of subcells (128/512 = 25%)                                     │
+│                                                                                 │
+│ The pattern maintains roughly 1/4 density while ensuring even distribution     │
+│ across all three spatial dimensions.                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+USE CASES FOR CHECKERBOARD PATTERN:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. PERFORMANCE TESTING:                                                        │
+│    // Render subset for performance comparison                                 │
+│    auto start = std::chrono::high_resolution_clock::now();                     │
+│    FacetBox checker = cube.getCheckerboardFacets();                           │
+│    renderer.draw(checker);                                                     │
+│    auto end = std::chrono::high_resolution_clock::now();                       │
+│                                                                                 │
+│ 2. LEVEL-OF-DETAIL RENDERING:                                                 │
+│    if (distance_to_camera > threshold) {                                      │
+│      // Use checkerboard for distant objects                                  │
+│      renderer.draw(cube.getCheckerboardFacets());                             │
+│    } else {                                                                    │
+│      // Use full detail for close objects                                     │
+│      renderer.draw(cube.getFacets());                                         │
+│    }                                                                           │
+│                                                                                 │
+│ 3. VISUAL EFFECTS:                                                            │
+│    // Animate alternating pattern                                             │
+│    renderer.setColor(RED);                                                    │
+│    renderer.draw(cube.getCheckerboardFacets());                               │
+│    renderer.setColor(BLUE);                                                   │
+│    // Draw remaining subcells with different rendering                        │
+│                                                                                │
+│ 4. SAMPLING AND ANALYSIS:                                                     │
+│    auto samples = cube.getCheckerboardSubcells();                             │
+│    double total_volume = 0;                                                    │
+│    for (const SubCell& cell : samples) {                                      │
+│      total_volume += std::pow(cell.radius * 2, 3);  // Volume of each subcell │
+│    }                                                                           │
+│    double estimated_total = total_volume * 4;  // Scale up sample             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COMBINING WITH OTHER OPERATIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ // Disable checkerboard subcells for complementary pattern                    │
+│ auto checker_cells = cube.getCheckerboardSubcells();                          │
+│ for (const SubCell& cell : checker_cells) {                                   │
+│   cube.setSubCellActive(/* convert to logical coords */, false);              │
+│ }                                                                              │
+│ cube.refreshTriangulation();                                                   │
+│                                                                                │
+│ // Now getFacets() returns the inverse checkerboard pattern                   │
+│ FacetBox inverse_pattern = cube.getFacets();                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showFacetHelp() const {
+        std::cout << R"(
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                             FACET GENERATION HELP                              │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+WHAT ARE FACETS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Facets are triangular faces that represent the visual geometry of the cube:    │
+│ • Each cube face is divided into 2 triangular faces                           │
+│ • Basic cube: 6 faces × 2 triangles = 12 triangular faces                     │
+│ • Subdivided cube: n³ subcubes × 12 triangular faces each                     │
+│ • Triangular faces are stored in FacetBox containers                          │
+│ • Each triangular face consists of 3 vertices in 3D space                     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+INDIVIDUAL SUBCELL FACETS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getSubCellFacets(int x, int y, int z) const                           │
+│   Generate the 12 triangular faces for a single subcell.                      │
+│   • Returns empty FacetBox if subcell is inactive                             │
+│   • Uses current vertex positions (reflects any modifications)                │
+│   • Each subcell always generates exactly 12 triangular faces when active    │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(3);                                                         │
+│     FacetBox center_faces = cube.getSubCellFacets(0, 0, 0);                   │
+│     std::cout << center_faces.size() << " triangular faces\n";  // Outputs: 12│
+│                                                                                 │
+│     // Check if subcell is active                                             │
+│     if (center_faces.size() == 0) {                                           │
+│       std::cout << "Center subcell is inactive\n";                            │
+│     }                                                                          │
+│                                                                                │
+│     // Render individual subcell                                              │
+│     renderer.setColor(GREEN);                                                 │
+│     renderer.drawFacets(center_faces);                                         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COMPLETE CUBE FACETS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ const FacetBox& getFacets() const noexcept                                     │
+│   Get all triangular faces for the entire cube structure.                     │
+│   • For basic cubes: returns 12 triangular faces                              │
+│   • For subdivided cubes: returns n³ × 12 triangular faces (active subcells) │
+│   • Reflects current state (active/inactive subcells, vertex modifications)   │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     Cube basic_cube(1.0, Vector3D(0,0,0));                                    │
+│     std::cout << basic_cube.getFacets().size();  // Outputs: 12               │
+│                                                                                │
+│     Cube sub_cube(1.0, Vector3D(0,0,0), 3);                                  │
+│     std::cout << sub_cube.getFacets().size();    // Outputs: 324 (27×12)     │
+│                                                                                │
+│     // Disable some subcells                                                  │
+│     sub_cube.setSubCellActive(0, 0, 0, false);                                │
+│     sub_cube.refreshTriangulation();                                           │
+│     std::cout << sub_cube.getFacets().size();    // Outputs: 312 (26×12)     │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PLANE-BASED FACETS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getPlaneFacets(int axis, int layer) const                             │
+│ FacetBox getPlaneFacets(const std::string& coord1, coord2, coord3) const       │
+│   Generate triangular faces for all subcells in a specific 2D plane.          │
+│   • Useful for layer-by-layer rendering or analysis                           │
+│   • Only includes triangular faces from active subcells in the plane          │
+│   • Each active subcell in plane contributes 12 triangular faces              │
+│                                                                                 │
+│   EXAMPLES:                                                                     │
+│     cube.subdivide(4);                                                         │
+│     // Numeric interface                                                       │
+│     FacetBox xy_plane = cube.getPlaneFacets(2, 2);     // Center XY plane     │
+│     std::cout << xy_plane.size();  // 4×4×12 = 192 triangular faces          │
+│                                                                                │
+│     // String interface (more user-friendly)                                  │
+│     FacetBox center_xy = cube.getPlaneFacets("x", "y", "0");                  │
+│     FacetBox upper_xz = cube.getPlaneFacets("x", "1", "z");                   │
+│                                                                                │
+│     // Render planes with different colors                                    │
+│     renderer.setColor(RED);                                                   │
+│     renderer.drawFacets(center_xy);                                            │
+│     renderer.setColor(BLUE);                                                  │
+│     renderer.drawFacets(upper_xz);                                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+PATTERN-BASED FACETS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FacetBox getCheckerboardFacets() const                                         │
+│   Generate triangular faces for subcells following checkerboard pattern.      │
+│   • Selects ~25% of subcells in spatially distributed pattern                │
+│   • Useful for performance testing and visual effects                         │
+│   • Only includes triangular faces from active pattern subcells               │
+│                                                                                 │
+│   EXAMPLE:                                                                      │
+│     cube.subdivide(8);                                                         │
+│     FacetBox all_faces = cube.getFacets();                                    │
+│     FacetBox checker_faces = cube.getCheckerboardFacets();                    │
+│                                                                                │
+│     std::cout << "Full: " << all_faces.size()                                 │
+│               << ", Checkerboard: " << checker_faces.size() << std::endl;     │
+│     // Outputs approximately: "Full: 6144, Checkerboard: 1536"               │
+│                                                                                │
+│     // Performance comparison                                                  │
+│     auto t1 = std::chrono::high_resolution_clock::now();                      │
+│     renderer.drawFacets(checker_faces);                                        │
+│     auto t2 = std::chrono::high_resolution_clock::now();                      │
+│     // Measure rendering time difference                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+FACET COUNT CALCULATIONS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ CUBE TYPE           │ SUBCELLS    │ FACES PER SUBCELL │ TOTAL TRIANGULAR FACES │ │
+│ ────────────────────┼─────────────┼───────────────────┼────────────────────────┤ │
+│ Basic cube          │ 1           │ 12                │ 12                     │ │
+│ subdivide(2)        │ 2³ = 8      │ 12                │ 96                     │ │
+│ subdivide(3)        │ 3³ = 27     │ 12                │ 324                    │ │
+│ subdivide(5)        │ 5³ = 125    │ 12                │ 1,500                  │ │
+│ subdivide(10)       │ 10³ = 1,000 │ 12                │ 12,000                 │ │
+│                                                                                 │
+│ PLANE FACES (for n×n×n subdivision):                                          │ │
+│ • XY/XZ/YZ plane: n² subcells × 12 triangular faces = n² × 12                 │ │
+│ • Checkerboard: ~n³/4 subcells × 12 triangular faces = ~n³ × 3                │ │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+FACET STRUCTURE AND PROPERTIES:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Each Facet (triangular face) contains:                                        │ │
+│ • 3 vertices (Vector3D positions)                                             │ │
+│ • Automatically calculated normal vector                                       │ │
+│ • Consistent winding order for proper rendering                               │ │
+│                                                                                 │
+│ FacetBox properties:                                                           │ │
+│ • Efficient storage of multiple triangular faces                              │ │
+│ • Iteratable container for rendering loops                                    │ │
+│ • Compatible with standard rendering pipelines                                 │ │
+│ • Supports batch operations and transformations                               │ │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+COMMON RENDERING WORKFLOWS:
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. FULL CUBE RENDERING:                                                       │
+│    FacetBox all_faces = cube.getFacets();                                     │
+│    renderer.drawFacets(all_faces);                                             │
+│                                                                                │
+│ 2. LAYER-BY-LAYER ANIMATION:                                                  │
+│    for (int z = -n/2; z < n/2; ++z) {                                         │
+│      FacetBox layer = cube.getPlaneFacets("x", "y", std::to_string(z));       │
+│      renderer.drawFacets(layer);                                               │
+│      std::this_thread::sleep_for(std::chrono::milliseconds(100));             │
+│    }                                                                           │
+│                                                                                │
+│ 3. SELECTIVE RENDERING:                                                       │
+│    // Render only interesting subcells                                        │
+│    for (auto [x,y,z] : interesting_coordinates) {                             │
+│      if (cube.getSubCell(x,y,z).active) {                                     │
+│        FacetBox cell_faces = cube.getSubCellFacets(x,y,z);                    │
+│        renderer.setColor(getColorFor(x,y,z));                                 │
+│        renderer.drawFacets(cell_faces);                                        │
+│      }                                                                         │
+│    }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+)" << std::endl;
+    }
+    
+    void showMethodHelp(const std::string& method_name) const {
+        if (method_name == "faceCount") {
+            std::cout << R"(
+METHOD: size_t faceCount() const noexcept
+
+DESCRIPTION:
+  Returns the total number of triangular faces in the cube.
+
+PARAMETERS:
+  None
+
+RETURN VALUE:
+  size_t - Number of triangular faces
+  • Basic cube: 12
+  • Subdivided cube: n³ × 12 (where n = subdivision levels)
+
+EXAMPLE:
+  Cube cube(1.0, Vector3D(0,0,0));
+  std::cout << cube.faceCount();        // Output: 12
+  
+  cube.subdivide(3);
+  std::cout << cube.faceCount();        // Output: 324
+
+NOTES:
+  • noexcept guarantee - will never throw exceptions
+  • O(1) constant time operation
+  • Count reflects active subcells only
+)" << std::endl;
+
+        } else if (method_name == "center") {
+            std::cout << R"(
+METHOD: Vector3D center() const
+
+DESCRIPTION:
+  Calculate geometric center by averaging all vertex positions.
+
+PARAMETERS:
+  None
+
+RETURN VALUE:
+  Vector3D - The geometric center point
+
+EXCEPTIONS:
+  std::runtime_error - If no vertices have been initialized
+
+EXAMPLE:
+  Cube cube(2.0, Vector3D(5,3,1));
+  Vector3D c = cube.center();           // c = (5,3,1)
+  
+  cube.translate(Vector3D(10,0,0));
+  Vector3D new_c = cube.center();       // new_c = (15,3,1)
+
+NOTES:
+  • For basic cubes: matches original center parameter
+  • For subdivided cubes: center of overall structure
+  • Reflects any translations applied to the cube
+)" << std::endl;
+
+        } else if (method_name == "translate") {
+            std::cout << R"(
+METHOD: void translate(const Vector3D& offset)
+
+DESCRIPTION:
+  Move entire cube by adding offset to all vertex positions.
+
+PARAMETERS:
+  offset - Vector3D displacement to apply
+
+RETURN VALUE:
+  None (void)
+
+SIDE EFFECTS:
+  • Updates all vertex positions
+  • Automatically rebuilds triangulation
+  • Affects both main vertices and subdivision data
+
+EXAMPLE:
+  Cube cube(1.0, Vector3D(0,0,0));
+  cube.translate(Vector3D(5,3,1));      // Move to (5,3,1)
+  cube.translate(Vector3D(0,0,10));     // Move up by 10 units
+  Vector3D final_pos = cube.center();   // final_pos = (5,3,11)
+
+PERFORMANCE:
+  O(n³) for subdivided cubes due to triangulation rebuild
+)" << std::endl;
+
+        } else if (method_name == "scale") {
+            std::cout << R"(
+METHOD: void scale(double s, const Vector3D& pivot)
+
+DESCRIPTION:
+  Scale all vertices relative to a pivot point.
+
+PARAMETERS:
+  s     - Scaling factor (1.0=no change, >1.0=larger, <1.0=smaller)
+  pivot - Fixed point that doesn't move during scaling
+
+RETURN VALUE:
+  None (void)
+
+SIDE EFFECTS:
+  • Updates all vertex positions
+  • Automatically rebuilds triangulation
+
+EXAMPLE:
+  Cube cube(1.0, Vector3D(0,0,0));
+  Vector3D center = cube.center();
+  cube.scale(2.0, center);              // Double size around center
+  cube.scale(0.5, Vector3D(0,0,0));     // Half size around origin
+
+NOTES:
+  • Scaling around cube center preserves center position
+  • Scaling around origin moves cube toward/away from origin
+)" << std::endl;
+
+        } else if (method_name == "subdivide") {
+            std::cout << R"(
+METHOD: void subdivide(int n)
+
+DESCRIPTION:
+  Divide cube into n×n×n smaller subcubes with full triangulation.
+
+PARAMETERS:
+  n - Number of subdivisions per axis (must be > 0)
+
+RETURN VALUE:
+  None (void)
+
+SIDE EFFECTS:
+  • Creates n³ subcubes in 3D grid
+  • Replaces simple triangulation with complex subdivision
+  • Sets hasSubdivision() to true
+  • Updates faceCount() to n³ × 12
+
+EXAMPLE:
+  Cube cube(1.0, Vector3D(0,0,0));
+  cube.subdivide(3);                    // Creates 27 subcubes
+  assert(cube.hasSubdivision());        // Now true
+  assert(cube.faceCount() == 324);      // 27 × 12
+
+PERFORMANCE:
+  • Memory: O(n³) for subcell storage
+  • Time: O(n³) for initial creation
+  • Consider memory usage for large n values
+)" << std::endl;
+
+        } else if (method_name == "hasSubdivision") {
+            std::cout << R"(
+METHOD: bool hasSubdivision() const noexcept
+
+DESCRIPTION:
+  Check if subdivision has been performed and data is available.
+
+PARAMETERS:
+  None
+
+RETURN VALUE:
+  bool - true if subdivision exists and is accessible
+
+EXAMPLE:
+  Cube cube(1.0, Vector3D(0,0,0));
+  if (!cube.hasSubdivision()) {         // Returns true - no subdivision
+    cube.subdivide(3);
+  }
+  assert(cube.hasSubdivision());        // Now returns true
+
+USAGE:
+  ALWAYS check this before using subdivision-specific methods:
+  • getSubCell(), getPlane(), updateSubCellVertex(), etc.
+  • Prevents runtime errors from invalid subdivision access
+
+NOTES:
+  • noexcept guarantee - will never throw exceptions
+  • Required guard for all subdivision operations
+)" << std::endl;
+
+        } else if (method_name == "getSubCell") {
+            std::cout << R"(
+METHOD: const SubCell& getSubCell(int x, int y, int z) const
+
+DESCRIPTION:
+  Access specific subcell using logical coordinates (user-friendly).
+
+PARAMETERS:
+  x - Logical X-coordinate (0=center, negative=left, positive=right)
+  y - Logical Y-coordinate (0=center, negative=down, positive=up)  
+  z - Logical Z-coordinate (0=center, negative=back, positive=front)
+
+RETURN VALUE:
+  const SubCell& - Reference to the specified subcell
+
+EXCEPTIONS:
+  std::out_of_range - If coordinates invalid or no subdivision
+
+EXAMPLE:
+  cube.subdivide(5);
+  const SubCell& center = cube.getSubCell(0, 0, 0);    // Center
+  const SubCell& corner = cube.getSubCell(2, 2, 2);    // Corner
+  
+  Vector3D pos = center.center;         // Access subcell properties
+  double r = center.radius;
+  bool active = center.active;
+
+COORDINATE RANGES:
+  Depends on subdivision level n:
+  • n=3: x,y,z ∈ [-1, 1]
+  • n=5: x,y,z ∈ [-2, 2]  
+  • n=4: x,y,z ∈ [-2, 1] (asymmetric for even n)
+)" << std::endl;
+
+        } else if (method_name == "updateSubCellVertex") {
+            std::cout << R"(
+METHOD: void updateSubCellVertex(int x, int y, int z, int vertex_idx, 
+                                const Vector3D& new_pos)
+
+DESCRIPTION:
+  Modify position of specific vertex within a subcell.
+
+PARAMETERS:
+  x,y,z      - Logical coordinates of target subcell
+  vertex_idx - Vertex index [0,7] within the subcell
+  new_pos    - New 3D position for the vertex
+
+RETURN VALUE:
+  None (void)
+
+EXCEPTIONS:
+  std::out_of_range - If coordinates or vertex_idx invalid
+
+VERTEX INDICES:
+  0: front-bottom-left     4: back-bottom-left
+  1: front-bottom-right    5: back-bottom-right  
+  2: front-top-right       6: back-top-right
+  3: front-top-left        7: back-top-left
+
+EXAMPLE:
+  cube.subdivide(3);
+  // Pull center subcell's top-right vertex upward
+  Vector3D new_pos = Vector3D(1.5, 2.0, 1.5);
+  cube.updateSubCellVertex(0, 0, 0, 2, new_pos);
+  cube.refreshTriangulation();          // REQUIRED after changes
+
+WORKFLOW:
+  1. Make vertex modifications (can batch multiple updates)
+  2. Call refreshTriangulation() once at end
+  3. Changes reflected in getFacets(), getSubCellFacets(), etc.
+)" << std::endl;
+
+        } else if (method_name == "refreshTriangulation") {
+            std::cout << R"(
+METHOD: void refreshTriangulation()
+
+DESCRIPTION:
+  Rebuild all triangular faces after vertex modifications.
+
+PARAMETERS:
+  None
+
+RETURN VALUE:
+  None (void)
+
+WHEN TO CALL:
+  REQUIRED after any updateSubCellVertex() operations
+  • Scans all active subcells
+  • Regenerates 12 triangular faces per subcell
+  • Updates internal facets collection
+
+EXAMPLE:
+  // Batch vertex updates for efficiency
+  cube.updateSubCellVertex(0, 0, 0, 0, pos1);
+  cube.updateSubCellVertex(0, 0, 0, 1, pos2);  
+  cube.updateSubCellVertex(1, 1, 1, 3, pos3);
+  // Single refresh for all changes
+  cube.refreshTriangulation();
+
+PERFORMANCE:
+  • O(n³) complexity where n = subdivision levels
+  • Expensive for large subdivisions
+  • Batch vertex updates to minimize calls
+
+SIDE EFFECTS:
+  • Updates getFacets() return value
+  • Updates all facet generation methods
+  • Skips inactive subcells automatically
+)" << std::endl;
+
+        } else if (method_name == "getPlane") {
+            std::cout << R"(
+METHOD: std::vector<std::reference_wrapper<const SubCell>> 
+        getPlane(int axis, int layer) const
+
+DESCRIPTION:
+  Extract all subcells from a 2D plane within the 3D subdivision.
+
+PARAMETERS:
+  axis  - Plane orientation (0=YZ, 1=XZ, 2=XY)
+  layer - Physical layer index [0, n) within the axis
+
+RETURN VALUE:
+  Vector of const references to subcells in the plane
+
+EXCEPTIONS:
+  std::out_of_range - If axis or layer invalid
+  std::runtime_error - If no subdivision available
+
+AXIS MEANINGS:
+  0 (YZ plane): fixes X, varies Y and Z
+  1 (XZ plane): fixes Y, varies X and Z  
+  2 (XY plane): fixes Z, varies X and Y
+
+EXAMPLE:
+  cube.subdivide(5);
+  // Get center XY plane (layer 2 for n=5)
+  auto xy_plane = cube.getPlane(2, 2);
+  std::cout << xy_plane.size();         // Output: 25 (5×5)
+  
+  for (const SubCell& cell : xy_plane) {
+    std::cout << cell.center << std::endl;
+  }
+
+LAYER CALCULATION:
+  For logical coordinate L and subdivision n:
+  Physical layer = n/2 + L
+)" << std::endl;
+
+        } else if (method_name == "getPlaneFacets") {
+            std::cout << R"(
+METHOD: FacetBox getPlaneFacets(int axis, int layer) const
+        FacetBox getPlaneFacets(const std::string& coord1, coord2, coord3) const
+
+DESCRIPTION:
+  Generate triangular faces for all subcells in a 2D plane.
+
+NUMERIC VERSION PARAMETERS:
+  axis  - Plane orientation (0=YZ, 1=XZ, 2=XY)
+  layer - Physical layer index [0, n)
+
+STRING VERSION PARAMETERS:  
+  coord1,coord2,coord3 - Two axis names ("x","y","z") + one numeric value
+
+RETURN VALUE:
+  FacetBox containing triangular faces from plane subcells
+
+EXAMPLES:
+  // Numeric interface
+  FacetBox xy_faces = cube.getPlaneFacets(2, 2);     // Center XY plane
+  
+  // String interface (more intuitive)
+  FacetBox center_xy = cube.getPlaneFacets("x", "y", "0");
+  FacetBox upper_xz = cube.getPlaneFacets("x", "1", "z");
+  FacetBox right_yz = cube.getPlaneFacets("2", "y", "z");
+
+FACE COUNT:
+  n² subcells × 12 triangular faces per subcell = n² × 12 total
+
+USAGE:
+  renderer.drawFacets(cube.getPlaneFacets("x", "y", "0"));
+)" << std::endl;
+
+        } else if (method_name == "getCheckerboardFacets") {
+            std::cout << R"(
+METHOD: FacetBox getCheckerboardFacets() const
+
+DESCRIPTION:
+  Generate triangular faces for subcells in 3D checkerboard pattern.
+
+PARAMETERS:
+  None
+
+RETURN VALUE:
+  FacetBox containing triangular faces from pattern subcells
+
+PATTERN RULE:
+  Selects subcells where (i+j+k) % 4 == 0 using physical coordinates
+  Results in ~25% of subcells in spatially distributed pattern
+
+EXAMPLE:
+  cube.subdivide(8);
+  FacetBox all_faces = cube.getFacets();            // All subcells
+  FacetBox checker_faces = cube.getCheckerboardFacets(); // ~25% of subcells
+  
+  std::cout << "Reduction: " << checker_faces.size() 
+            << "/" << all_faces.size() << std::endl;
+
+USE CASES:
+  • Performance testing with reduced geometry
+  • Level-of-detail rendering for distant objects  
+  • Visual effects with alternating patterns
+  • Sampling and statistical analysis
+
+PERFORMANCE:
+  Roughly 4× faster rendering due to 25% face count reduction
+)" << std::endl;
+        } else {
+            std::cout << "❌ No specific help available for method: " << method_name << std::endl;
+        }
+    }
+
+This help system provides:
+Key Features:
+
+    Comprehensive Coverage: Every method, constructor, and concept explained
+    Categorized Organization: Methods grouped by functionality (constructors, basic ops, subdivision, etc.)
+    Usage Examples: Practical code examples for each method
+    Visual Diagrams: ASCII art showing coordinate systems, patterns, and structures
+    Error Guidance: Common exceptions and how to avoid them
+    Performance Notes: Complexity analysis and optimization tips
+
+Usage Examples:
+
+// Get general help
+cube.help();
+
+// Get category help  
+cube.help("constructors");
+cube.help("subdivision");
+cube.help("coordinates");
+
+// Get specific method help
+cube.help("subdivide");
+cube.help("getSubCell");
+cube.help("updateSubCellVertex");
+
+// Case-insensitive and flexible
+cube.help("SUBDIVISION");
+cube.help("coords");
+cube.help("facets");
+

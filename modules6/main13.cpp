@@ -33,6 +33,15 @@ double rad = 5.0;
 // Glass transparency toggle
 bool g_glassMode = false;
 
+// Fisheye camera parameters
+static bool g_fisheyeMode = false;
+static float g_fisheyeStrength = 1.0f;  // 0.0 = normal, 2.0 = extreme fisheye
+
+// Surface proximity and collision detection
+static float g_minDistanceToSurface = 0.1f;
+static float g_surfaceZoomFactor = 1.0f;
+static bool g_enableSurfaceZoom = true;
+
 // UI state for plane selection
 int g_currentOrientation = 0;  // 0=XY, 1=YZ, 2=XZ
 int g_currentLayer = 4;        // Current layer within the selected orientation
@@ -105,6 +114,17 @@ FacetBox selected_subcells;  // Selective rendering demo
 
 double ra = 0.0;
 Vector3D ce = Vector3D{0,0,0};
+
+//==============================================================================
+// Camera Collision Detection Structure
+//==============================================================================
+struct CameraCollision {
+    Vector3D position;
+    Vector3D direction;
+    float distance;
+    bool hasCollision;
+    Vector3D normal;
+};
 
 //==============================================================================
 // OPTION A: Real-Time Multi-Reflection System
@@ -235,7 +255,6 @@ Color hsv2rgb(float h, float s, float v) {
     }
 }
 
-
 // Subdivide each triangle in `initial` n times, returning only the final mesh.
 FacetBox refine(const FacetBox& initial, int n) {
     FacetBox curr = initial;
@@ -254,6 +273,176 @@ FacetBox refine(const FacetBox& initial, int n) {
     return curr;  // only the final, fully-refined mesh
 }
 
+//==============================================================================
+// Fisheye Camera Functions
+//==============================================================================
+
+//-----------------------------------------------------------------------------
+// Apply fisheye distortion projection
+//-----------------------------------------------------------------------------
+void applyFisheyeProjection(int w, int h) {
+    if (!g_fisheyeMode) {
+        // Standard perspective projection
+        gluPerspective(50.0, (double)w/h, 0.1, 1000.0);
+        return;
+    }
+    
+    // Custom fisheye projection matrix
+    glLoadIdentity();
+    
+    float aspect = (float)w / h;
+    float baseFov = 50.0f;
+    
+    // Fisheye parameters - increase FOV dramatically for fisheye effect
+    float fisheyeFactor = 1.0f + g_fisheyeStrength * 2.5f;  // 1.0 to 3.5
+    float fisheyeFov = baseFov * fisheyeFactor;
+    
+    // Clamp to reasonable values (but allow wide angles)
+    fisheyeFov = fminf(fisheyeFov, 170.0f);
+    
+    // Apply perspective with fisheye FOV
+    gluPerspective(fisheyeFov, aspect, 0.05, 1000.0);
+    
+    // Apply additional barrel distortion matrix
+    if (g_fisheyeStrength > 0.1f) {
+        GLfloat distortionMatrix[16] = {
+            1.0f - g_fisheyeStrength * 0.2f, 0, 0, 0,
+            0, 1.0f - g_fisheyeStrength * 0.2f, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        glMultMatrixf(distortionMatrix);
+    }
+}
+
+//==============================================================================
+// Surface Collision Detection and Zoom
+//==============================================================================
+
+//-----------------------------------------------------------------------------
+// Check collision with all cube faces
+//-----------------------------------------------------------------------------
+CameraCollision checkCameraCollision(const Vector3D& cameraPos, const Vector3D& cameraDir) {
+    CameraCollision result;
+    result.hasCollision = false;
+    result.distance = 1000.0f;
+    
+    // Check collision with main cubes
+    std::vector<FacetBox*> cubes = {&cube_facets_2, &cube_facets_3};
+    
+    for (auto* cubeBox : cubes) {
+        if (cubeBox->size() == 0) continue;
+        
+        for (size_t i = 0; i < cubeBox->size(); ++i) {
+            const Facet& face = (*cubeBox)[i];
+            
+            // Ray-triangle intersection test
+            Vector3D v0 = face[0];
+            Vector3D v1 = face[1]; 
+            Vector3D v2 = face[2];
+            
+            // Calculate triangle normal
+            Vector3D edge1 = v1 - v0;
+            Vector3D edge2 = v2 - v0;
+            Vector3D normal = edge1 % edge2;
+            
+            // Normalize normal if not zero
+            float normalLength = abs(normal);
+            if (normalLength < 1e-6) continue;
+            normal = normal / normalLength;
+            
+            // Ray-plane intersection
+            float denom = normal * cameraDir;
+            if (fabs(denom) < 1e-6) continue; // Ray parallel to plane
+            
+            Vector3D p0l0 = v0 - cameraPos;
+            float t = (p0l0*normal) / denom;
+            
+            if (t < 0.01f) continue; // Intersection too close or behind camera
+            
+            // Point of intersection
+            Vector3D intersectionPoint = cameraPos + cameraDir * t;
+            
+            // Check if point is inside triangle (barycentric coordinates)
+            Vector3D v0v1 = v1 - v0;
+            Vector3D v0v2 = v2 - v0;
+            Vector3D v0p = intersectionPoint - v0;
+            
+            float dot00 = v0v2*v0v2;
+            float dot01 = v0v2*v0v1;
+            float dot02 = v0v2*v0p;
+            float dot11 = v0v1*v0v1;
+            float dot12 = v0v1*v0p;
+            
+            float invDenom = 1.0f / (dot00 * dot11 - dot01 * dot01);
+            if (fabs(invDenom) > 1e6) continue; // Degenerate triangle
+            
+            float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+            float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+            
+            if (u >= -0.1f && v >= -0.1f && u + v <= 1.1f) {
+                // We have a collision (with small tolerance)
+                if (t < result.distance) {
+                    result.hasCollision = true;
+                    result.distance = t;
+                    result.position = intersectionPoint;
+                    result.normal = normal;
+                    result.direction = cameraDir;
+                }
+            }
+        }
+    }
+    
+    return result;
+}
+
+//-----------------------------------------------------------------------------
+// Calculate surface zoom based on proximity
+//-----------------------------------------------------------------------------
+float calculateSurfaceZoom() {
+    static float g_angleX = 20.0f, g_angleY = -30.0f;
+    if (!g_enableSurfaceZoom) return 1.0f;
+    
+    // Calculate camera direction based on current rotation
+    float radX = g_angleX * M_PI / 180.0f;
+    float radY = g_angleY * M_PI / 180.0f;
+    
+    // Camera looks down negative Z in view space
+    Vector3D cameraDir(
+        sin(radY) * cos(radX),
+        -sin(radX),
+        -cos(radY) * cos(radX)
+    );
+   
+   static float g_zoom   = 1.0f;
+    // Camera position in world space (approximate)
+    Vector3D cameraPos(0, 0, 5.0f * g_zoom);
+    
+    // Apply rotation to camera position
+    float cosX = cos(radX), sinX = sin(radX);
+    float cosY = cos(radY), sinY = sin(radY);
+    
+    Vector3D rotatedCameraPos(
+        cameraPos.x() * cosY + cameraPos.z() * sinY,
+        cameraPos.x() * sinX * sinY + cameraPos.y() * cosX - cameraPos.z() * sinX * cosY,
+        -cameraPos.x() * cosX * sinY + cameraPos.y() * sinX + cameraPos.z() * cosX * cosY
+    );
+    
+    CameraCollision collision = checkCameraCollision(rotatedCameraPos, cameraDir);
+    
+    if (collision.hasCollision && collision.distance < 8.0f) {
+        // Calculate zoom factor based on distance
+        float normalizedDistance = collision.distance / 8.0f; // Normalize to 0-1
+        normalizedDistance = fmaxf(0.05f, normalizedDistance); // Prevent division by zero
+        
+        // Smooth zoom curve - more aggressive zoom as we get closer
+        float zoomFactor = 1.0f + (1.0f - normalizedDistance * normalizedDistance) * 4.0f;
+        
+        return fminf(zoomFactor, 8.0f); // Cap maximum zoom
+    }
+    
+    return 1.0f;
+}
 
 void Setup() {
 
@@ -285,7 +474,7 @@ void Setup() {
         cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠄⠋⠫⠯⣍⢻⣿⣿⣷⣕⣵⣹⣽⣿⣷⣇⡏⣿⡿⣍⡝⠵⠯⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
         cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠠⠁⠋⢣⠓⡍⣫⠹⣿⣿⣷⡿⠯⠺⠁⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
         cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠋⢀⠋⢈⡿⠿⠁⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "                                     ~[Cube Class Example]\n\n";
+        cout << "                              ~[Cube Class Example - Enhanced Camera]\n\n";
         
         // ==================== CUBE SETUP ====================
         // cube2: Subdivided cube with 96 triangles
@@ -324,9 +513,6 @@ void Setup() {
             cout << "  Triangulation refreshed\n";
         }
 
-
-
-
         if (cube4.hasSubdivision()) {                                                                                                                                                   
             int n = cube4.getSubdivisionLevels();
             int center = n / 2;
@@ -350,9 +536,6 @@ void Setup() {
             cube4.refreshTriangulation();                                                                                                                                               
             cout << "  Triangulation refreshed\n";
         }
-
-        
-
 
         if (cube5.hasSubdivision()) {
             int n = cube5.getSubdivisionLevels();
@@ -378,8 +561,6 @@ void Setup() {
             cout << "  Triangulation refreshed\n";
         }
 
-
-
         if (cube6.hasSubdivision()) {                                                                                                                                                   
             int n = cube6.getSubdivisionLevels();
             int center = n / 2;
@@ -403,8 +584,6 @@ void Setup() {
             cube6.refreshTriangulation();                                                                                                                                               
             cout << "  Triangulation refreshed\n";
         }
-
-
 
         if (cube7.hasSubdivision()) {
             int n = cube7.getSubdivisionLevels();
@@ -431,7 +610,6 @@ void Setup() {
         }
 
     }
-
 }
 
 ///////////////////     DRAW       ///////////////////////
@@ -475,13 +653,11 @@ void Draw() {
 	}
 }
 
-
 void ProcessingProto() {
 	//extern void Setup();  // your existing setup
     //Setup();
 	Draw();
 }
-
 
 //-----------------------------------------------------------------------------
 // Utility: draw a small sphere (GLUT) at a 3D position
@@ -552,7 +728,6 @@ void drawLine(const Vector3D& a, const Vector3D& b) {
         glVertex3f(b.x(), b.y(), b.z());
         glEnd();
 }
-
 
 void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
 
@@ -691,47 +866,6 @@ void drawText3D(const Vector3D& pos, const char* text) {
     glPopAttrib();
 }
 
-
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-
 //////////////////////////////////////
 //                                  //
 //                                  //
@@ -776,7 +910,7 @@ int main(int argc, char** argv)
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(720, 720);
-    glutCreateWindow(" JAZ 4D   U.U ");
+    glutCreateWindow(" JAZ 4D Enhanced Camera U.U ");
 
     // Enable smoothing & blending by default
     ProcessMenu(1);
@@ -836,33 +970,40 @@ void initGL()
 }
 
 //-----------------------------------------------------------------------------
-// Handle window size changes
+// Handle window size changes with fisheye support
 //-----------------------------------------------------------------------------
 void reshape(int w, int h)
 {
-    glViewport(0,0,w,h);
+    glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(50.0, (double)w/h, 0.5, 1000.0);
+    
+    // Apply fisheye projection
+    applyFisheyeProjection(w, h);
+    
     glMatrixMode(GL_MODELVIEW);
 }
 
 //-----------------------------------------------------------------------------
-// Draw help overlay
+// Draw help overlay with new controls
 //-----------------------------------------------------------------------------
 void drawHUD() {
     if (!g_showHelp) return;
     const char* lines[] = {
         "L-drag: Rotate",
-        "M-drag: Pan",
+        "M-drag: Pan", 
         "R-drag/Wheel: Zoom",
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
+        "[F]: Toggle Fisheye Mode",
+        "[/]: Fisheye Strength -/+",
+        "[S]: Toggle Surface Zoom",
         "[O]: Cycle Orientation (XY/YZ/XZ)",
         "[+/-]: Change Layer",
         "[R]: Toggle Reflection",
         "Right-click: UI Menu"
     };
+    
     glMatrixMode(GL_PROJECTION); glPushMatrix();
     glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
@@ -905,22 +1046,49 @@ void drawHUD() {
     for(const char* c=refParams; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
 
+    // Add fisheye status
+    if (g_fisheyeMode) {
+        y -= 0.05f;
+        char fisheyeStatus[100];
+        sprintf(fisheyeStatus, "Fisheye: ON (Strength: %.1f)", g_fisheyeStrength);
+        glColor3f(0.2f, 0.2f, 0.8f);  // Blue color for fisheye
+        glRasterPos2f(0.02f, y);
+        for(const char* c=fisheyeStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+    
+    // Add surface zoom status
+    if (g_enableSurfaceZoom && g_surfaceZoomFactor > 1.01f) {
+        y -= 0.05f;
+        char zoomStatus[100];
+        sprintf(zoomStatus, "Surface Zoom: %.1fx", g_surfaceZoomFactor);
+        glColor3f(0.8f, 0.5f, 0.0f);  // Orange color for zoom
+        glRasterPos2f(0.02f, y);
+        for(const char* c=zoomStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
 }
 
 //-----------------------------------------------------------------------------
-// Main display: apply interactive camera, then draw
+// Main display with surface zoom and fisheye
 //-----------------------------------------------------------------------------
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    /* - Camera: pan, zoom, rotate*/
-    // Move back and zoom
-    glTranslatef(0, 0, -5.0f * g_zoom);
+    // Calculate surface zoom factor
+    g_surfaceZoomFactor = calculateSurfaceZoom();
+    
+    // Apply surface zoom to the base zoom
+    float effectiveZoom = g_zoom / g_surfaceZoomFactor;
+    
+    // Move back and zoom (with surface zoom effect)
+    glTranslatef(g_panX, g_panY, -5.0f * effectiveZoom);
 
     // Apply rotations
     glRotatef(g_angleX, 1, 0, 0);
@@ -928,7 +1096,6 @@ void display()
 
     // Draw axes at origin
     drawAxes(10.0f);
-
 
     ProcessingProto();   // calls Setup() then Draw()
 
@@ -939,8 +1106,6 @@ void display()
     
     glutSwapBuffers();
 }
-
-
 
 //-----------------------------------------------------------------------------
 // Mouse button: track left/middle/right for rotate/pan/zoom, handle wheel
@@ -966,7 +1131,6 @@ void mouseButton(int button, int state, int x, int y)
     }
     g_lastX = x; g_lastY = y;
 }
-
 
 //-----------------------------------------------------------------------------
 // Mouse drag: update angles/pan/zoom
@@ -996,7 +1160,7 @@ void mouseMotion(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
-// Keyboard handler for glass mode toggle
+// Keyboard handler with fisheye and surface zoom controls
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
@@ -1006,9 +1170,45 @@ void keyboard(unsigned char key, int x, int y) {
             printf("Glass mode: %s\n", g_glassMode ? "ON" : "OFF");
             glutPostRedisplay();
             break;
+            
         case 'h':
         case 'H':
             g_showHelp = !g_showHelp;
+            glutPostRedisplay();
+            break;
+
+        // Fisheye controls
+        case 'f':
+        case 'F':
+            g_fisheyeMode = !g_fisheyeMode;
+            printf("Fisheye mode: %s\n", g_fisheyeMode ? "ON" : "OFF");
+            reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            glutPostRedisplay();
+            break;
+            
+        case '[':
+            g_fisheyeStrength = fmaxf(0.0f, g_fisheyeStrength - 0.1f);
+            printf("Fisheye strength: %.1f\n", g_fisheyeStrength);
+            if (g_fisheyeMode) {
+                reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            }
+            glutPostRedisplay();
+            break;
+            
+        case ']':
+            g_fisheyeStrength = fminf(2.0f, g_fisheyeStrength + 0.1f);
+            printf("Fisheye strength: %.1f\n", g_fisheyeStrength);
+            if (g_fisheyeMode) {
+                reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            }
+            glutPostRedisplay();
+            break;
+            
+        // Surface zoom control
+        case 's':
+        case 'S':
+            g_enableSurfaceZoom = !g_enableSurfaceZoom;
+            printf("Surface zoom: %s\n", g_enableSurfaceZoom ? "ON" : "OFF");
             glutPostRedisplay();
             break;
 
@@ -1055,7 +1255,9 @@ void keyboard(unsigned char key, int x, int y) {
 void MenuHandler(int choice) {
     switch(choice) {
         case 1: g_showHelp = !g_showHelp; break;       // toggle HUD
-        case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; break; // reset
+        case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; 
+                g_fisheyeMode=false; g_fisheyeStrength=1.0f; 
+                g_enableSurfaceZoom=true; break; // reset
         case 3: exit(0); break;                      // quit
     }
     glutPostRedisplay();
@@ -1091,4 +1293,3 @@ void ProcessMenu(int value)
     }
     glutPostRedisplay();
 }
-
