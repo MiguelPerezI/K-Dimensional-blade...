@@ -84,7 +84,7 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 // ==================== CUBE INSTANCES ====================
-int N = 12; // Number of subdivision levels
+int N = 20; // Number of subdivision levels
 double cube_dim = 2.0;
 // Basic cube: radius=1.0 (side length=2.0), positioned right of center
 // This creates a simple cube with 12 triangular faces (2 triangles per face × 6 faces)
@@ -428,6 +428,26 @@ public:
         return cubes.size();
     }
 
+    /**
+     * @brief Export all managed cubes to a single STL file.
+     * 
+     * Writes all cubes in the manager's collection to one STL file,
+     * creating a unified model suitable for 3D printing or visualization.
+     * 
+     * @param filename Path to output STL file.
+     * @param objectName Custom name for the STL object (default: "CubeCollection").
+     */
+    void exportToSTL(const std::string& filename, const std::string& objectName = "CubeCollection") const {
+        if (cubes.empty()) {
+            throw std::runtime_error("CubeManager::exportToSTL: No cubes to export");
+        }
+        
+        // Use the static method from Cube class
+        Cube::writeMultiSTL(filename, cubes, objectName);
+        
+        std::cout << "Exported " << cubes.size() << " cubes to " << filename << std::endl;
+    }
+
 };
 
 // Global cube manager
@@ -485,7 +505,9 @@ void Setup() {
     }
         // Initialize all cubes
         g_cubeManager.initializeCubes();
-
+        
+        cout << "\nWriting cubes to STL\n";
+        g_cubeManager.exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
     }
 }
 

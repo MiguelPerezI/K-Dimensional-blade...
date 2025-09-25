@@ -401,6 +401,107 @@ public:
         return facets_;  // Direct access to internal triangular face storage
     }
 
+    /**
+     * @brief Write cube geometry to STL file format for 3D printing or CAD applications.
+     *
+     * Exports all triangular faces of the cube (basic or subdivided) to an STL file.
+     * The STL format stores triangular mesh data with surface normals, making it
+     * suitable for 3D printing, CAD software, and mesh processing applications.
+     * Only active subcells are included in subdivided cubes.
+     *
+     * @param filename Path to output STL file (will be created or overwritten).
+     * @throws std::runtime_error if file cannot be created or written.
+     */
+    void writeSTL(const std::string& filename) const {
+        std::ofstream stl(filename);  // Create output file stream
+        if (!stl.is_open()) {  // Validate file was successfully opened
+            throw std::runtime_error("Cube::writeSTL: Cannot create file " + filename);
+        }
+    
+        stl << "solid Cube\n";  // STL header with object name
+    
+        // Write all triangular faces from the cube's facet collection
+        for (size_t i = 0; i < facets_.size(); ++i) {
+            const Facet& face = facets_[i];  // Get current triangular face
+    
+            // Extract the three vertices from the facet using operator[]
+            Vector3D v1 = face[0];  // Vertex A (index 0)
+            Vector3D v2 = face[1];  // Vertex B (index 1)
+            Vector3D v3 = face[2];  // Vertex C (index 2)
+    
+            // Get the precomputed normal or calculate it
+            Vector3D normal = face.getNormal();  // Use the stored normal
+    
+            // Write STL facet in standard format
+            stl << "facet normal ";
+            stl << std::scientific << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+    
+        stl << "endsolid Cube\n";  // STL footer
+        stl.close();  // Ensure file is properly closed
+    }
+
+    /**
+     * @brief Write multiple cube geometries to a single STL file.
+     * 
+     * Exports all triangular faces from a collection of cubes into one STL file.
+     * This is useful for creating complex multi-cube models, architectural structures,
+     * or batch processing of cube collections for 3D printing applications.
+     * 
+     * @param filename Path to output STL file (will be created or overwritten).
+     * @param cubes Vector of cube objects to include in the STL file.
+     * @param objectName Name to use in STL header (default: "MultiCube").
+     * @throws std::runtime_error if file cannot be created or written.
+     */
+    static void writeMultiSTL(const std::string& filename, 
+                             const std::vector<Cube>& cubes, 
+                             const std::string& objectName = "MultiCube") {
+        std::ofstream stl(filename);  // Create output file stream
+        if (!stl.is_open()) {  // Validate file was successfully opened
+            throw std::runtime_error("Cube::writeMultiSTL: Cannot create file " + filename);
+        }
+        
+        stl << "solid " << objectName << "\n";  // STL header with custom object name
+        
+        // Write all triangular faces from each cube in the collection
+        for (size_t cubeIndex = 0; cubeIndex < cubes.size(); ++cubeIndex) {
+            const Cube& cube = cubes[cubeIndex];  // Get current cube
+            
+            // Process all faces in this cube
+            for (size_t i = 0; i < cube.facets_.size(); ++i) {
+                const Facet& face = cube.facets_[i];  // Get current triangular face
+                
+                // Extract the three vertices from the facet using operator[]
+                Vector3D v1 = face[0];  // Vertex A (index 0)
+                Vector3D v2 = face[1];  // Vertex B (index 1)
+                Vector3D v3 = face[2];  // Vertex C (index 2)
+                
+                // Get the precomputed normal
+                Vector3D normal = face.getNormal();  // Use the stored normal
+                
+                // Write STL facet in standard format
+                stl << "facet normal ";
+                stl << std::scientific << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+                stl << "\touter loop\n";
+                stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+                stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+                stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+                stl << "\tendloop\n";
+                stl << "endfacet\n";
+            }
+        }
+        
+        stl << "endsolid " << objectName << "\n";  // STL footer
+        stl.close();  // Ensure file is properly closed
+    }
+
+
     /* === SUBDIVISION OPERATIONS === */
     
     /**
@@ -1009,6 +1110,7 @@ public:
     void setSubCellActive(int x, int y, int z, bool active) {
         getSubCellMutable(x, y, z).active = active;  // Set the active/inactive state flag
     }
+
 
 private:
     // === CORE DATA MEMBERS ===
