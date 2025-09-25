@@ -84,6 +84,8 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 // ==================== CUBE INSTANCES ====================
+int N = 12; // Number of subdivision levels
+double cube_dim = 2.0;
 // Basic cube: radius=1.0 (side length=2.0), positioned right of center
 // This creates a simple cube with 12 triangular faces (2 triangles per face × 6 faces)
 Cube cube1(1.0, Vector3D{2.5,0,0});
@@ -91,14 +93,21 @@ Cube cube1(1.0, Vector3D{2.5,0,0});
 // Subdivided cube: radius=0.8, positioned left of center, with 2 subdivision levels
 // This creates 2³=8 subcubes, each triangulated with regular 12 triangle mesh
 // Total faces: 8 subcubes × 12 triangular faces = 96 triangles
-Cube cube2(1.6, Vector3D{0,0,0}, 8);
+Cube cube2(cube_dim, Vector3D{0,0,0}, N);
 
-// Demonstration cube for advanced subdivision features
-Cube cube3(1.6, Vector3D{0,0,0}, 8);  // 3³=27 subcells for detailed examples
-Cube cube4(1.6, Vector3D{0,0,0}, 8);
-Cube cube5(1.6, Vector3D{0,0,0}, 8);
-Cube cube6(1.6, Vector3D{0,0,0}, 8);
-Cube cube7(1.6, Vector3D{0,0,0}, 8);
+// Define a Cube Configuration Structure
+struct CubeConfig {
+    double radius;
+    Vector3D position;
+    int subdivisionLevels;
+    Vector3D transformCenter;  // For sigma transformation
+    double transformRadius;    // For sigma transformation
+    
+    // Constructor for easy initialization
+    CubeConfig(double r, Vector3D pos, int subdiv, Vector3D tCenter, double tRadius)
+        : radius(r), position(pos), subdivisionLevels(subdiv), 
+          transformCenter(tCenter), transformRadius(tRadius) {}
+};
 
 // ==================== FACET STORAGE ====================
 // Storage for cube triangle collections
@@ -107,13 +116,13 @@ FacetBox cube_facets_2;  // Subdivided cube triangulation
 FacetBox cube_facets_3;  // Advanced subdivision demos
 
 // Advanced subdivision control demos
-FacetBox single_subcell;     // Single subcell rendering demo
+//FacetBox single_subcell;     // Single subcell rendering demo
 FacetBox plane_subcells;     // Plane rendering demo
-FacetBox plane_subcells_2;
-FacetBox selected_subcells;  // Selective rendering demo
+//FacetBox plane_subcells_2;
+//FacetBox selected_subcells;  // Selective rendering demo
 
-double ra = 0.0;
-Vector3D ce = Vector3D{0,0,0};
+//double ra = 0.0;
+//Vector3D ce = Vector3D{0,0,0};
 
 //==============================================================================
 // Camera Collision Detection Structure
@@ -127,109 +136,42 @@ struct CameraCollision {
 };
 
 //==============================================================================
-// OPTION A: Real-Time Multi-Reflection System
-//==============================================================================
-class ReflectionManager {
-public:
-    struct ReflectionPoint {
-        Vector3D center;
-        double radius;
-        bool active = true;
-
-        ReflectionPoint(const Vector3D& c, double r) : center(c), radius(r) {}
-    };
-
-    std::vector<ReflectionPoint> reflection_points;
-
-    void addReflectionPoint(const Vector3D& center, double radius) {
-        reflection_points.emplace_back(center, radius);
-    }
-
-    void clearReflectionPoints() {
-        reflection_points.clear();
-    }
-
-    // Generate reflected cube facets on-the-fly for rendering
-    FacetBox getReflectedCubeFacets(const Cube& original, int reflection_index) {
-        if (reflection_index < 0 || reflection_index >= reflection_points.size()) {
-            return FacetBox(); // Return empty
-        }
-
-        const auto& rp = reflection_points[reflection_index];
-        if (!rp.active) {
-            return FacetBox(); // Return empty if disabled
-        }
-
-        FacetBox reflected_facets;
-        const FacetBox& original_facets = original.getFacets();
-
-        try {
-            for (size_t i = 0; i < original_facets.size(); ++i) {
-                const Facet& face = original_facets[i];
-
-                // Reflect each vertex of the triangle
-                Vector3D v0 = sigma(face[0], rp.center, rp.radius);
-                Vector3D v1 = sigma(face[1], rp.center, rp.radius);
-                Vector3D v2 = sigma(face[2], rp.center, rp.radius);
-
-                reflected_facets.push(v0, v1, v2);
-            }
-        } catch (const std::runtime_error& e) {
-            // Skip reflections that fail (e.g., point at sphere center)
-            std::cerr << "Reflection warning: " << e.what() << std::endl;
-        }
-
-        return reflected_facets;
-    }
-
-    void setReflectionActive(int index, bool active) {
-        if (index >= 0 && index < reflection_points.size()) {
-            reflection_points[index].active = active;
-        }
-    }
-};
-
-//==============================================================================
 // Simple Cube Reflection Function
 //==============================================================================
 
 /**
  * @brief Reflect a subdivided cube using checkboard pattern (i+j+k)%2
- * @param source_cube The cube to reflect
- * @param reflection_center Center of the reflection sphere
- * @param reflection_radius Radius of the reflection sphere
- * @returns FacetBox containing reflected triangles from checkboard subcells
+ * @param cube Target cube to modify and update
+ * @param center Center of the reflection sphere
+ * @param radius Radius of the reflection sphere
+ * @returns void
  */
-void reflectCubeWithCheckboard(Cube& source_cube, const Vector3D& reflection_center, double reflection_radius) {
-    FacetBox reflected_facets;
-
-    if (!source_cube.hasSubdivision()) {
-
-        int n =source_cube.getSubdivisionLevels();
-        for (int i = 0; i < n; i++) 
-        for (int j = 0; j < n; j++) 
-        for (int k = 0; k < n; k++) {
-        
-            for (int l = 0; l < 8; l++) {
-                Vector3D v_p = source_cube.getSubCell(i, j, k).vertices[l];
-        
-                // Move it upward by 0.2 units
-                Vector3D new_pos = sigma(v_p, reflection_center, reflection_radius);
-                source_cube.updateSubCellVertex(i, j, k, l, new_pos);
-            }
-        
-            //cout << "  Moved vertex  of subcell (0,0,0) from " << original_pos << " to " << new_pos << "\n";
-        }
-        // Refresh triangulation
-        source_cube.refreshTriangulation();
-        //cube_facets_3 = cube3.getFacets();  // Update facets
-        //plane_subcells = cube3.getPlaneFacets(2, 4);
-        //cout << "  Triangulation refreshed\n";
+void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double radius) {
+    if (!cube.hasSubdivision()) {
+        return;
     }
+    
+    int n = cube.getSubdivisionLevels();
+    int centerIdx = n / 2;
+    
+    // Apply transformation to all vertices
+    for (int i = -centerIdx; i < centerIdx; i++) {
+        for (int j = -centerIdx; j < centerIdx; j++) {
+            for (int k = -centerIdx; k < centerIdx; k++) {
+                for (int l = 0; l < 8; l++) {
+                    Vector3D v_p = cube.getSubCell(i, j, k).vertices[l];
+                    Vector3D new_pos = sigma(v_p, center, radius);
+                    cube.updateSubCellVertex(i, j, k, l, new_pos);
+                }
+            }
+        }
+    }
+    
+    // Refresh triangulation
+    cube.refreshTriangulation();
+    cout << "  Triangulation refreshed for cube\n";
 }
 
-// Global instances
-ReflectionManager g_reflectionManager;
 
 // Global reflection parameters for simple approach
 Vector3D g_reflection_center{0, 0, 0};
@@ -256,22 +198,22 @@ Color hsv2rgb(float h, float s, float v) {
 }
 
 // Subdivide each triangle in `initial` n times, returning only the final mesh.
-FacetBox refine(const FacetBox& initial, int n) {
-    FacetBox curr = initial;
-    FacetBox next;
-
-    for (int pass = 0; pass < n; ++pass) {
-        next.clear();  // throw away last level
-        for (size_t i = 0; i < curr.size(); ++i) {
-            // fromFacet() returns 3 new sub-triangles around the centroid
-            FacetBox tiny = FacetBox::fromFacet(curr[i]);
-            next += tiny;  // append those three
-        }
-        std::swap(curr, next);
-    }
-
-    return curr;  // only the final, fully-refined mesh
-}
+//FacetBox refine(const FacetBox& initial, int n) {
+//    FacetBox curr = initial;
+//    FacetBox next;
+//
+//    for (int pass = 0; pass < n; ++pass) {
+//        next.clear();  // throw away last level
+//        for (size_t i = 0; i < curr.size(); ++i) {
+//            // fromFacet() returns 3 new sub-triangles around the centroid
+//            FacetBox tiny = FacetBox::fromFacet(curr[i]);
+//            next += tiny;  // append those three
+//        }
+//        std::swap(curr, next);
+//    }
+//
+//    return curr;  // only the final, fully-refined mesh
+//}
 
 //==============================================================================
 // Fisheye Camera Functions
@@ -444,6 +386,52 @@ float calculateSurfaceZoom() {
     return 1.0f;
 }
 
+//Create Dynamic Cube Management System
+
+class CubeManager {
+private:
+    std::vector<Cube> cubes;           // Dynamic array of cubes
+    std::vector<CubeConfig> configs;   // Configuration for each cube
+
+public:
+    // Add a cube configuration
+    void addCubeConfig(const CubeConfig& config) {
+        configs.push_back(config);
+    }
+
+    // Initialize all cubes based on configurations
+    void initializeCubes() {
+        cubes.clear();  // Clear existing cubes
+        cubes.reserve(configs.size());  // Pre-allocate memory for efficiency
+
+        for (const auto& config : configs) {
+            // Create cube with basic parameters
+            cubes.emplace_back(config.radius, config.position, config.subdivisionLevels);
+
+            // Apply sigma transformation
+            applySigmaTransformationToCube(cubes.back(), config.transformCenter, config.transformRadius);
+        }
+
+        std::cout << "Initialized " << cubes.size() << " cubes\n";
+    }
+
+    // Get cube by index
+    Cube& getCube(size_t index) {
+        if (index >= cubes.size()) {
+            throw std::out_of_range("Cube index out of range");
+        }
+        return cubes[index];
+    }
+
+    // Get number of cubes
+    size_t size() const {
+        return cubes.size();
+    }
+
+};
+
+// Global cube manager
+CubeManager g_cubeManager;
 void Setup() {
 
 	if (ciclo == 0) {
@@ -477,137 +465,26 @@ void Setup() {
         cout << "                              ~[Cube Class Example - Enhanced Camera]\n\n";
         
         // ==================== CUBE SETUP ====================
-        // cube2: Subdivided cube with 96 triangles
-        cube_facets_2 = cube2.getFacets();
-
-        // cube3: Advanced subdivision demos (3³ = 27 subcells)
-        cube_facets_3 = cube3.getFacets();
-
-        cout << "Cube 2 (subdivided): " << cube_facets_2.size() << " triangular faces\n";
-        cout << "Cube 3 (advanced): " << cube_facets_3.size() << " triangular faces\n";
-
         // ==================== ADVANCED SUBDIVISION DEMOS - Reflection of the subdivision in Spheres ====================
         cout << "\n--- Advanced Subdivision Control Demos ---\n";
         cout << "Demo 4: Vertex Manipulation\n";
-        if (cube3.hasSubdivision()) {
-            int n = cube3.getSubdivisionLevels();
-            int center = n / 2;
-            double ra = cube2.getSubcellRadius(0, 0, 0);
-            Vector3D ce = cube2.getSubcellCenter(0, 0, 0);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = -center; i < center; i++) 
-            for (int j = -center; j < center; j++) 
-            for (int k = -center; k < center; k++) {
+        // Configure cubes you want to create
+        
+        int n = cube2.getSubdivisionLevels();
+        int center = n / 2;                                                                                                                                                                                                               
+        // Get original position of vertex (l) in subcell (i,j,k)
+        for (int i = -center; i < center; i++) 
+        for (int j = -center; j < center; j++) 
+        for (int k = -center; k < center; k++) {
+            double radi = abs(Vector3D{(double)i, (double)j, (double)k});
 
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube3.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube3.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-            
-            }
-            // Refresh triangulation
-            cube3.refreshTriangulation();                                                                                                                                               
-            cout << "  Triangulation refreshed\n";
-        }
-
-        if (cube4.hasSubdivision()) {                                                                                                                                                   
-            int n = cube4.getSubdivisionLevels();
-            int center = n / 2;
-            double ra = cube2.getSubcellRadius(0, 0, 1);
-            Vector3D ce = cube2.getSubcellCenter(0, 0, 1);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = -center; i < center; i++) 
-            for (int j = -center; j < center; j++) 
-            for (int k = -center; k < center; k++) {
-
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube4.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube4.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-            
-            }
-            // Refresh triangulation
-            cube4.refreshTriangulation();                                                                                                                                               
-            cout << "  Triangulation refreshed\n";
-        }
-
-        if (cube5.hasSubdivision()) {
-            int n = cube5.getSubdivisionLevels();
-            int center = n / 2;
-            double ra = cube2.getSubcellRadius(0, 1, 0);
-            Vector3D ce = cube2.getSubcellCenter(0, 1, 0);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = -center; i < center; i++)
-            for (int j = -center; j < center; j++)
-            for (int k = -center; k < center; k++) {
-
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube5.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube5.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-
-            }
-            // Refresh triangulation
-            cube5.refreshTriangulation();
-            cout << "  Triangulation refreshed\n";
-        }
-
-        if (cube6.hasSubdivision()) {                                                                                                                                                   
-            int n = cube6.getSubdivisionLevels();
-            int center = n / 2;
-            double ra = cube2.getSubcellRadius(1, 0, 0);
-            Vector3D ce = cube2.getSubcellCenter(1, 0, 0);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = -center; i < center; i++) 
-            for (int j = -center; j < center; j++) 
-            for (int k = -center; k < center; k++) {
-
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube6.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube6.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-            
-            }
-            // Refresh triangulation
-            cube6.refreshTriangulation();                                                                                                                                               
-            cout << "  Triangulation refreshed\n";
-        }
-
-        if (cube7.hasSubdivision()) {
-            int n = cube7.getSubdivisionLevels();
-            int center = n / 2;
-            double ra = cube2.getSubcellRadius(1, 1, 1);
-            Vector3D ce = cube2.getSubcellCenter(1, 1, 1);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = -center; i < center; i++)
-            for (int j = -center; j < center; j++)
-            for (int k = -center; k < center; k++) {
-
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube7.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube7.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-
-            }
-            // Refresh triangulation
-            cube7.refreshTriangulation();
-            cout << "  Triangulation refreshed\n";
-        }
+            if (abs(radi) < 1.5)
+                g_cubeManager.addCubeConfig(CubeConfig(cube_dim, Vector3D{0,0,0}, N,
+                                                  cube2.getSubcellCenter(i,j,k),
+                                                  cube2.getSubcellRadius(i,j,k)));
+    }
+        // Initialize all cubes
+        g_cubeManager.initializeCubes();
 
     }
 }
@@ -620,35 +497,14 @@ void Draw() {
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/	
         //// ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
-        plane_subcells = cube3.getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
-        // Draw reflected cube using checkboard pattern
-        for (size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
+        for (size_t s = 0; s < g_cubeManager.size(); s++) {
+            plane_subcells = g_cubeManager.getCube(s).getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
+            // Draw reflected cube using checkboard pattern
+            for (size_t i = 0; i < plane_subcells.size(); ++i) {
+                drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
+            }
         }
 
-        plane_subcells = cube4.getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
-        // Draw reflected cube using checkboard pattern
-        for (size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
-        }
-
-        plane_subcells = cube5.getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
-        // Draw reflected cube using checkboard pattern
-        for (size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
-        }
-
-        plane_subcells = cube6.getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
-        // Draw reflected cube using checkboard pattern
-        for (size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
-        }
-
-        plane_subcells = cube7.getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
-        // Draw reflected cube using checkboard pattern
-        for (size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
-        }
 
 	}
 }
@@ -996,7 +852,7 @@ void drawHUD() {
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
         "[F]: Toggle Fisheye Mode",
-        "[/]: Fisheye Strength -/+",
+        "[[]: Fisheye Strength -/+",
         "[S]: Toggle Surface Zoom",
         "[O]: Cycle Orientation (XY/YZ/XZ)",
         "[+/-]: Change Layer",
@@ -1098,9 +954,6 @@ void display()
     drawAxes(10.0f);
 
     ProcessingProto();   // calls Setup() then Draw()
-
-    // Draw a test sphere to demonstrate glass effect
-    drawSphere(ce, ra, 16, 16);
 
     drawHUD();
     
