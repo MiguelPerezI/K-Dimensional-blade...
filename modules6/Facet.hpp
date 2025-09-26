@@ -69,6 +69,9 @@ class Facet {
     void applyHyperboloid();
     Facet hyperboloid() const;
 
+    /* Spherical inversion methods -------------------------------------------*/
+    void applySigma(const Vector3D& center, double radius);
+    Facet sigma(const Vector3D& center, double radius) const;
 };
 
 istream& operator >> (istream& is, Facet& a);

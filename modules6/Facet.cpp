@@ -168,3 +168,27 @@ void Facet::crunch(double t, const Vector3D& pivot)
     //    updateFacet will reset A, B, C and recompute the normal N.
     updateFacet(a, b, c);
 }
+
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Apply spherical inversion in-place
+/*——————————————————————————————————————————————————————————————————————————————*/
+void Facet::applySigma(const Vector3D& center, double radius)
+{
+    // Apply sigma to each vertex using the global Vector3D sigma function
+    Vector3D a_inverted = ::sigma(A.V(), center, radius);  // :: forces global scope
+    Vector3D b_inverted = ::sigma(B.V(), center, radius);
+    Vector3D c_inverted = ::sigma(C.V(), center, radius);
+
+    // Update the facet with inverted vertices
+    updateFacet(a_inverted, b_inverted, c_inverted);
+}
+
+/*——————————————————————————————————————————————————————————————————————————————*/
+// Return a new Facet with spherical inversion applied
+/*——————————————————————————————————————————————————————————————————————————————*/
+Facet Facet::sigma(const Vector3D& center, double radius) const
+{
+    Facet result = *this;
+    result.applySigma(center, radius);
+    return result;
+}

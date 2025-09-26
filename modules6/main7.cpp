@@ -735,7 +735,7 @@ void Setup() {
         FacetBox box_sum_3(dodec_3.getFacets());
 
         // Apply different subdivision algorithms
-        int levels = 4;  // Number of refinement iterations
+        int levels = 1;  // Number of refinement iterations
         
         // Centroid3: Subdivides each triangle into 3 using centroid
         box_out_0 = box_sum_0.refine(levels, FacetBox::SubdivisionMode::Centroid3);

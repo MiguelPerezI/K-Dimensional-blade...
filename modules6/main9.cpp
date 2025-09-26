@@ -139,10 +139,10 @@ void Setup() {
 
         box_out_0 = box_out_3.refine(1, FacetBox::SubdivisionMode::Midpoint4);
 
-        box_out_2 = box_out_0.refine(1, FacetBox::SubdivisionMode::Midpoint6);
+        //box_out_2 = box_out_0.refine(1, FacetBox::SubdivisionMode::Midpoint6);
 
         // 2) Mutate in-place: project every triangle into hyperbolic space
-        box_out_2.applyHyperboloid();
+        box_out_0.applyHyperboloid();
         // Now 'box_out_1' contains hyperolic-mapped facets
 
         // 3) Or, produce a new hyperbolic mesh without touching the original:
@@ -165,14 +165,14 @@ void Draw() {
         //drawSphere(f_1[2], 0.1f, 6, 6);
 
 
-        size_t total = box_out_2.size();      // e.g. 36*3
+        size_t total = box_out_0.size();      // e.g. 36*3
         for(size_t i = 0; i < total; ++i) {
             // pick hue from 0°→360° across the range
             float hue = float(i) / float(total) * 360.0f;
             Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
             // convert to 0–255 ints
             int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-            drawFacet(box_out_2[i], R, G, B, 1.0f);
+            drawFacet(box_out_0[i], R, G, B, 1.0f);
         }
 
 

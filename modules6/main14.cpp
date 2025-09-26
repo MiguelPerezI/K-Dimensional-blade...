@@ -33,10 +33,19 @@ double rad = 5.0;
 // Glass transparency toggle
 bool g_glassMode = false;
 
+// Fisheye camera parameters
+static bool g_fisheyeMode = false;
+static float g_fisheyeStrength = 1.0f;  // 0.0 = normal, 2.0 = extreme fisheye
+
+// Surface proximity and collision detection
+static float g_minDistanceToSurface = 0.1f;
+static float g_surfaceZoomFactor = 1.0f;
+static bool g_enableSurfaceZoom = true;
+
 // UI state for plane selection
 int g_currentOrientation = 0;  // 0=XY, 1=YZ, 2=XZ
 int g_currentLayer = 4;        // Current layer within the selected orientation
-int g_maxLayers = 16;          // Maximum layers available (matches cube3 subdivision)
+int g_maxLayers = 8;           // Maximum layers available (matches cube2/cube3 subdivision)
 
 //////////////////////////////////////
 //
@@ -69,36 +78,42 @@ void drawSphere(const Vector3D& pos, float radius, int slices, int stacks);
 void drawAxes(float length);
 void drawText3D(const Vector3D& pos, const char* text);
 
-Vector3D d_ui(1.0, 0.0, 0.0);
-Vector3D e_ui(0.0, 1.0, 0.0);
-Vector3D f_ui(0.0, 0.0, 1.0);
-Facet f_1(d_ui, e_ui, f_ui);
+//==============================================================================
+// Simple Cube Reflection Function
+//==============================================================================
 
-// ==================== CUBE INSTANCES ====================
-// Basic cube: radius=1.0 (side length=2.0), positioned right of center
-// This creates a simple cube with 12 triangular faces (2 triangles per face × 6 faces)
-Cube cube1(1.0, Vector3D{2.5,0,0});
-
-// Subdivided cube: radius=0.8, positioned left of center, with 2 subdivision levels
-// This creates 2³=8 subcubes, each triangulated with regular 12 triangle mesh
-// Total faces: 8 subcubes × 12 triangular faces = 96 triangles
-Cube cube2(1.6, Vector3D{0,0,0}, 8);
-
-// Demonstration cube for advanced subdivision features
-Cube cube3(1.6, Vector3D{0,0,0}, 8);  // 3³=27 subcells for detailed examples
-
-// ==================== FACET STORAGE ====================
-// Storage for cube triangle collections
-FacetBox cube_facets_1;  // Basic cube triangulation
-FacetBox cube_facets_2;  // Subdivided cube triangulation
-FacetBox cube_facets_3;  // Advanced subdivision demos
-
-// Advanced subdivision control demos
-FacetBox single_subcell;     // Single subcell rendering demo
-FacetBox plane_subcells;     // Plane rendering demo
-FacetBox plane_subcells_2;
-FacetBox selected_subcells;  // Selective rendering demo
-
+/**
+ * @brief Reflect a subdivided cube using checkboard pattern (i+j+k)%2
+ * @param cube Target cube to modify and update
+ * @param center Center of the reflection sphere
+ * @param radius Radius of the reflection sphere
+ * @returns void
+ */
+void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double radius) {
+    if (!cube.hasSubdivision()) {
+        return;
+    }
+    
+    int n = cube.getSubdivisionLevels();
+    int centerIdx = n / 2;
+    
+    // Apply transformation to all vertices
+    for (int i = -centerIdx; i < centerIdx; i++) {
+        for (int j = -centerIdx; j < centerIdx; j++) {
+            for (int k = -centerIdx; k < centerIdx; k++) {
+                for (int l = 0; l < 8; l++) {
+                    Vector3D v_p = cube.getSubCell(i, j, k).vertices[l];
+                    Vector3D new_pos = sigma(v_p, center, radius);
+                    cube.updateSubCellVertex(i, j, k, l, new_pos);
+                }
+            }
+        }
+    }
+    
+    // Refresh triangulation
+    cube.refreshTriangulation();
+    cout << "  Triangulation refreshed for cube\n";
+}
 
 // Helper: convert HSV→RGB (all in [0,1])                                                  
 struct Color { float r, g, b; };
@@ -119,160 +134,94 @@ Color hsv2rgb(float h, float s, float v) {
     }
 }
 
+//==============================================================================
+// Fisheye Camera Functions
+//==============================================================================
 
-// Subdivide each triangle in `initial` n times, returning only the final mesh.
-FacetBox refine(const FacetBox& initial, int n) {
-    FacetBox curr = initial;
-    FacetBox next;
-
-    for (int pass = 0; pass < n; ++pass) {
-        next.clear();  // throw away last level
-        for (size_t i = 0; i < curr.size(); ++i) {
-            // fromFacet() returns 3 new sub-triangles around the centroid
-            FacetBox tiny = FacetBox::fromFacet(curr[i]);
-            next += tiny;  // append those three
-        }
-        std::swap(curr, next);
+//-----------------------------------------------------------------------------
+// Apply fisheye distortion projection
+//-----------------------------------------------------------------------------
+void applyFisheyeProjection(int w, int h) {
+    if (!g_fisheyeMode) {
+        // Standard perspective projection
+        gluPerspective(50.0, (double)w/h, 0.1, 1000.0);
+        return;
     }
-
-    return curr;  // only the final, fully-refined mesh
+    
+    // Custom fisheye projection matrix
+    glLoadIdentity();
+    
+    float aspect = (float)w / h;
+    float baseFov = 50.0f;
+    
+    // Fisheye parameters - increase FOV dramatically for fisheye effect
+    float fisheyeFactor = 1.0f + g_fisheyeStrength * 2.5f;  // 1.0 to 3.5
+    float fisheyeFov = baseFov * fisheyeFactor;
+    
+    // Clamp to reasonable values (but allow wide angles)
+    fisheyeFov = fminf(fisheyeFov, 170.0f);
+    
+    // Apply perspective with fisheye FOV
+    gluPerspective(fisheyeFov, aspect, 0.05, 1000.0);
+    
+    // Apply additional barrel distortion matrix
+    if (g_fisheyeStrength > 0.1f) {
+        GLfloat distortionMatrix[16] = {
+            1.0f - g_fisheyeStrength * 0.2f, 0, 0, 0,
+            0, 1.0f - g_fisheyeStrength * 0.2f, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        glMultMatrixf(distortionMatrix);
+    }
 }
 
+/*---------------------------------------
+Global setup parameters 
+-----------------------------------------*/
+Dodecahedron d0(1.0, Vector3D{0.0, 0.0, 0.0}, FaceMode::Pentagons);
+FacetBox box;
+FacetBox box_0(d0.getFacets());
+FacetBox box_1;
+FacetBox box_2;
+double scal = 1.01;
+double radi = 1.0;
+Vector3D p = Vector3D{0,0,0};
+Vector3D p_1[12];
 
 void Setup() {
 
 	if (ciclo == 0) {
 
         cout << "\n———————————————————————————————————————————————————————————————————————\n";
-        cout <<   "|- CUBEs                    ———————————————————————————————————————————\n";
+        cout <<   "|- Hyperbolic Dodecahedron ———————————————————————————————————————————\n";
         cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠄⠀⡀⠀⠀⠀⠀⠀⠀⢀⠀⠀⡀⠀⢀⠀⢀⡀⣤⡢⣤⡤⡀⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⡄⡄⠐⡀⠈⣀⠀⡠⡠⠀⣢⣆⢌⡾⢙⠺⢽⠾⡋⣻⡷⡫⢵⣭⢦⣴⠦⠀⢠⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⢠⣤⣽⣥⡈⠧⣂⢧⢾⠕⠞⠡⠊⠁⣐⠉⠀⠉⢍⠀⠉⠌⡉⠀⠂⠁⠱⠉⠁⢝⠻⠎⣬⢌⡌⣬⣡⣀⣢⣄⡄⠀⡀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⢀⢸⣿⣿⢿⣾⣯⣑⢄⡂⠀⠄⠂⠀⠀⢀⠀⠀⠐⠀⠀⠀⠀⠀⠀⠀⠀⠄⠐⠀⠀⠀⠀⣄⠭⠂⠈⠜⣩⣿⢝⠃⠀⠁⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⢀⣻⡟⠏⠀⠚⠈⠚⡉⡝⢶⣱⢤⣅⠈⠀⠄⠀⠀⠀⠀⠀⠠⠀⠀⡂⠐⣤⢕⡪⢼⣈⡹⡇⠏⠏⠋⠅⢃⣪⡏⡇⡍⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠺⣻⡄⠀⠀⠀⢠⠌⠃⠐⠉⢡⠱⠧⠝⡯⣮⢶⣴⣤⡆⢐⣣⢅⣮⡟⠦⠍⠉⠀⠁⠐⠀⠀⠀⠄⠐⠡⣽⡸⣎⢁⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⢈⡻⣧⠀⠁⠐⠀⠀⠀⠀⠀⠀⠊⠀⠕⢀⡉⠈⡫⠽⡿⡟⠿⠟⠁⠀⠀⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠬⠥⣋⡯⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⡀⣾⡍⠕⡀⠀⠀⠀⠄⠠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠥⣤⢌⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠀⠀⠄⢀⠀⢝⢞⣫⡆⡄⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⣽⡶⡄⠐⡀⠀⠀⠀⠀⠀⠀⢀⠀⠄⠀⠀⠀⠄⠁⠇⣷⡆⠀⠀⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡸⢝⣮⠍⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⢀⠀⢾⣷⠀⠠⡀⠀⠀⠀⠀⢀⠀⠀⠀⠀⠀⠁⡁⠀⠀⣾⡥⠖⠀⠀⠀⠂⠀⠀⠀⠀⠀⠁⠀⡀⠁⠀⠀⠻⢳⣻⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⣞⡙⠨⣀⠠⠄⠀⠂⠀⠀⠀⠈⢀⠀⠀⠀⠀⠀⠤⢚⢢⣟⠀⠀⠀⠀⡐⠀⠀⡀⠀⠀⠀⠀⠁⠈⠌⠊⣯⣮⡏⠡⠂⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⣻⡟⡄⡡⣄⠀⠠⠀⠀⡅⠀⠐⠀⡀⠀⡀⠀⠄⠈⠃⠳⠪⠤⠀⠀⠀⠀⡀⠀⠂⠀⠀⠀⠁⠈⢠⣠⠒⠻⣻⡧⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠪⡎⠠⢌⠑⡀⠂⠀⠄⠠⠀⠠⠀⠁⡀⠠⠠⡀⣀⠜⢏⡅⠀⠀⡀⠁⠀⠀⠁⠁⠐⠄⡀⢀⠀⠀⠄⢑⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠼⣻⠧⣣⣀⠐⠨⠁⠕⢈⢀⢀⡁⠀⠈⠠⢀⠀⠐⠜⣽⡗⡤⠀⠂⠀⠠⠀⢂⠠⠀⠁⠀⠀⠔⠀⠑⣨⣿⢯⠋⡅⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⡚⣷⣭⠎⢃⡗⠄⡄⢀⠁⠀⠅⢀⢅⡀⠠⠀⢠⡀⡩⠷⢇⠀⡀⠄⡀⠄⠂⠀⠀⠄⠉⡠⠃⠴⠀⠈⢁⣿⡛⡯⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠘⡬⡿⣿⡏⡻⡯⠌⢁⢛⠠⠓⠐⠐⠐⠌⠃⠋⠂⡠⢰⣈⢏⣠⠂⠈⠀⠠⠒⠡⠄⠢⠤⠨⠢⡬⠆⠿⢷⢿⡽⡧⠉⠊⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠺⣷⣺⣗⣿⡶⡎⡅⣣⢎⠠⡅⣢⡖⠴⠬⡈⠂⡨⢡⠾⣣⣢⠀⠀⡹⠄⡄⠄⡇⣰⡖⡊⠔⢹⣄⣿⣭⣵⣿⢷⡀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠩⣿⣿⣲⣿⣷⣟⣼⠟⣬⢉⡠⣪⢜⣂⣁⠥⠓⠚⡁⢶⣷⣠⠂⡄⡢⣀⡐⠧⢆⣒⡲⡳⡫⢟⡃⢪⡧⣟⡟⣯⠐⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⢺⠟⢿⢟⢻⡗⡮⡿⣲⢷⣆⣏⣇⡧⣄⢖⠾⡷⣿⣤⢳⢷⣣⣦⡜⠗⣭⢂⠩⣹⢿⡲⢎⡧⣕⣖⣓⣽⡿⡖⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠂⠂⠏⠿⢻⣥⡪⢽⣳⣳⣥⡶⣫⣍⢐⣥⣻⣾⡻⣅⢭⡴⢭⣿⠕⣧⡭⣞⣻⣣⣻⢿⠟⠛⠙⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠄⠋⠫⠯⣍⢻⣿⣿⣷⣕⣵⣹⣽⣿⣷⣇⡏⣿⡿⣍⡝⠵⠯⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠠⠁⠋⢣⠓⡍⣫⠹⣿⣿⣷⡿⠯⠺⠁⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠋⢀⠋⢈⡿⠿⠁⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
-        cout << "                                     ~[Cube Class Example]\n\n";
 
+        cout << "      _----------_,\n";
+        cout << "    ,\"__         _-:, \n";
+        cout << "   /    \"\"--_--\"\"...:\\ \n";
+        cout << "  /         |.........\\ \n";
+        cout << " /          |..........\\ \n";
+        cout << "/,         _'_........./. \n";
+        cout << "! -,    _-\"   \"-_... ,;;: \n";
+        cout << "\\   -_-\"         \"-_/;;;. \n";
+        cout << " \\   \\             /;;;. \n";
+        cout << "  \\   \\           /;;;. \n";
+        cout << "   '.  \\         /;;;' \n";
+        cout << "     \"-_\\_______/;;'        ~[Hyperbolic Dodecahedron Class]\n\n";
+        
         // ==================== CUBE SETUP ====================
-        // Extract triangular facets from cube instances
-        // cube1: Basic cube with 12 triangles
-        cube_facets_1 = cube1.getFacets();
-
-        // cube2: Subdivided cube with 96 triangles
-        cube_facets_2 = cube2.getFacets();
-
-        // cube3: Advanced subdivision demos (3³ = 27 subcells)
-        cube_facets_3 = cube3.getFacets();
-
-        cout << "Cube 1 (basic): " << cube_facets_1.size() << " triangular faces\n";
-        cout << "Cube 2 (subdivided): " << cube_facets_2.size() << " triangular faces\n";
-        cout << "Cube 3 (advanced): " << cube_facets_3.size() << " triangular faces\n";
-
-        // ==================== ADVANCED SUBDIVISION DEMOS ====================
+        // ==================== ADVANCED SUBDIVISION DEMOS - Reflection of the subdivision in Spheres ====================
         cout << "\n--- Advanced Subdivision Control Demos ---\n";
-
-        // 1. Individual subcell access demo
-        cout << "Demo 1: Individual Subcell Access\n";
-        if (cube2.hasSubdivision()) {
-            const Cube::SubCell& center_cell = cube2.getSubCell(1, 1, 1);  // Center subcell of 2x2x2
-            cout << "  Center subcell (1,1,1) position: " << center_cell.center << "\n";
-            cout << "  Active status: " << (center_cell.active ? "enabled" : "disabled") << "\n";
-
-            // Extract facets for this specific subcell
-            single_subcell = cube2.getSubCellFacets(1, 1, 1);
-            cout << "  Subcell triangles: " << single_subcell.size() << "\n";
-        }
-
-        // 2. Plane access demo
-        cout << "Demo 2: Plane Access\n";
-        if (cube2.hasSubdivision()) {
-            auto xy_plane = cube2.getPlane(2, 4);  // XY plane at Z=1
-            cout << "  XY plane at Z=1 contains " << xy_plane.size() << " subcells\n";
-
-            // Extract all facets for this plane
-            plane_subcells_2 = cube2.getPlaneFacets(2, 4);
-            cout << "  Plane triangles: " << plane_subcells_2.size() << "\n";
-        }
-
-        // 3. Selective rendering demo - create "hollow frame"
-        cout << "Demo 3: Selective Rendering (Hollow Frame)\n";
-        if (cube3.hasSubdivision()) {
-            int n = cube3.getSubdivisionLevels();
-            int disabled_count = 0;
-
-            // Disable interior subcells to create hollow effect
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
-                    for (int k = 0; k < n; k++) {
-
-                        if ((i%2 == 0 && j%2 == 0 && k%2 == 0) || (i%2 == 1 && j%2 == 1 && k%2 == 1)) {
-                            cube3.setSubCellActive(i, j, k, false);
-                            cube2.setSubCellActive(i, j, k, false);
-                            disabled_count++;
-                        }
-                    }
-                }
-            }
-
-            cout << "  Disabled " << disabled_count << " interior subcells\n";
-            cout << "  Creating hollow frame effect\n";
-
-            // Refresh triangulation after modifications
-            cube3.refreshTriangulation();
-            cube2.refreshTriangulation();
-            cube_facets_3 = cube3.getFacets();  // Update facets
-            cube_facets_2 = cube2.getFacets();  // Update facets
-            cout << "  Frame triangles: " << cube_facets_3.size() << "\n";
-        }
-
-        // 4. Real-time vertex manipulation demo
-        cout << "Demo 4: Vertex Manipulation\n";
-        if (cube3.hasSubdivision()) {
-            int n = cube3.getSubdivisionLevels();
-            double ra = cube2.getSubcellRadius(0, 0, 0);
-            Vector3D ce = cube2.getSubcellCenter(0, 0, 0);
-            // Get original position of vertex (l) in subcell (i,j,k)
-            for (int i = 0; i < n; i++) 
-            for (int j = 0; j < n; j++) 
-            for (int k = 0; k < n; k++) {
-
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube3.getSubCell(i, j, k).vertices[l];
-
-                    // Move it upward by 0.2 units
-                    Vector3D new_pos = sigma(v_p, ce, ra);
-                    cube3.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-            
-                //cout << "  Moved vertex  of subcell (0,0,0) from " << original_pos << " to " << new_pos << "\n";
-            }
-            // Refresh triangulation
-            cube3.refreshTriangulation();
-            //cube_facets_3 = cube3.getFacets();  // Update facets
-            plane_subcells = cube3.getPlaneFacets(2, 4);
-            cout << "  Triangulation refreshed\n";
-        }
-
+        cout << "Demo 1: Spherical Reflection Manipulation\n";
+        // We apply levels of Midpoint4 refinement
+        int levels = 2; 
+        box = box_0.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        for (size_t i = 0; i < 12; i++)
+            p_1[i] = sigma(d0.getPentagonCenter(i), 1.01*d0.getPentagonCenter(0), 1.0);
+        box_1 = box.sigma(1.01*d0.getPentagonCenter(0), 1.0);
+        box_2 = box.sigma(Vector3D{0,0,0}, 1.0);
     }
-
 }
 
 ///////////////////     DRAW       ///////////////////////
@@ -281,56 +230,38 @@ void Draw() {
     extern void Setup(); // assume you define this elsewhere
     static int ciclo = 1;  // or however you manage visibility
 	if (ciclo > 0) {
-        /*Draw here with OpenGL*/	
-        // ==================== CUBE RENDERING ====================
-
-        //// Draw first cube (basic cube, positioned right side) - Main.c color scheme
-        //// This demonstrates the basic cube triangulation with 12 faces
-        //size_t cube1_total = cube_facets_1.size();
-        //for(size_t i = 0; i < cube1_total; ++i) {
-        //    drawFacetMainCStyle(cube_facets_1[i], i);
-        //}
-
-        //// Draw second cube (subdivided cube with vertex manipulation, positioned left side)
-        //// This demonstrates cube subdivision with real-time vertex modification - Main.c colors
-        //size_t cube2_total = cube_facets_2.size();
-        //for(size_t i = 0; i < cube2_total; ++i) {
-        //    drawFacetMainCStyle(cube_facets_2[i], i + 100);  // Offset index for color variation
-        //}
-
-        //// Draw third cube (hollow frame effect, positioned above) - Main.c colors
-        //// This demonstrates selective subcell rendering
-        //size_t cube3_total = cube_facets_3.size();
-        //for(size_t i = 0; i < cube3_total; ++i) {
-        //    drawFacetMainCStyle(cube_facets_3[i], i + 200);  // Different offset for variety
-        //}
-
-        //// ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
-
-        //// Demo 1: Highlight single subcell using Main.c color scheme
-        //for(size_t i = 0; i < single_subcell.size(); ++i) {
-        //    drawFacetMainCStyle(single_subcell[i], i + 300);  // Different offset
-        //}
-
-        // Demo 2: Render plane subcells using Main.c color scheme
-        // Update plane_subcells based on current UI selection
-        plane_subcells = cube3.getPlaneFacets(g_currentOrientation, g_currentLayer);
-
-        for(size_t i = 0; i < plane_subcells.size(); ++i) {
-            drawFacetMainCStyle(plane_subcells[i], i);  // Use Main.c color cycling
-            drawFacetMainCStyle(plane_subcells_2[i], i);
+        /*Draw here with OpenGL*/
+        // In your draw‐all loop:
+        size_t total = box_2.size();      // e.g. 36*3
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_2[i], R, G, B, 1.0f);
         }
 
-	}
+        total = box_1.size();      // e.g. 36*3                                                                                                          
+        for(size_t i = 0; i < total; ++i) {
+            // pick hue from 0°→360° across the range
+            float hue = float(i) / float(total) * 360.0f;
+            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
+            // convert to 0–255 ints
+            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+            drawFacet(box_1[i], R, G, B, 1.0f);
+        }
+        for (size_t i = 0; i < 12; i++)
+            drawSphere(p_1[i], 0.07f, 12, 12);
+	
+    }
 }
-
 
 void ProcessingProto() {
 	//extern void Setup();  // your existing setup
     //Setup();
 	Draw();
 }
-
 
 //-----------------------------------------------------------------------------
 // Utility: draw a small sphere (GLUT) at a 3D position
@@ -401,7 +332,6 @@ void drawLine(const Vector3D& a, const Vector3D& b) {
         glVertex3f(b.x(), b.y(), b.z());
         glEnd();
 }
-
 
 void drawLineColor(const Vector3D& a, const Vector3D& b, int R, int G, int B) {
 
@@ -540,47 +470,6 @@ void drawText3D(const Vector3D& pos, const char* text) {
     glPopAttrib();
 }
 
-
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-/**/
-
 //////////////////////////////////////
 //                                  //
 //                                  //
@@ -625,7 +514,7 @@ int main(int argc, char** argv)
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(720, 720);
-    glutCreateWindow(" JAZ 4D   U.U ");
+    glutCreateWindow(" JAZ 4D Enhanced Camera U.U ");
 
     // Enable smoothing & blending by default
     ProcessMenu(1);
@@ -685,32 +574,39 @@ void initGL()
 }
 
 //-----------------------------------------------------------------------------
-// Handle window size changes
+// Handle window size changes with fisheye support
 //-----------------------------------------------------------------------------
 void reshape(int w, int h)
 {
-    glViewport(0,0,w,h);
+    glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(50.0, (double)w/h, 0.5, 1000.0);
+    
+    // Apply fisheye projection
+    applyFisheyeProjection(w, h);
+    
     glMatrixMode(GL_MODELVIEW);
 }
 
 //-----------------------------------------------------------------------------
-// Draw help overlay
+// Draw help overlay with new controls
 //-----------------------------------------------------------------------------
 void drawHUD() {
     if (!g_showHelp) return;
     const char* lines[] = {
         "L-drag: Rotate",
-        "M-drag: Pan",
+        "M-drag: Pan", 
         "R-drag/Wheel: Zoom",
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
+        "[F]: Toggle Fisheye Mode",
+        "[[]: Fisheye Strength -/+",
         "[O]: Cycle Orientation (XY/YZ/XZ)",
         "[+/-]: Change Layer",
+        "[R]: Toggle Reflection",
         "Right-click: UI Menu"
     };
+    
     glMatrixMode(GL_PROJECTION); glPushMatrix();
     glLoadIdentity(); glOrtho(0,1,0,1,-1,1);
     glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
@@ -735,22 +631,35 @@ void drawHUD() {
     for(const char* c=status; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
+    // Add fisheye status
+    if (g_fisheyeMode) {
+        y -= 0.05f;
+        char fisheyeStatus[100];
+        sprintf(fisheyeStatus, "Fisheye: ON (Strength: %.1f)", g_fisheyeStrength);
+        glColor3f(0.2f, 0.2f, 0.8f);  // Blue color for fisheye
+        glRasterPos2f(0.02f, y);
+        for(const char* c=fisheyeStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+    
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
 }
 
 //-----------------------------------------------------------------------------
-// Main display: apply interactive camera, then draw
+// Main display with surface zoom and fisheye
 //-----------------------------------------------------------------------------
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    /* - Camera: pan, zoom, rotate*/
-    // Move back and zoom
-    glTranslatef(0, 0, -5.0f * g_zoom);
+    // Apply surface zoom to the base zoom
+    float effectiveZoom = g_zoom / g_surfaceZoomFactor;
+    
+    // Move back and zoom (with surface zoom effect)
+    glTranslatef(g_panX, g_panY, -5.0f * effectiveZoom);
 
     // Apply rotations
     glRotatef(g_angleX, 1, 0, 0);
@@ -759,18 +668,12 @@ void display()
     // Draw axes at origin
     drawAxes(10.0f);
 
-
     ProcessingProto();   // calls Setup() then Draw()
-
-    // Draw a test sphere to demonstrate glass effect
-    drawSphere(Vector3D(0, 0, 0), 1.0f, 16, 16);
 
     drawHUD();
     
     glutSwapBuffers();
 }
-
-
 
 //-----------------------------------------------------------------------------
 // Mouse button: track left/middle/right for rotate/pan/zoom, handle wheel
@@ -796,7 +699,6 @@ void mouseButton(int button, int state, int x, int y)
     }
     g_lastX = x; g_lastY = y;
 }
-
 
 //-----------------------------------------------------------------------------
 // Mouse drag: update angles/pan/zoom
@@ -826,7 +728,7 @@ void mouseMotion(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
-// Keyboard handler for glass mode toggle
+// Keyboard handler with fisheye and surface zoom controls
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
@@ -836,35 +738,75 @@ void keyboard(unsigned char key, int x, int y) {
             printf("Glass mode: %s\n", g_glassMode ? "ON" : "OFF");
             glutPostRedisplay();
             break;
+            
         case 'h':
         case 'H':
             g_showHelp = !g_showHelp;
             glutPostRedisplay();
             break;
 
+        // Fisheye controls
+        case 'f':
+        case 'F':
+            g_fisheyeMode = !g_fisheyeMode;
+            printf("Fisheye mode: %s\n", g_fisheyeMode ? "ON" : "OFF");
+            reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            glutPostRedisplay();
+            break;
+            
+        case '[':
+            g_fisheyeStrength = fmaxf(0.0f, g_fisheyeStrength - 0.1f);
+            printf("Fisheye strength: %.1f\n", g_fisheyeStrength);
+            if (g_fisheyeMode) {
+                reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            }
+            glutPostRedisplay();
+            break;
+            
+        case ']':
+            g_fisheyeStrength = fminf(2.0f, g_fisheyeStrength + 0.1f);
+            printf("Fisheye strength: %.1f\n", g_fisheyeStrength);
+            if (g_fisheyeMode) {
+                reshape(glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+            }
+            glutPostRedisplay();
+            break;
+            
         // Plane orientation controls
         case 'o':
+            radi += 0.01;
+            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            for (size_t i = 0; i < 12; i++)
+                p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
+            cout << "Sphere Radius:: " << radi << "\n";
+            glutPostRedisplay();
+            break;
         case 'O':
-            g_currentOrientation = (g_currentOrientation + 1) % 3;
-            printf("Orientation: %s\n", g_currentOrientation == 0 ? "XY" :
-                                       g_currentOrientation == 1 ? "YZ" : "XZ");
+            radi -= 0.01;
+            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);            
+            for (size_t i = 0; i < 12; i++)
+                p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
+            cout << "Sphere Radius :: " << radi << "\n";
             glutPostRedisplay();
             break;
 
         // Layer controls
         case '+':
-        case '=':
-            g_currentLayer = (g_currentLayer + 1) % g_maxLayers;
-            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
+            scal += 0.012;
+            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            for (size_t i = 0; i < 12; i++)
+                p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
+            cout << "Reflection Sphere :: " << scal*d0.getPentagonCenter(0) << "\n";
             glutPostRedisplay();
             break;
         case '-':
-        case '_':
-            g_currentLayer = (g_currentLayer - 1 + g_maxLayers) % g_maxLayers;
-            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
+            scal -= 0.012;
+            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            for (size_t i = 0; i < 12; i++)
+                p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
+            cout << "Reflection Sphere :: " << scal*d0.getPentagonCenter(0) << "\n";
             glutPostRedisplay();
             break;
-
         case 27: // ESC key
             exit(0);
             break;
@@ -877,7 +819,9 @@ void keyboard(unsigned char key, int x, int y) {
 void MenuHandler(int choice) {
     switch(choice) {
         case 1: g_showHelp = !g_showHelp; break;       // toggle HUD
-        case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; break; // reset
+        case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; 
+                g_fisheyeMode=false; g_fisheyeStrength=1.0f; 
+                g_enableSurfaceZoom=true; break; // reset
         case 3: exit(0); break;                      // quit
     }
     glutPostRedisplay();
@@ -913,4 +857,3 @@ void ProcessMenu(int value)
     }
     glutPostRedisplay();
 }
-

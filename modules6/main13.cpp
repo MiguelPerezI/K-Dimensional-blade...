@@ -448,6 +448,28 @@ public:
         std::cout << "Exported " << cubes.size() << " cubes to " << filename << std::endl;
     }
 
+    /**
+     * @brief Export all managed cubes to STL with pattern support.
+     * 
+     * @param filename Path to output STL file.
+     * @param objectName Custom name for the STL object.
+     * @param mode Extraction mode for facets.
+     * @param layer Layer index for plane modes.
+     */
+    void exportToSTL_m(const std::string& filename, 
+                    const std::string& objectName = "CubeCollection",
+                    const std::string& mode = "full",
+                    int layer = 0) const {
+        if (cubes.empty()) {
+            throw std::runtime_error("CubeManager::exportToSTL: No cubes to export");
+        }
+        
+        Cube::writeMultiSTL_m(filename, cubes, objectName, mode, layer);
+        
+        std::cout << "Exported " << cubes.size() << " cubes (" << mode << " mode) to " 
+                  << filename << std::endl;
+    }
+
 };
 
 // Global cube manager
@@ -507,7 +529,7 @@ void Setup() {
         g_cubeManager.initializeCubes();
         
         cout << "\nWriting cubes to STL\n";
-        g_cubeManager.exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
+        g_cubeManager.exportToSTL_m("/home/mike666/Downloads/my_cube_collection.stl", "CheckerCollection", "checkerboard");//exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
     }
 }
 

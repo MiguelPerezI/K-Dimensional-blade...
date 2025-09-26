@@ -65,20 +65,42 @@ Quaternion& Quaternion::operator/=(double scalar) {
 }
 
 /*----- Hyperbolic projection ———————————————————————————————————————————————*/
-    /*----- Hyperbolic projection — subgroup toHyperboloid ------------------
-     * Project a pure-vector quaternion (r()==0) from the unit ball into
-     * the hyperboloid model via µ(x) = (1/√(1−‖x‖²), x/√(1−‖x‖²)),
-     * then re-project to the gnomic disk: (0, x') where x' = x/(1+u').
-     * @throws std::domain_error if ‖x‖ ≥ 1
-     */
-    Quaternion Quaternion::toHyperboloid() const {
-        double sq = v * v;  // squared norm of vector part
-        if (sq >= 1.0) throw std::domain_error("toHyperboloid: vector norm must be < 1");
-        double s = 1.0 / std::sqrt(1.0 - sq);
-        Quaternion ret{ s, s * v };
-        // final gnomic re-projection
-        return Quaternion{ 0.0, (1.0 / (1.0 + ret.r())) * ret.V() };
-    }
+/*----- Hyperbolic projection — subgroup toHyperboloid ------------------
+ * Project a pure-vector quaternion (r()==0) from the unit ball into
+ * the hyperboloid model via µ(x) = (1/√(1−‖x‖²), x/√(1−‖x‖²)),
+ * then re-project to the gnomic disk: (0, x') where x' = x/(1+u').
+ * @throws std::domain_error if ‖x‖ ≥ 1
+ */
+Quaternion Quaternion::toHyperboloid() const {
+    double sq = v * v;  // squared norm of vector part
+    if (sq >= 1.0) throw std::domain_error("toHyperboloid: vector norm must be < 1");
+    double s = 1.0 / std::sqrt(1.0 - sq);
+    Quaternion ret{ s, s * v };
+    // final gnomic re-projection
+    return Quaternion{ 0.0, (1.0 / (1.0 + ret.r())) * ret.V() };
+}
+
+/* Quaternion spherical inversion (sigma method) -------------------------*/
+Quaternion sigma(const Quaternion& x, const Quaternion& a, double r)
+{
+    // For quaternions, we need to define "distance"
+    // Option 1: Treat as 4D vectors (u, v.x, v.y, v.z)
+    // Option 2: Use quaternion-specific distance measure
+    
+    // Using 4D approach:
+    Quaternion diff = x - a;
+    
+    // Distance squared in 4D space: ||(u, x, y, z)||²
+    double dist_squared = diff.r() * diff.r() + (diff.V() * diff.V());
+    
+    if (std::abs(dist_squared) < 1e-12)
+        throw std::runtime_error("sigma: quaternion coincides with sphere center");
+    
+    double r_squared = r * r;
+    double factor = r_squared / dist_squared;
+    
+    return a + (factor * diff);
+}
 
 /* ---------- Free-function Operators --------------------------------------- */
 // Quaternion addition

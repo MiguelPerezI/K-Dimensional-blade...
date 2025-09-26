@@ -302,6 +302,28 @@ public:
     // mesh3 = box.refine(2, FacetBox::SubdivisionMode::Centroid3);
     // mesh4 = box.refine(2, FacetBox::SubdivisionMode::Midpoint4);
 
+    /* - Spherical Inversion ————————————————————————————————————————————————*/
+    /**
+     * @brief Apply spherical inversion to all facets in-place
+     * @param center Center of the inversion sphere
+     * @param radius Radius of the inversion sphere
+     */
+    void applySigma(const Vector3D& center, double radius) {
+        for (auto& f : facets_)
+            f.applySigma(center, radius);
+    }
+    
+    /**
+     * @brief Return a new FacetBox with spherical inversion applied
+     * @param center Center of the inversion sphere
+     * @param radius Radius of the inversion sphere
+     */
+    FacetBox sigma(const Vector3D& center, double radius) const {
+        FacetBox result = *this;
+        result.applySigma(center, radius);
+        return result;
+    }
+
 
 private:
     std::vector<Facet> facets_;  ///< underlying storage
