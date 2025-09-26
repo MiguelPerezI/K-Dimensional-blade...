@@ -184,6 +184,16 @@ FacetBox box;
 FacetBox box_0(d0.getFacets());
 FacetBox box_1;
 FacetBox box_2;
+FacetBox box_3;
+FacetBox box_4;
+FacetBox box_5;
+FacetBox box_6;
+FacetBox box_7;
+FacetBox box_8;
+FacetBox box_9;
+FacetBox box_10;
+FacetBox box_11;
+FacetBox box_12;
 double scal = 1.01;
 double radi = 1.0;
 Vector3D p = Vector3D{0,0,0};
@@ -216,11 +226,21 @@ void Setup() {
         cout << "Demo 1: Spherical Reflection Manipulation\n";
         // We apply levels of Midpoint4 refinement
         int levels = 2; 
-        box = box_0.refine(levels, FacetBox::SubdivisionMode::Midpoint4);
+        box = box_0.refine(levels, FacetBox::SubdivisionMode::Midpoint4).refine(1, FacetBox::SubdivisionMode::Centroid3);
         for (size_t i = 0; i < 12; i++)
             p_1[i] = sigma(d0.getPentagonCenter(i), 1.01*d0.getPentagonCenter(0), 1.0);
         box_1 = box.sigma(1.01*d0.getPentagonCenter(0), 1.0);
-        box_2 = box.sigma(Vector3D{0,0,0}, 1.0);
+        box_2 = box.sigma(1.01*d0.getPentagonCenter(1), 1.0);
+        box_3 = box.sigma(1.01*d0.getPentagonCenter(2), 1.0);
+        box_4 = box.sigma(1.01*d0.getPentagonCenter(3), 1.0);
+        box_5 = box.sigma(1.01*d0.getPentagonCenter(4), 1.0);
+        box_6 = box.sigma(1.01*d0.getPentagonCenter(5), 1.0);
+        box_7 = box.sigma(1.01*d0.getPentagonCenter(6), 1.0);
+        box_8 = box.sigma(1.01*d0.getPentagonCenter(7), 1.0);
+        box_9 = box.sigma(1.01*d0.getPentagonCenter(8), 1.0);
+        box_10 = box.sigma(1.01*d0.getPentagonCenter(9), 1.0);
+        box_11 = box.sigma(1.01*d0.getPentagonCenter(10), 1.0);
+        box_12 = box.sigma(1.01*d0.getPentagonCenter(11), 1.0);
     }
 }
 
@@ -250,10 +270,22 @@ void Draw() {
             // convert to 0–255 ints
             int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
             drawFacet(box_1[i], R, G, B, 1.0f);
+            drawFacet(box_2[i], R, G, B, 1.0f);
+            drawFacet(box_3[i], R, G, B, 1.0f);
+            drawFacet(box_4[i], R, G, B, 1.0f);
+            drawFacet(box_5[i], R, G, B, 1.0f);
+            drawFacet(box_6[i], R, G, B, 1.0f);
+            drawFacet(box_7[i], R, G, B, 1.0f);
+            drawFacet(box_8[i], R, G, B, 1.0f);
+            drawFacet(box_9[i], R, G, B, 1.0f);
+            drawFacet(box_10[i], R, G, B, 1.0f);
+            drawFacet(box_11[i], R, G, B, 1.0f);
+            drawFacet(box_12[i], R, G, B, 1.0f);
         }
-        for (size_t i = 0; i < 12; i++)
-            drawSphere(p_1[i], 0.07f, 12, 12);
-	
+        //for (size_t i = 0; i < 12; i++)
+        //    drawSphere(p_1[i], 0.07f, 12, 12);
+        
+        //drawSphere(Vector3D{0,0,0}, radi, 12, 12);	
     }
 }
 
@@ -776,6 +808,18 @@ void keyboard(unsigned char key, int x, int y) {
         case 'o':
             radi += 0.01;
             box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            box_2 = box.sigma(scal*d0.getPentagonCenter(1), radi);
+            box_3 = box.sigma(scal*d0.getPentagonCenter(2), radi);
+            box_4 = box.sigma(scal*d0.getPentagonCenter(3), radi);
+            box_5 = box.sigma(scal*d0.getPentagonCenter(4), radi);
+            box_6 = box.sigma(scal*d0.getPentagonCenter(5), radi);
+            box_7 = box.sigma(scal*d0.getPentagonCenter(6), radi);
+            box_8 = box.sigma(scal*d0.getPentagonCenter(7), radi);
+            box_9 = box.sigma(scal*d0.getPentagonCenter(8), radi);
+            box_10 = box.sigma(scal*d0.getPentagonCenter(9), radi);
+            box_11 = box.sigma(scal*d0.getPentagonCenter(10), radi);
+            box_12 = box.sigma(scal*d0.getPentagonCenter(11), radi);
+            //box_2 = box.sigma(Vector3D{0,0,0}, radi);
             for (size_t i = 0; i < 12; i++)
                 p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
             cout << "Sphere Radius:: " << radi << "\n";
@@ -783,7 +827,19 @@ void keyboard(unsigned char key, int x, int y) {
             break;
         case 'O':
             radi -= 0.01;
-            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);            
+            box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            box_2 = box.sigma(scal*d0.getPentagonCenter(1), radi);
+            box_3 = box.sigma(scal*d0.getPentagonCenter(2), radi);
+            box_4 = box.sigma(scal*d0.getPentagonCenter(3), radi);
+            box_5 = box.sigma(scal*d0.getPentagonCenter(4), radi);
+            box_6 = box.sigma(scal*d0.getPentagonCenter(5), radi);
+            box_7 = box.sigma(scal*d0.getPentagonCenter(6), radi);
+            box_8 = box.sigma(scal*d0.getPentagonCenter(7), radi);
+            box_9 = box.sigma(scal*d0.getPentagonCenter(8), radi);
+            box_10 = box.sigma(scal*d0.getPentagonCenter(9), radi);
+            box_11 = box.sigma(scal*d0.getPentagonCenter(10), radi);
+            box_12 = box.sigma(scal*d0.getPentagonCenter(11), radi);            
+            //box_2 = box.sigma(Vector3D{0,0,0}, radi);
             for (size_t i = 0; i < 12; i++)
                 p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
             cout << "Sphere Radius :: " << radi << "\n";
@@ -794,6 +850,17 @@ void keyboard(unsigned char key, int x, int y) {
         case '+':
             scal += 0.012;
             box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            box_2 = box.sigma(scal*d0.getPentagonCenter(1), radi);
+            box_3 = box.sigma(scal*d0.getPentagonCenter(2), radi);
+            box_4 = box.sigma(scal*d0.getPentagonCenter(3), radi);
+            box_5 = box.sigma(scal*d0.getPentagonCenter(4), radi);
+            box_6 = box.sigma(scal*d0.getPentagonCenter(5), radi);
+            box_7 = box.sigma(scal*d0.getPentagonCenter(6), radi);
+            box_8 = box.sigma(scal*d0.getPentagonCenter(7), radi);
+            box_9 = box.sigma(scal*d0.getPentagonCenter(8), radi);
+            box_10 = box.sigma(scal*d0.getPentagonCenter(9), radi);
+            box_11 = box.sigma(scal*d0.getPentagonCenter(10), radi);
+            box_12 = box.sigma(scal*d0.getPentagonCenter(11), radi);
             for (size_t i = 0; i < 12; i++)
                 p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
             cout << "Reflection Sphere :: " << scal*d0.getPentagonCenter(0) << "\n";
@@ -802,6 +869,17 @@ void keyboard(unsigned char key, int x, int y) {
         case '-':
             scal -= 0.012;
             box_1 = box.sigma(scal*d0.getPentagonCenter(0), radi);
+            box_2 = box.sigma(scal*d0.getPentagonCenter(1), radi);
+            box_3 = box.sigma(scal*d0.getPentagonCenter(2), radi);
+            box_4 = box.sigma(scal*d0.getPentagonCenter(3), radi);
+            box_5 = box.sigma(scal*d0.getPentagonCenter(4), radi);
+            box_6 = box.sigma(scal*d0.getPentagonCenter(5), radi);
+            box_7 = box.sigma(scal*d0.getPentagonCenter(6), radi);
+            box_8 = box.sigma(scal*d0.getPentagonCenter(7), radi);
+            box_9 = box.sigma(scal*d0.getPentagonCenter(8), radi);
+            box_10 = box.sigma(scal*d0.getPentagonCenter(9), radi);
+            box_11 = box.sigma(scal*d0.getPentagonCenter(10), radi);
+            box_12 = box.sigma(scal*d0.getPentagonCenter(11), radi);            
             for (size_t i = 0; i < 12; i++)
                 p_1[i] = sigma(d0.getPentagonCenter(i), scal*d0.getPentagonCenter(0), radi);
             cout << "Reflection Sphere :: " << scal*d0.getPentagonCenter(0) << "\n";
