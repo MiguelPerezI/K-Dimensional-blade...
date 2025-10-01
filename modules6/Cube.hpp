@@ -1016,7 +1016,7 @@ public:
             for (int j = 0; j < n; ++j) {  // Y dimension physical coordinates
                 for (int k = 0; k < n; ++k) {  // Z dimension physical coordinates
                     // Select subcells where coordinate sum is divisible by 4 (checkerboard pattern)
-                    if ((i * j + k) % 5 == 0) {
+                    if (/*(i*i + j*j) % 2 == 0 && k%2 == 0*/k%2 == 0 && i%2 == 0 || j%2 == 0) {
                         checkerboard.emplace_back(subcells_[i][j][k]);  // Add subcell reference to pattern
                     }
                 }
