@@ -143,7 +143,7 @@ void applyFisheyeProjection(int w, int h) {
 Global setup parameters 
 -----------------------------------------*/
 int cube_dim = 2.0;
-int N = 11 ;
+int N = 37 ;
 Cube cube(cube_dim, Vector3D{0,0.0001,0}, N);
 FacetBox plane_subcells;
 
@@ -168,7 +168,6 @@ void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double r
     
     int n = cube.getSubdivisionLevels();
     int centerIdx = n / 2;
-    
     // Apply transformation to all vertices
     for (int i = -centerIdx; i < centerIdx+1; i++) {
         for (int j = -centerIdx; j < centerIdx+1; j++) {
@@ -225,11 +224,15 @@ void Setup() {
 
         // ==================== ADVANCED SUBDIVISION DEMOS - Reflection of the subdivision in Spheres ====================
         applySigmaTransformationToCube(cube, Vector3D{0,0,0}, 0.5); 
-
+        applySigmaTransformationToCube(cube, cube.getSubcellCenter(1,1,1), cube.getSubcellRadius(1,1,1));
+        cube.writeSTL_s("/home/mike666/Downloads/mesh_output.stl", "MyCube", "checkerboard", 2, 2, 9);
     }
 }
 
 ///////////////////     DRAW       ///////////////////////
+int ii = 4;
+int jj = 5;
+int kk = 9;
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere
@@ -237,7 +240,7 @@ void Draw() {
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/
         // In your draw‐all loop:
-        plane_subcells = cube.getCheckerboardFacets();
+        plane_subcells = cube.getCheckerboardFacets(ii, kk, jj);
         for (size_t i = 0; i < plane_subcells.size(); ++i) {
             drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
         }
@@ -761,21 +764,21 @@ void keyboard(unsigned char key, int x, int y) {
             
         // Plane orientation controls
         case 'o':
-            radi += 0.01;
+            kk += 1;
             glutPostRedisplay();
             break;
         case 'O':
-            radi -= 0.01;
+            kk -= 1;
             glutPostRedisplay();
             break;
 
         // Layer controls
         case '+':
-            scal += 0.012;
+            ii += 1;
             glutPostRedisplay();
             break;
         case '-':
-            scal -= 0.012;
+            ii -= 1;
             glutPostRedisplay();
             break;
         case 27: // ESC key

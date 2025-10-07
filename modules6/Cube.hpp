@@ -502,6 +502,189 @@ public:
     }
 
     /**
+     * @brief Write cube geometry to STL file with pattern support.
+     *
+     * Exports triangular faces from the current cube into an STL file.
+     * Supports different extraction modes including full geometry, checkerboard patterns,
+     * and plane slices for creating complex geometric models.
+     *
+     * @param filename Path to output STL file (will be created or overwritten).
+     * @param objectName Name to use in STL header (default: "Cube").
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param layer Layer index for plane modes (ignored for other modes, default: 0).
+     * @throws std::runtime_error if file cannot be created or written.
+     * @throws std::invalid_argument if mode is invalid or plane layer is out of range.
+     */
+    void writeSTL_s(const std::string& filename,
+                    const std::string& objectName = "Cube",
+                    const std::string& mode = "full",
+                    int layer = 0) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open()) {
+            throw std::runtime_error("Cube::writeSTL_s: Cannot create file " + filename);
+        }
+    
+        stl << "solid " << objectName << "\n";
+    
+        FacetBox facetsToWrite;  // Container for facets to export
+    
+        // Select facets based on extraction mode
+        if (mode == "full") {
+            // Use all facets from the cube
+            facetsToWrite = getFacets();
+    
+        } else if (mode == "checkerboard") {
+            // Use checkerboard pattern (only works with subdivided cubes)
+            if (!hasSubdivision()) {
+                // For non-subdivided cubes, fall back to full geometry
+                facetsToWrite = getFacets();
+            } else {
+                facetsToWrite = getCheckerboardFacets();
+            }
+    
+        } else if (mode == "plane_xy") {
+            // Extract XY plane (perpendicular to Z-axis)
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(2, layer);  // axis=2 (Z), layer
+    
+        } else if (mode == "plane_xz") {
+            // Extract XZ plane (perpendicular to Y-axis)
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(1, layer);  // axis=1 (Y), layer
+    
+        } else if (mode == "plane_yz") {
+            // Extract YZ plane (perpendicular to X-axis)
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(0, layer);  // axis=0 (X), layer
+    
+        } else {
+            throw std::invalid_argument("Invalid mode: " + mode +
+                ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+        }
+    
+        // Write all selected facets to STL
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+    
+            // Extract vertices
+            Vector3D v1 = face[0];  // Vertex A
+            Vector3D v2 = face[1];  // Vertex B
+            Vector3D v3 = face[2];  // Vertex C
+    
+            // Get normal
+            Vector3D normal = face.getNormal();
+    
+            // Write STL facet
+            stl << "facet normal ";
+            stl << std::scientific << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+    
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+    /**
+     * @brief Write cube geometry to STL file with pattern support including parameterized checkerboard.
+     *
+     * Exports triangular faces from the current cube into an STL file.
+     * Supports different extraction modes including full geometry, parameterized checkerboard patterns,
+     * and plane slices for creating complex geometric models.
+     *
+     * @param filename Path to output STL file (will be created or overwritten).
+     * @param objectName Name to use in STL header (default: "Cube").
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param x X-axis modulo parameter for checkerboard (default: 2), or layer for plane modes.
+     * @param y Y-axis modulo parameter for checkerboard (default: 9).
+     * @param z Z-axis modulo parameter for checkerboard (default: 2).
+     * @throws std::runtime_error if file cannot be created or written.
+     * @throws std::invalid_argument if mode is invalid or parameters are out of range.
+     */
+    void writeSTL_s(const std::string& filename,
+                    const std::string& objectName,
+                    const std::string& mode,
+                    int x,
+                    int y = 9,
+                    int z = 2) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open()) {
+            throw std::runtime_error("Cube::writeSTL_s: Cannot create file " + filename);
+        }
+    
+        stl << "solid " << objectName << "\n";
+    
+        FacetBox facetsToWrite;
+    
+        if (mode == "full") {
+            facetsToWrite = getFacets();
+    
+        } else if (mode == "checkerboard") {
+            if (!hasSubdivision()) {
+                facetsToWrite = getFacets();
+            } else {
+                // Use parameterized checkerboard with x, y, z as modulo parameters
+                facetsToWrite = getCheckerboardFacets(x, y, z);
+            }
+    
+        } else if (mode == "plane_xy") {
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(2, x);  // x is layer parameter for plane modes
+    
+        } else if (mode == "plane_xz") {
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(1, x);  // x is layer parameter for plane modes
+    
+        } else if (mode == "plane_yz") {
+            if (!hasSubdivision()) {
+                throw std::invalid_argument("Plane extraction requires subdivided cube");
+            }
+            facetsToWrite = getPlaneFacets(0, x);  // x is layer parameter for plane modes
+    
+        } else {
+            throw std::invalid_argument("Invalid mode: " + mode +
+                ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+        }
+    
+        // Write all selected facets to STL
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+    
+            Vector3D v1 = face[0];
+            Vector3D v2 = face[1];
+            Vector3D v3 = face[2];
+    
+            Vector3D normal = face.getNormal();
+    
+            stl << "facet normal ";
+            stl << std::scientific << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+    
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+    /**
      * @brief Write multiple cube geometries to a single STL file with pattern support.
      *
      * Exports triangular faces from a collection of cubes into one STL file.
@@ -600,6 +783,102 @@ public:
         stl << "endsolid " << objectName << "\n";
         stl.close();
     }
+
+
+    /**
+     * @brief Write multiple cube geometries to a single STL file with parameterized pattern support.
+     *
+     * Exports triangular faces from a collection of cubes into one STL file.
+     * Supports different extraction modes including full geometry, parameterized checkerboard patterns,
+     * and plane slices for creating complex multi-cube models.
+     *
+     * @param filename Path to output STL file (will be created or overwritten).
+     * @param cubes Vector of cube objects to include in the STL file.
+     * @param objectName Name to use in STL header (default: "MultiCube").
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param x X-axis modulo parameter for checkerboard (default: 2), or layer for plane modes.
+     * @param y Y-axis modulo parameter for checkerboard (default: 9).
+     * @param z Z-axis modulo parameter for checkerboard (default: 2).
+     * @throws std::runtime_error if file cannot be created or written.
+     * @throws std::invalid_argument if mode is invalid or parameters are out of range.
+     */
+    static void writeMultiSTL_m(const std::string& filename,
+                             const std::vector<Cube>& cubes,
+                             const std::string& objectName,
+                             const std::string& mode,
+                             int x,
+                             int y = 9,
+                             int z = 2) {
+        std::ofstream stl(filename);
+        if (!stl.is_open()) {
+            throw std::runtime_error("Cube::writeMultiSTL_m: Cannot create file " + filename);
+        }
+    
+        stl << "solid " << objectName << "\n";
+    
+        for (size_t cubeIndex = 0; cubeIndex < cubes.size(); ++cubeIndex) {
+            const Cube& cube = cubes[cubeIndex];
+            FacetBox facetsToWrite;
+    
+            if (mode == "full") {
+                facetsToWrite = cube.getFacets();
+    
+            } else if (mode == "checkerboard") {
+                if (!cube.hasSubdivision()) {
+                    facetsToWrite = cube.getFacets();
+                } else {
+                    // Use parameterized checkerboard with x, y, z as modulo parameters
+                    facetsToWrite = cube.getCheckerboardFacets(x, y, z);
+                }
+    
+            } else if (mode == "plane_xy") {
+                if (!cube.hasSubdivision()) {
+                    throw std::invalid_argument("Plane extraction requires subdivided cube");
+                }
+                facetsToWrite = cube.getPlaneFacets(2, x);  // x is layer parameter
+    
+            } else if (mode == "plane_xz") {
+                if (!cube.hasSubdivision()) {
+                    throw std::invalid_argument("Plane extraction requires subdivided cube");
+                }
+                facetsToWrite = cube.getPlaneFacets(1, x);  // x is layer parameter
+    
+            } else if (mode == "plane_yz") {
+                if (!cube.hasSubdivision()) {
+                    throw std::invalid_argument("Plane extraction requires subdivided cube");
+                }
+                facetsToWrite = cube.getPlaneFacets(0, x);  // x is layer parameter
+    
+            } else {
+                throw std::invalid_argument("Invalid mode: " + mode +
+                    ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+            }
+    
+            // Write all selected facets to STL
+            for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+                const Facet& face = facetsToWrite[i];
+    
+                Vector3D v1 = face[0];
+                Vector3D v2 = face[1];
+                Vector3D v3 = face[2];
+    
+                Vector3D normal = face.getNormal();
+    
+                stl << "facet normal ";
+                stl << std::scientific << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+                stl << "\touter loop\n";
+                stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+                stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+                stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+                stl << "\tendloop\n";
+                stl << "endfacet\n";
+            }
+        }
+    
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
 
     /* === SUBDIVISION OPERATIONS === */
     
@@ -1016,13 +1295,52 @@ public:
             for (int j = 0; j < n; ++j) {  // Y dimension physical coordinates
                 for (int k = 0; k < n; ++k) {  // Z dimension physical coordinates
                     // Select subcells where coordinate sum is divisible by 4 (checkerboard pattern)
-                    if (/*(i*i + j*j) % 2 == 0 && k%2 == 0*/k%2 == 0 && i%2 == 0 || j%2 == 0) {
+                    if (/*k%2 == 0 && i%2 == 0 && j%2 == 0*/ (i%2 == 0 && k%2 == 0) || j%9 == 0) {
                         checkerboard.emplace_back(subcells_[i][j][k]);  // Add subcell reference to pattern
                     }
                 }
             }
         }
         return checkerboard;  // Return complete collection of pattern-matching subcells
+    }
+
+    /**
+     * @brief Extract subcells following a parameterized 3D checkerboard pattern.
+     * 
+     * Returns subcells where the pattern (i%x == 0 && k%z == 0) || j%y == 0 is satisfied.
+     * This allows customizable checkerboard patterns with different modulo values for
+     * each axis, enabling flexible geometric sampling and visual effects.
+     * 
+     * @param x Modulo divisor for i-coordinate (X-axis pattern frequency).
+     * @param y Modulo divisor for j-coordinate (Y-axis pattern frequency).
+     * @param z Modulo divisor for k-coordinate (Z-axis pattern frequency).
+     * @return Vector of const references to subcells matching the custom pattern.
+     * @throws std::runtime_error if no subdivision available.
+     * @throws std::invalid_argument if x, y, or z are less than 1.
+     */
+    std::vector<std::reference_wrapper<const SubCell>> getCheckerboardSubcells(int x, int y, int z) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::getCheckerboardSubcells: no subdivision available");
+        }
+        
+        if (x < 1 || y < 1 || z < 1) {
+            throw std::invalid_argument("Cube::getCheckerboardSubcells: x, y, z must be >= 1");
+        }
+    
+        std::vector<std::reference_wrapper<const SubCell>> checkerboard;
+        int n = subdivision_levels_;
+    
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    // Apply parameterized checkerboard pattern
+                    if ((i%x == 0 && k%z == 0) || j%y == 0) {
+                        checkerboard.emplace_back(subcells_[i][j][k]);
+                    }
+                }
+            }
+        }
+        return checkerboard;
     }
 
     /**
@@ -1052,6 +1370,34 @@ public:
             }
         }
         return checkerboard_facets;  // Return complete set of pattern triangular faces
+    }
+
+    /**
+     * @brief Generate triangular faces for parameterized checkerboard pattern.
+     * 
+     * Creates a FacetBox containing triangular faces from all subcells that match
+     * the custom checkerboard pattern defined by (i%x == 0 && k%z == 0) || j%y == 0.
+     * 
+     * @param x Modulo divisor for i-coordinate (X-axis pattern frequency).
+     * @param y Modulo divisor for j-coordinate (Y-axis pattern frequency).
+     * @param z Modulo divisor for k-coordinate (Z-axis pattern frequency).
+     * @return FacetBox containing triangular faces from matching active subcells.
+     * @throws std::runtime_error if no subdivision available.
+     * @throws std::invalid_argument if x, y, or z are less than 1.
+     */
+    FacetBox getCheckerboardFacets(int x, int y, int z) const {
+        auto checkerboard_subcells = getCheckerboardSubcells(x, y, z);
+        FacetBox checkerboard_facets;
+    
+        for (const SubCell& cell : checkerboard_subcells) {
+            if (!cell.active) continue;
+    
+            for (int t = 0; t < 12; ++t) {
+                auto const& tri = cube_triangles_[t];
+                checkerboard_facets.push(cell.vertices[tri[0]], cell.vertices[tri[1]], cell.vertices[tri[2]]);
+            }
+        }
+        return checkerboard_facets;
     }
 
     /* === STRING-BASED PLANE ACCESS === */

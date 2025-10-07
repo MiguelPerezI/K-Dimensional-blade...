@@ -84,7 +84,7 @@ Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
 // ==================== CUBE INSTANCES ====================
-int N = 20; // Number of subdivision levels
+int N = 11; // Number of subdivision levels
 double cube_dim = 2.0;
 // Basic cube: radius=1.0 (side length=2.0), positioned right of center
 // This creates a simple cube with 12 triangular faces (2 triangles per face × 6 faces)
@@ -464,7 +464,7 @@ public:
             throw std::runtime_error("CubeManager::exportToSTL: No cubes to export");
         }
         
-        Cube::writeMultiSTL_m(filename, cubes, objectName, mode, layer);
+        //Cube::writeMultiSTL_m(filename, cubes, objectName, mode, layer);
         
         std::cout << "Exported " << cubes.size() << " cubes (" << mode << " mode) to " 
                   << filename << std::endl;
@@ -529,11 +529,15 @@ void Setup() {
         g_cubeManager.initializeCubes();
         
         cout << "\nWriting cubes to STL\n";
-        g_cubeManager.exportToSTL_m("/home/mike666/Downloads/my_cube_collection.stl", "CheckerCollection", "checkerboard");//exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
+        //g_cubeManager.exportToSTL_m("/home/mike666/Downloads/my_cube_collection.stl", "CheckerCollection", "checkerboard");//exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
     }
 }
 
 ///////////////////     DRAW       ///////////////////////
+int ii = 2;
+int jj = 9;
+int kk = 2;
+
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere
@@ -542,7 +546,7 @@ void Draw() {
         /*Draw here with OpenGL*/	
         //// ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
         for (size_t s = 0; s < g_cubeManager.size(); s++) {
-            plane_subcells = g_cubeManager.getCube(s).getCheckerboardFacets();//getPlaneFacets(g_currentOrientation, g_currentLayer);
+            plane_subcells = g_cubeManager.getCube(s).getCheckerboardFacets(ii, kk, jj);//getPlaneFacets(g_currentOrientation, g_currentLayer);
             // Draw reflected cube using checkboard pattern
             for (size_t i = 0; i < plane_subcells.size(); ++i) {
                 drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
@@ -1111,21 +1115,29 @@ void keyboard(unsigned char key, int x, int y) {
 
         // Plane orientation controls
         case 'o':
+            kk += 1;                                                                                                                                
+            glutPostRedisplay();
+            break;
         case 'O':
-            g_currentOrientation = (g_currentOrientation + 1) % 3;
-            printf("Orientation: %s\n", g_currentOrientation == 0 ? "XY" :
-                                       g_currentOrientation == 1 ? "YZ" : "XZ");
+            kk -= 1;
             glutPostRedisplay();
             break;
 
         // Layer controls
         case '+':
+            ii += 1;
+            glutPostRedisplay();
+            break;
         case '=':
             g_currentLayer = (g_currentLayer + 1) % g_maxLayers;
             printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
             glutPostRedisplay();
             break;
         case '-':
+            ii -= 1;
+            glutPostRedisplay();
+            break;
+
         case '_':
             g_currentLayer = (g_currentLayer - 1 + g_maxLayers) % g_maxLayers;
             printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
