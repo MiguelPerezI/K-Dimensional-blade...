@@ -186,6 +186,10 @@ void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double r
     cout << "  Triangulation refreshed for cube\n";                                                                                                                                     
 }
 
+// ii, jj, kk : integers that represent the module action on the subecube lattice for cube.
+int ii = 4;
+int jj = 5;
+int kk = 9;
 
 void Setup() {
 
@@ -220,19 +224,15 @@ void Setup() {
         cout << "                              ~[Cube Class Example - Enhanced Camera]\n\n";
                                                                                                                                                                                         
         // ==================== CUBE SETUP ====================
-
-
+        cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
         // ==================== ADVANCED SUBDIVISION DEMOS - Reflection of the subdivision in Spheres ====================
         applySigmaTransformationToCube(cube, Vector3D{0,0,0}, 0.5); 
         applySigmaTransformationToCube(cube, cube.getSubcellCenter(1,1,1), cube.getSubcellRadius(1,1,1));
-        cube.writeSTL_s("/home/mike666/Downloads/mesh_output.stl", "MyCube", "checkerboard", 2, 2, 9);
+        cube.writeSTL_s("/home/mike666/Downloads/mesh_output.stl", "MyCube", "checkerboard", ii, kk, jj);
     }
 }
 
 ///////////////////     DRAW       ///////////////////////
-int ii = 4;
-int jj = 5;
-int kk = 9;
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere
@@ -762,25 +762,42 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
             
-        // Plane orientation controls
-        case 'o':
+        // Switch 'k' module
+        case 'k':
             kk += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
-        case 'O':
+        case 'K':
             kk -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
 
-        // Layer controls
-        case '+':
+        // Switch 'i' module
+        case 'i':
             ii += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
-        case '-':
+        case 'I':
             ii -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
+
+        // Switch 'j' module
+        case 'j':
+            jj += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
+            glutPostRedisplay();
+            break;
+        case 'J':
+            jj -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
+            glutPostRedisplay();
+            break;
+
         case 27: // ESC key
             exit(0);
             break;
