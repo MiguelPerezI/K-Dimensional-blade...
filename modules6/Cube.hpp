@@ -1400,6 +1400,85 @@ public:
         return checkerboard_facets;
     }
 
+    /**
+     * @brief Flatten the entire subdivided lattice into a contiguous position array.
+     *
+     * Fills `positions` with n^3 * 8 * 3 floats, iterating subcells in physical
+     * grid order [i][j][k] and local cube vertex 0..7. Each subcell contributes its
+     * own 8 vertices (vertices are duplicated across neighbours, matching the
+     * existing storage). This is the static vertex source for a GPU vertex buffer
+     * uploaded once after subdivision is finalized.
+     *
+     * @param positions Output buffer (cleared and filled). Length = n*n*n*8*3.
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillVertexLattice(std::vector<float>& positions) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillVertexLattice: no subdivision available");
+        }
+        const int n = subdivision_levels_;
+        positions.clear();
+        positions.reserve((size_t)n * n * n * 8 * 3);
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    for (int l = 0; l < 8; ++l) {
+                        const Vector3D& v = cell.vertices[l];
+                        positions.push_back((float)v.x());
+                        positions.push_back((float)v.y());
+                        positions.push_back((float)v.z());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Build a triangle index buffer for the parameterized checkerboard pattern.
+     *
+     * Mirrors getCheckerboardFacets(x,y,z) but emits raw vertex indices into the
+     * lattice produced by fillVertexLattice() instead of constructing Facet objects.
+     * The predicate (i%x==0 && k%z==0) || j%y== 0, the active-cell filter, and the
+     * cube_triangles_ lookup table are identical to the Facet-generating path, so the
+     * rendered geometry is byte-for-byte the same — only the per-frame CPU cost
+     * (cross product + sqrt per Facet) is eliminated. Uses unsigned int (no GL types)
+     * so Cube stays GL-agnostic. Divisors < 1 are clamped to 1 to avoid modulo-by-zero.
+     *
+     * @param x Modulo divisor for i (X-axis), clamped to >= 1.
+     * @param y Modulo divisor for j (Y-axis), clamped to >= 1.
+     * @param z Modulo divisor for k (Z-axis), clamped to >= 1.
+     * @param indices Output index buffer (cleared and filled). 12 triangles per active cell.
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillCheckerboardIndices(int x, int y, int z, std::vector<unsigned int>& indices) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillCheckerboardIndices: no subdivision available");
+        }
+        if (x < 1) x = 1;
+        if (y < 1) y = 1;
+        if (z < 1) z = 1;
+
+        const int n = subdivision_levels_;
+        indices.clear();
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if (!((i % x == 0 && k % z == 0) || j % y == 0)) continue;
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const unsigned int base = (unsigned int)(((i * n) + j) * n + k) * 8u;
+                    for (int t = 0; t < 12; ++t) {
+                        const auto& tri = cube_triangles_[t];
+                        indices.push_back(base + (unsigned int)tri[0]);
+                        indices.push_back(base + (unsigned int)tri[1]);
+                        indices.push_back(base + (unsigned int)tri[2]);
+                    }
+                }
+            }
+        }
+    }
+
     /* === STRING-BASED PLANE ACCESS === */
     
     /**

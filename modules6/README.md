@@ -31,6 +31,242 @@ F       : zoom In
 
 ---
 
+## 🚀 GPU-Accelerated Build — `main15_gpu` (NVIDIA Tesla T4)
+
+`main15_gpu.cpp` is a GPU-accelerated version of `main15.cpp`. It renders the same
+checkerboard-reflected subdivided cube, with the same look and the same controls,
+but on the **NVIDIA Tesla T4** instead of the CPU — which makes it dramatically
+faster. The original `main15.cpp` is left untouched as a reference/baseline.
+
+### Why the original was slow (root cause)
+
+The original `main15` was slow for **two compounding reasons**, both verified on
+this server:
+
+1. **It never used the GPU.** Its OpenGL context rendered through Mesa's
+   `llvmpipe` **software rasterizer** (CPU), not the installed Tesla T4. The T4
+   was fully usable — the app simply never selected the NVIDIA GLX backend.
+   Confirmed: querying the active renderer returned
+   `VENDOR=Mesa, RENDERER=llvmpipe`; forcing `__GLX_VENDOR_LIBRARY_NAME=nvidia`
+   switched the same program to `RENDERER=Tesla T4/PCIe/SSE2, OpenGL 4.6.0`.
+2. **Pathological immediate-mode rendering.** Every frame the CPU rebuilt
+   ~112,860 `Facet` objects (each does a cross product + `sqrt`) and issued
+   **~225K `glBegin/glEnd` batches** (fill + outline, two batches per triangle).
+   There were no VBOs, no display lists, no shaders. The 37³ cube geometry is
+   built **once** in `Setup()` and never changes per frame; only the
+   checkerboard *selection* (`ii/jj/kk`) changes, and only on key press.
+
+`main15_gpu` fixes both:
+
+- **Selects the NVIDIA GLX backend** via `setenv("__GLX_VENDOR_LIBRARY_NAME",
+  "nvidia",1)` before `glutInit` (and via the `run_gpu.sh` launcher), so the T4
+  rasterizes instead of llvmpipe.
+- **Replaces the immediate-mode loop** with a static VBO (uploaded once), an
+  index buffer rebuilt **only when `ii/jj/kk` change**, and a `#version 460 core`
+  GLSL shader that computes per-triangle face normals on the GPU via
+  `dFdx/dFdy`. The ~225K `glBegin/glEnd` batches collapse to **2
+  `glDrawElements` calls** per frame (one fill pass, one outline pass).
+
+### What it does (feature parity with `main15`)
+
+- Builds one `Cube` of radius `2.0` subdivided `37×37×37` (`50,653` subcells).
+- Applies two sphere-inversion (`sigma`) reflections in `Setup()` (one centered
+  at the origin, one at subcell `(1,1,1)`) — identical to `main15`.
+- Renders the **parameterized checkerboard selection** `(i%ii==0 && k%jj==0)
+  || j%kk==0` of active subcells, each as 12 triangles, with gray lit fills and
+  black triangle outlines (same look as `main15`).
+- Same interactive camera (mouse rotate/pan/zoom, wheel zoom), same keyboard
+  controls, same right-click menu, same fisheye "projection" toggle, same HUD.
+- Writes an STL export of the selected mesh to
+  `/home/mike666/Downloads/mesh_output_gpu.stl` (one-time, in `Setup()`).
+
+### How to execute
+
+```bash
+cd /home/mike666/K-Dimensional-blade.../modules6
+
+# 1. Compile (pure g++ + GL libs; no CUDA, no GLEW needed)
+g++ -o main15_gpu main15_gpu.cpp -lGL -lGLU -lglut -lm
+
+# 2. Run on the Tesla T4
+./run_gpu.sh
+#   run_gpu.sh is equivalent to:
+#   DISPLAY=:0.0 __GLX_VENDOR_LIBRARY_NAME=nvidia ./main15_gpu
+```
+
+On startup the program prints which renderer it actually got, e.g.:
+
+```
+[main15_gpu] GL VENDOR   = NVIDIA Corporation
+[main15_gpu] GL RENDERER = Tesla T4/PCIe/SSE2
+[main15_gpu] GL VERSION  = 4.6.0 NVIDIA 580.173.02
+[main15_gpu] VBO uploaded: 405224 vertices (4.64 MB)
+[main15_gpu] IBO rebuilt: 112860 triangles (ii,jj,kk=4,5,9)
+```
+
+If you ever see `RENDERER = llvmpipe`, the GPU was not selected — run it through
+`./run_gpu.sh` (or export `__GLX_VENDOR_LIBRARY_NAME=nvidia` yourself). The
+in-program `setenv` means the binary self-selects the T4 even without the
+launcher, but `run_gpu.sh` is the supported, belt-and-suspenders path.
+
+> The original baseline still works for comparison:
+> ```bash
+> g++ -o main15 main15.cpp -lGL -lGLU -lglut -lm && ./main15   # still llvmpipe/CPU
+> ```
+
+### What to install before use
+
+The program needs a working NVIDIA OpenGL stack and FreeGLUT. On this server
+(Ubuntu 24.04, Tesla T4, driver 580.173.02, CUDA 13.0) everything is already
+present. On a fresh machine, install:
+
+```bash
+# NVIDIA driver + userspace GL (provides libGLX_nvidia.so, the GL 4.6 backend)
+sudo apt update
+sudo apt install nvidia-driver-580     # or match your installed kernel module
+
+# OpenGL / GLUT development headers and runtime libs
+sudo apt install libgl1-mesa-dev libglu1-mesa-dev freeglut3-dev
+
+# (Optional) only to *inspect* which GL renderer is active — not required to run
+sudo apt install mesa-utils            # provides glxinfo
+```
+
+Notes:
+- **No GLEW / GLFW / glad required.** Modern GL functions (VBOs, shaders,
+  uniforms) are loaded with a tiny manual `glXGetProcAddressARB` loader bundled
+  in `main15_gpu.cpp` (see *Code architecture* below). The build only needs
+  `-lGL -lGLU -lglut -lm`.
+- **No CUDA toolkit required.** The speedup comes from GPU-side OpenGL
+  rasterization + shaders, not compute kernels. `nvcc` / CUDA are not used at
+  compile time or runtime. (CUDA 13.0 happens to be installed here, but the GPU
+  build does not depend on it.)
+- **A display is required.** The app opens a real GLUT window. This server runs
+  a real Xorg on `:0` (lightdm + sunshine), so `DISPLAY=:0.0` works. On a
+  headless box you'd need `Xvfb`/`xvfb-run` or an EGL/Headless approach (out of
+  scope for this build).
+
+### Dependencies map
+
+| Dependency | Provided by | Required? | Purpose |
+|---|---|---|---|
+| NVIDIA driver + `libGLX_nvidia.so` | `nvidia-driver-*` | **Yes** | Hardware GL 4.6 backend on the T4 |
+| `libGL.so` (GLVND) | `libgl1` / `libglvnd0` | Yes | OpenGL 1.x symbols + `glXGetProcAddressARB` loader |
+| `libGLU.so` | `libglu1-mesa-dev` | Yes | `gluPerspective` (fisheye projection) |
+| FreeGLUT (`libglut.so`, `GL/glut.h`) | `freeglut3-dev` | Yes | Window, context, input callbacks |
+| `libm` | glibc | Yes | `math.h` / `M_PI` |
+| GLEW / GLFW / glad | — | **No** | Replaced by the manual loader |
+| CUDA toolkit (`nvcc`, cudart) | `cuda-toolkit` | **No** | Not used by the GL render path |
+| `mesa-utils` (`glxinfo`) | `mesa-utils` | Optional | Only to inspect the active renderer |
+| C++17 compiler | `g++` (≥ 7) | Yes | Raw string literals, structured bindings |
+
+### Code architecture
+
+**Files added/changed for the GPU build:**
+
+| File | Role |
+|---|---|
+| `main15_gpu.cpp` | New program. Copy of `main15.cpp` with the render path rewritten (see below). |
+| `run_gpu.sh` | Launcher: sets `DISPLAY` + `__GLX_VENDOR_LIBRARY_NAME=nvidia`, execs `./main15_gpu`. |
+| `Cube.hpp` | Two small **additive** `const` accessors added (no existing behavior changed): |
+
+```cpp
+void fillVertexLattice(std::vector<float>& positions) const;                    // n^3*8*3 floats
+void fillCheckerboardIndices(int x,int y,int z, std::vector<unsigned int>& idx) const; // 12 tris/active cell
+```
+
+These iterate `subcells_[i][j][k]` and `cube_triangles_` exactly the way the
+existing `getCheckerboardSubcells` / `getCheckerboardFacets` do (same `[0,n)`
+indexing, same predicate, same triangulation table), so the GPU-rendered
+geometry is identical to the CPU path — only the per-frame `Facet`
+construction cost is removed. They use plain `float` / `unsigned int` so
+`Cube.hpp` stays GL-agnostic.
+
+**Render path (per frame) in `main15_gpu.cpp`:**
+
+```
+display()
+ ├─ glClear
+ ├─ set fixed-function MODELVIEW (glTranslate + glRotate)   ← same as main15
+ ├─ drawAxes()                                              ← unchanged fixed-function
+ ├─ drawGPU()
+ │   ├─ read back PROJECTION & MODELVIEW with glGetFloatv
+ │   ├─ uMVP = PROJECTION * MODELVIEW                        ← guarantees positional parity
+ │   ├─ compute camera pos + light dir (inverse of view rotation)
+ │   ├─ if selection dirty: rebuild IBO (only on i/I/j/J/k/K)
+ │   ├─ glUseProgram; bind VBO/IBO; set uniforms
+ │   ├─ fill pass:  glPolygonMode(FILL) + POLYGON_OFFSET_FILL; glDrawElements  (uMode=0)
+ │   └─ outline pass: glPolygonMode(LINE); glDrawElements                    (uMode=1, black)
+ ├─ drawHUD()                                               ← unchanged fixed-function
+ └─ glutSwapBuffers
+```
+
+Key architectural decisions:
+
+- **No external GL loader.** A ~25-line manual loader uses
+  `glXGetProcAddressARB` (from `<GL/glx.h>`) to fetch the post-GL-1.1 function
+  pointers (`glGenBuffers`, `glCreateShader`, `glUniformMatrix4fv`,
+  `glVertexAttribPointer`, …). GL 1.x calls (`glDrawElements`, `glClear`,
+  `glPolygonMode`, …) link directly from `-lGL`. Verified end-to-end on the T4.
+- **Matrix parity trick.** The fixed-function matrix stack is kept exactly as
+  in `main15` (`reshape` sets the projection with the fisheye distortion;
+  `display` sets the modelview). The shader's `uMVP` is built by reading those
+  matrices back with `glGetFloatv` and multiplying them. This guarantees the
+  GPU-rendered triangles land at the same screen positions as the original
+  fixed-function pipeline would have placed them, and it lets the axes/HUD
+  keep using fixed-function (they're tiny and not worth porting).
+- **Two-sided flat lighting in the fragment shader.** Normals are computed
+  per-triangle from `normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)))` (zero
+  CPU normal work), flipped to face the camera, and shaded with Blinn-Phong
+  using the same ambient/diffuse/specular/shininess values as the original
+  `initGL()` (`GL_LIGHT0` ambient 0.3, diffuse 0.7, specular 1.0, shininess 128,
+  gray material `(200,200,200)`).
+- **Index buffer rebuilt lazily.** `g_selectionDirty` is set by the `i/I/j/J/k/K`
+  key handlers; the IBO is rebuilt once on the next frame (and on the first
+  frame). Steady-state mouse rotate/pan/zoom never touches the IBO — it only
+  re-uploads the `uMVP` uniform.
+
+**Reused geometry classes (unchanged):** `Cube.hpp`, `Facet.hpp/cpp`,
+`FacetBox.hpp`, `Vector3D.hpp/cpp`, `Quaternion.hpp/cpp`. The one-time `Setup()`
+pipeline (`applySigmaTransformationToCube` → `refreshTriangulation` →
+`writeSTL_s`) is identical to `main15`. `Dodecahedron`, `Torus`, `Vector4D`,
+and `FacetBox.cpp` are linked in transitively but are **not on the per-frame
+render path** (legacy).
+
+### Performance numbers (this server)
+
+| Metric | `main15` (CPU/llvmpipe) | `main15_gpu` (Tesla T4) |
+|---|---|---|
+| OpenGL renderer | Mesa `llvmpipe` (software) | `Tesla T4/PCIe/SSE2` (hardware) |
+| Per-frame CPU facet construction | ~112,860 `Facet`s (cross+`sqrt` each) | **0** (normals in shader) |
+| Per-frame draw calls | ~225,000 `glBegin/glEnd` batches | **2** `glDrawElements` |
+| VBO upload | every frame (immediate mode) | **once** (405,224 verts, 4.64 MB) |
+| IBO rebuild | n/a (rebuilt facets every frame) | **only on `ii/jj/kk` change** (112,860 tris) |
+| Selection triangle count | ~112,860 | ~112,860 (identical geometry) |
+
+### Troubleshooting
+
+- **`RENDERER = llvmpipe`** — GPU not selected. Run via `./run_gpu.sh`, or
+  `export __GLX_VENDOR_LIBRARY_NAME=nvidia`. The program also prints a warning
+  in this case.
+- **`freeglut: ERROR: Internal error <FBConfig with necessary capabilities not found>`**
+  — the requested display mode couldn't be satisfied. Make sure you're using
+  `GLUT_DEPTH` (not `GL_DEPTH`), that an X server is running on `$DISPLAY`, and
+  that the NVIDIA driver is loaded (`nvidia-smi` works).
+- **No window / `DISPLAY` not set** — on a headless box you need an X server
+  (`Xvfb`/`xvfb-run`) or an EGL headless context. This build targets the
+  on-server `:0` Xorg.
+- **Link errors about `glGenBuffers` etc.** — those are loaded at runtime, not
+  linked; if you see them, you've accidentally called a modern GL function
+  without going through the loader. The build line is just
+  `g++ -o main15_gpu main15_gpu.cpp -lGL -lGLU -lglut -lm`.
+- **Shader compile error printed to stderr** — the program aborts if the
+  `#version 460 core` program fails to compile/link. This means the active GL
+  context is < 4.6 (e.g. an old software fallback); ensure the NVIDIA backend is
+  selected.
+
+---
+
 ## Cube Class Usage
 
 The `Cube.hpp` header provides a complete cube implementation with triangulation and subdivision capabilities, featuring **full subdivision control** for real-time manipulation and selective rendering.
