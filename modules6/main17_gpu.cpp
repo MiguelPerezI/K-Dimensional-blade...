@@ -17,7 +17,59 @@
 
 //////////////////////////////////////
 //
-//  main15_gpu.cpp  —  GPU-accelerated build of main15.
+//  main17_gpu.cpp  —  car camera that drives on the mesh surface.
+//
+//  Builds on main16_gpu.cpp (the realtime-animated inversion build). The mesh is a
+//  3D checkerboard of small subcell-cubes warped each frame by two sphere-inversions
+//  (composeSigma) into an inflating/contracting blob. The inversion is applied to a
+//  STATIC identity lattice (g_identityPositions); the Cube object never moves.
+//
+//  New in main17: a "car camera". The car lives in IDENTITY space — it drives on the
+//  flat top face of the identity cube (y = yMax, x,z within the cube extent). Each
+//  frame, the SAME composeSigma that deforms the mesh maps the car's identity-space
+//  position + orientation (via a finite-difference Jacobian) into world space, so the
+//  camera rides the blob's outer skin exactly — sticking to the surface through every
+//  inflation/contraction with no mesh-topology/adjacency work.
+//
+//    Controls:  W/S throttle | A/D steer | C toggles car<->orbit cam | Esc quit
+//    View: cockpit/first-person on the skin; starts at rest in the centre of the face.
+//
+//  Inherited from main16_gpu (unchanged): the NVIDIA GLX backend force, the dynamic
+//  VBO upload path, the index buffer rebuilt only on ii/jj/kk change, the #version 460
+//  core shader, and the fixed-function matrix stack that the shader's uMVP is read back
+//  from (so the car camera lands correctly with no shader changes).
+//
+//////////////////////////////////////
+
+//////////////////////////////////////
+//  (legacy main16 header below)
+//////////////////////////////////////
+//
+//  Changes vs main15_gpu.cpp:
+//    1. The two sphere-inversion (sigma) passes that main15 baked once in Setup()
+//       (lines 306/307) are now driven per frame from the IDENTITY lattice:
+//         - pass 1 center oscillates in z:  Vector3D(0, 0, sin(t)), radius 0.5
+//         - pass 2 center/radius walk a curated list of lattice corners via
+//           cube.getSubcellCenter(i,j,k) / cube.getSubcellRadius(i,j,k)
+//       The cube itself stays pristine (identity) forever; each frame the
+//       composed sigma is computed from a cached identity vertex buffer into the
+//       VBO (now GL_DYNAMIC_DRAW). This avoids the ~608k-Facet cost of
+//       refreshTriangulation()/subdivide() per frame and the frame-over-frame
+//       compounding that re-applying sigma in place would cause.
+//    2. A glutTimerFunc drives the animation clock; [Space] pauses/resumes.
+//
+//  Inherited from main15_gpu: the NVIDIA GLX backend force, the static-style VBO
+//  upload path (now dynamic), the index buffer rebuilt only on ii/jj/kk change,
+//  and the #version 460 core shader. The fixed-function matrix stack is kept
+//  exactly as in main15 (reshape sets the projection, display sets the modelview).
+//
+//////////////////////////////////////
+
+//////////////////////////////////////
+//  (legacy header from main15_gpu below)
+//////////////////////////////////////
+//
+//  GPU-accelerated build of main15.
 //
 //  Two changes vs main15.cpp:
 //    1. Force the NVIDIA GLX backend (setenv before glutInit) so the Tesla T4
@@ -67,6 +119,7 @@ GLDECL(void,  glGenBuffers, (GLsizei, GLuint*));
 GLDECL(void,  glDeleteBuffers, (GLsizei, const GLuint*));
 GLDECL(void,  glBindBuffer, (GLenum, GLuint));
 GLDECL(void,  glBufferData, (GLenum, GLsizeiptr, const void*, GLenum));
+GLDECL(void,  glBufferSubData, (GLenum, GLintptr, GLsizeiptr, const void*));
 GLDECL(GLuint, glCreateShader, (GLenum));
 GLDECL(void,  glDeleteShader, (GLuint));
 GLDECL(void,  glShaderSource, (GLuint, GLsizei, const GLchar* const*, const GLint*));
@@ -92,7 +145,7 @@ GLDECL(void,  glVertexAttribPointer, (GLuint, GLint, GLenum, GLboolean, GLsizei,
 
 static void loadGL() {
     #define L(name) name = (PFN_##name)glXGetProcAddressARB((const GLubyte*)#name)
-    L(glGenBuffers); L(glDeleteBuffers); L(glBindBuffer); L(glBufferData);
+    L(glGenBuffers); L(glDeleteBuffers); L(glBindBuffer); L(glBufferData); L(glBufferSubData);
     L(glCreateShader); L(glDeleteShader); L(glShaderSource); L(glCompileShader);
     L(glCreateProgram); L(glDeleteProgram); L(glAttachShader); L(glLinkProgram);
     L(glUseProgram); L(glGetShaderiv); L(glGetShaderInfoLog);
@@ -112,6 +165,20 @@ static GLint  g_locMVP = -1, g_locLightDir = -1, g_locCamPos = -1, g_locMode = -
 static GLsizei g_indexCount = 0;
 static bool g_selectionDirty = true;  // (re)build IBO on first frame & on key press
 
+//==============================================================================
+// Realtime inversion animation (main16)
+//   pass 1 center = Vector3D(0, 0, sin(t)),  radius = 0.5  (oscillates in z)
+//   pass 2 center/radius fixed at subcell (1,1,1) — as in main15_gpu Setup():
+//            cube.getSubcellCenter(1,1,1) / cube.getSubcellRadius(1,1,1)
+// The cube stays pristine (identity) forever; each frame the composed sigma is
+// computed from g_identityPositions into g_deformedPositions and uploaded.
+//==============================================================================
+static std::vector<float> g_identityPositions;    // pristine identity lattice (filled once)
+static std::vector<float> g_deformedPositions;    // recomputed each frame, uploaded to VBO
+static double g_animTime    = 0.0;                 // animation clock (advanced by timer)
+static bool   g_animPaused  = false;
+static const double g_timeStep    = 0.02;          // animTime advance per timer tick (~33ms)
+
 // Interactive camera state (declared early so drawGPU can read it).
 static float g_angleX = 20.0f, g_angleY = -30.0f;
 static float g_zoom = 1.0f;
@@ -119,6 +186,24 @@ static float g_panX = 0.0f, g_panY = 0.0f;
 static int   g_lastX = 0, g_lastY = 0;
 static bool  g_leftDown = false, g_middleDown = false, g_rightDown = false;
 static bool  g_showHelp = true;
+
+//==============================================================================
+// Car camera (main17). The car lives in IDENTITY space — it drives on the flat
+// top face of the identity cube. Each frame the same composeSigma that deforms the
+// mesh maps the car into world space, so it sticks to the blob's outer skin through
+// every inflation/contraction. See display() for the mapping + Jacobian.
+//==============================================================================
+static bool   g_carMode    = true;     // ON by default; 'C' toggles back to orbit cam
+static double g_carX       = 0.0;      // position on identity top face (y = g_idYmax)
+static double g_carZ       = 0.0;
+static double g_carHeading = 0.0;      // radians, measured in the X-Z plane
+static double g_carSpeed   = 0.0;      // identity-space units / second
+// identity-space bounding box of the lattice (filled once in initAnimatedBuffers)
+static float  g_idXmin = 0, g_idXmax = 0, g_idYmax = 0, g_idZmin = 0, g_idZmax = 0;
+// drive keys (set in keyboard(), cleared in keyboardUp()) — consumed by animTimer()
+static bool   g_keyW = false, g_keyS = false, g_keyA = false, g_keyD = false;
+// world-space eye computed each frame in display(), read by drawGPU() for uCamPos
+static float  g_carEye[3] = {0.0f, 0.0f, 0.0f};
 
 static void drawAxes(float length);
 void Setup();
@@ -128,6 +213,7 @@ void display();
 void mouseButton(int button, int state, int x, int y);
 void mouseMotion(int x, int y);
 void keyboard(unsigned char key, int x, int y);
+void keyboardUp(unsigned char key, int x, int y);
 void drawHUD();
 void createUI();
 void ProcessMenu(int value);
@@ -180,7 +266,7 @@ static GLuint compileShader(GLenum type, const char* src) {
     GLint ok = 0; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
     if (!ok) {
         char log[4096] = {0}; glGetShaderInfoLog(s, sizeof(log), nullptr, log);
-        std::cerr << "[main15_gpu] " << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT")
+        std::cerr << "[main16_gpu] " << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT")
                   << " shader compile failed:\n" << log << std::endl;
         glDeleteShader(s);
         return 0;
@@ -203,7 +289,7 @@ static GLuint buildProgram() {
     GLint ok = 0; glGetProgramiv(prog, GL_LINK_STATUS, &ok);
     if (!ok) {
         char log[4096] = {0}; glGetProgramInfoLog(prog, sizeof(log), nullptr, log);
-        std::cerr << "[main15_gpu] program link failed:\n" << log << std::endl;
+        std::cerr << "[main16_gpu] program link failed:\n" << log << std::endl;
         glDeleteProgram(prog);
         return 0;
     }
@@ -247,13 +333,13 @@ static void buildInvRotation(const float* view, float invR[16]) {
 //==============================================================================
 void applyFisheyeProjection(int w, int h) {
     if (!g_fisheyeMode) {
-        gluPerspective(50.0, (double)w / h, 0.1, 1000.0);
+        gluPerspective(50.0, (double)w / h, 0.001, 1000.0);
         return;
     }
     glLoadIdentity();
     float aspect = (float)w / h;
     float fisheyeFov = fminf(50.0f * (1.0f + g_fisheyeStrength * 2.5f), 170.0f);
-    gluPerspective(fisheyeFov, aspect, 0.05, 1000.0);
+    gluPerspective(fisheyeFov, aspect, 0.001, 1000.0);
     if (g_fisheyeStrength > 0.1f) {
         GLfloat distortionMatrix[16] = {
             1.0f - g_fisheyeStrength * 0.2f, 0, 0, 0,
@@ -300,27 +386,58 @@ void Setup() {
     if (ciclo != 0) return;
 
     std::cout << "\n———————————————————————————————————————————————————————————————————————\n";
-    std::cout <<   "|- CUBEs  (GPU build — NVIDIA T4) ———————————————————————————————————\n";
+    std::cout <<   "|- CUBEs  (GPU build — NVIDIA T4, realtime inversion) —————————————————\n";
     std::cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
     std::cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
+
+    // One-time deformed STL export at t=0 (matches the old main15_gpu behavior), then
+    // reset the cube to the pristine identity lattice so initAnimatedBuffers() captures
+    // identity. The realtime loop never mutates the cube again.
+    //   t=0  => pass-1 center = (0,0,sin 0) = (0,0,0), radius 0.5
+    //   pass-2 = subcell (1,1,1) — same as main15_gpu Setup()
     applySigmaTransformationToCube(cube, Vector3D{0, 0, 0}, 0.5);
-    applySigmaTransformationToCube(cube, cube.getSubcellCenter(1, 1, 1), cube.getSubcellRadius(1, 1, 1));
+    applySigmaTransformationToCube(cube, cube.getSubcellCenter(1, 1, 1),
+                                         cube.getSubcellRadius(1, 1, 1));
     cube.writeSTL_s("/home/mike666/Downloads/mesh_output_gpu.stl", "MyCube", "checkerboard", ii, kk, jj);
+    cube.subdivide(N);   // reset to pristine identity lattice
+    std::cout << "[main16_gpu] cube reset to identity lattice for realtime loop\n";
 }
 
 //==============================================================================
 // GPU geometry buffers
 //==============================================================================
-static void uploadVertexLattice() {
-    std::vector<float> positions;
-    cube.fillVertexLattice(positions);  // n^3 * 8 * 3 floats
+static void initAnimatedBuffers() {
+    // Capture the pristine identity lattice ONCE. The cube is never deformed during
+    // the realtime loop, so this stays valid; each frame we sigma-transform a copy of
+    // it into the VBO.
+    cube.fillVertexLattice(g_identityPositions);  // n^3 * 8 * 3 floats
+    g_deformedPositions.resize(g_identityPositions.size());
     glGenBuffers(1, &g_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
-    glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(float),
-                 positions.data(), GL_STATIC_DRAW);
-    std::cout << "[main15_gpu] VBO uploaded: " << (positions.size() / 3)
-              << " vertices (" << (positions.size() * sizeof(float) / (1024.0 * 1024.0))
+    glBufferData(GL_ARRAY_BUFFER, g_identityPositions.size() * sizeof(float),
+                 g_identityPositions.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    std::cout << "[main16_gpu] VBO (dynamic): " << (g_identityPositions.size() / 3)
+              << " identity verts captured ("
+              << (g_identityPositions.size() * sizeof(float) / (1024.0 * 1024.0))
               << " MB)\n";
+
+    // Identity-space bounding box of the lattice. The car drives on the top face
+    // (y = g_idYmax), clamped to the x/z extents, so the bounds must match the
+    // actual cube placement (cube_dim / center) rather than being hard-coded.
+    g_idXmin = g_idXmax = g_identityPositions[0];
+    g_idYmax = g_identityPositions[1];
+    g_idZmin = g_idZmax = g_identityPositions[2];
+    float yMin = g_idYmax;
+    for (size_t i = 0; i + 2 < g_identityPositions.size(); i += 3) {
+        float x = g_identityPositions[i], y = g_identityPositions[i+1], z = g_identityPositions[i+2];
+        if (x < g_idXmin) g_idXmin = x; if (x > g_idXmax) g_idXmax = x;
+        if (y < yMin)     yMin     = y; if (y > g_idYmax) g_idYmax = y;
+        if (z < g_idZmin) g_idZmin = z; if (z > g_idZmax) g_idZmax = z;
+    }
+    std::cout << "[main17_gpu] identity bounds X[" << g_idXmin << "," << g_idXmax
+              << "] Y[" << yMin << "," << g_idYmax << "] Z[" << g_idZmin << "," << g_idZmax
+              << "]  car drives on top face y=" << g_idYmax << "\n";
 }
 
 static void rebuildIndexBuffer() {
@@ -332,8 +449,67 @@ static void rebuildIndexBuffer() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
                  indices.data(), GL_DYNAMIC_DRAW);
     g_selectionDirty = false;
-    std::cout << "[main15_gpu] IBO rebuilt: " << (g_indexCount / 3)
+    std::cout << "[main16_gpu] IBO rebuilt: " << (g_indexCount / 3)
               << " triangles (ii,jj,kk=" << ii << "," << jj << "," << kk << ")\n";
+}
+
+//==============================================================================
+// Composed sphere-inversion (the two Setup passes, now animated).
+// Inlined with a singular-center guard: the free sigma() in Vector3D.cpp throws
+// when a vertex coincides with the sphere center, which would crash the render
+// loop. Here we just leave such a vertex untouched.
+//==============================================================================
+static inline Vector3D composeSigma(const Vector3D& p,
+                                    const Vector3D& c1, double r1,
+                                    const Vector3D& c2, double r2) {
+    Vector3D d1 = p - c1;  double ds1 = d1 * d1;
+    Vector3D q  = (ds1 < 1e-12) ? p : c1 + (r1 * r1 / ds1) * d1;   // pass 1 (was line 306)
+    Vector3D d2 = q - c2;  double ds2 = d2 * d2;
+    return (ds2 < 1e-12) ? q : c2 + (r2 * r2 / ds2) * d2;         // pass 2 (was line 307)
+}
+
+//==============================================================================
+// Shared sigma parameters for the animated frame. Both the mesh update
+// (updateAnimatedGeometry) and the car-camera mapping (display) call this so they
+// use IDENTICAL inversion centres/radii each frame — that is what makes the car
+// stick to the mesh exactly as it inflates/contracts.
+//==============================================================================
+struct SigmaParams { Vector3D c1; double r1; Vector3D c2; double r2; };
+static SigmaParams currentSigmaParams(double t) {
+    SigmaParams s;
+    s.c1 = Vector3D(0.0, 0.0, 0.1 * sin(t));
+    s.r1 = 0.5;
+    s.c2 = cube.getSubcellCenter(1, 1, 1);
+    s.r2 = cube.getSubcellRadius(1, 1, 1);
+    return s;
+}
+static inline Vector3D composeSigmaAt(const Vector3D& p, const SigmaParams& s) {
+    return composeSigma(p, s.c1, s.r1, s.c2, s.r2);
+}
+
+//==============================================================================
+// Per-frame lattice computation + VBO upload.
+// Reads the pristine identity lattice, applies the two inversions, and streams
+// the result into the VBO. The cube object is never mutated, so
+// getSubcellCenter/getSubcellRadius always return stable identity values.
+//==============================================================================
+static void updateAnimatedGeometry() {
+    // Same two animated inversions as main16, now via the shared helper so the car
+    // camera (display()) sees the identical deformation this frame.
+    SigmaParams sp = currentSigmaParams(g_animTime);
+
+    const size_t n = g_identityPositions.size();
+    for (size_t i = 0; i + 2 < n; i += 3) {
+        Vector3D p(g_identityPositions[i], g_identityPositions[i+1], g_identityPositions[i+2]);
+        Vector3D q = composeSigmaAt(p, sp);
+        g_deformedPositions[i]   = (float)q.x();
+        g_deformedPositions[i+1] = (float)q.y();
+        g_deformedPositions[i+2] = (float)q.z();
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(n * sizeof(float)),
+                    g_deformedPositions.data());
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 //==============================================================================
@@ -354,7 +530,14 @@ static void drawGPU() {
     // Camera world position and light direction (light is fixed in eye space,
     // set with identity modelview in initGL — see comment in main).
     float invR[16]; buildInvRotation(view, invR);
-    float camPos[3]; xformPoint(invR, -g_panX, -g_panY, 5.0f * g_zoom, camPos);
+    float camPos[3];
+    if (g_carMode) {
+        // display() already computed the car eye in world space.
+        camPos[0] = g_carEye[0]; camPos[1] = g_carEye[1]; camPos[2] = g_carEye[2];
+    } else {
+        // Orbit camera: recover the world-space eye from the orbit modelview.
+        xformPoint(invR, -g_panX, -g_panY, 5.0f * g_zoom, camPos);
+    }
     float lightDir[3]; xformPoint(invR, 1.0f, 1.0f, 0.25f, lightDir);
 
     glUseProgram(g_program);
@@ -405,6 +588,39 @@ void drawAxes(float length) {
 //////////////////////////////////////
 
 //-----------------------------------------------------------------------------
+// Animation timer — advances the realtime inversion clock and requests a redraw.
+// Re-registers itself for a ~30 Hz tick. While paused, t holds so the geometry
+// freezes (display() also skips the lattice update when paused).
+//-----------------------------------------------------------------------------
+static void animTimer(int /*value*/) {
+    if (!g_animPaused) g_animTime += g_timeStep;
+
+    // Car physics, integrated in IDENTITY space (the flat top face). Time-based via
+    // g_timeStep so behaviour is independent of the frame rate. The world-space
+    // mapping happens later in display() via composeSigma, so this stays simple.
+    if (g_carMode && !g_animPaused) {
+        const double accel = 0.6, drag = 0.9, maxSpeed = 0.6, turnRate = 1.6;
+        double throttle = (g_keyW ? 1.0 : 0.0) - (g_keyS ? 1.0 : 0.0);
+        double steer    = (g_keyA ? 1.0 : 0.0) - (g_keyD ? 1.0 : 0.0);
+        g_carSpeed += throttle * accel * g_timeStep;
+        g_carSpeed *= drag;                                   // friction / natural stop
+        g_carSpeed = fmax(-maxSpeed, fmin(maxSpeed, g_carSpeed));
+        if (fabs(g_carSpeed) > 1e-4)                          // only steer while moving
+            g_carHeading += steer * turnRate * g_timeStep * (g_carSpeed > 0 ? 1.0 : -1.0);
+        g_carX += g_carSpeed * cos(g_carHeading) * g_timeStep;
+        g_carZ += g_carSpeed * sin(g_carHeading) * g_timeStep;
+        // clamp to the top face; zero speed on hit so the car "bumps" the edge
+        if (g_carX < g_idXmin) { g_carX = g_idXmin; g_carSpeed = 0; }
+        if (g_carX > g_idXmax) { g_carX = g_idXmax; g_carSpeed = 0; }
+        if (g_carZ < g_idZmin) { g_carZ = g_idZmin; g_carSpeed = 0; }
+        if (g_carZ > g_idZmax) { g_carZ = g_idZmax; g_carSpeed = 0; }
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(33, animTimer, 0);
+}
+
+//-----------------------------------------------------------------------------
 // Main
 //-----------------------------------------------------------------------------
 int main(int argc, char** argv) {
@@ -415,37 +631,39 @@ int main(int argc, char** argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(720, 720);
-    glutCreateWindow(" JAZ 4D GPU (Tesla T4) ");
+    glutCreateWindow(" JAZ 4D GPU (Tesla T4) — realtime inversion ");
 
     loadGL();
 
     // Confirm which renderer we actually got.
-    std::cout << "[main15_gpu] GL VENDOR   = " << glGetString(GL_VENDOR)   << "\n";
-    std::cout << "[main15_gpu] GL RENDERER = " << glGetString(GL_RENDERER) << "\n";
-    std::cout << "[main15_gpu] GL VERSION  = " << glGetString(GL_VERSION)  << "\n";
+    std::cout << "[main16_gpu] GL VENDOR   = " << glGetString(GL_VENDOR)   << "\n";
+    std::cout << "[main16_gpu] GL RENDERER = " << glGetString(GL_RENDERER) << "\n";
+    std::cout << "[main16_gpu] GL VERSION  = " << glGetString(GL_VERSION)  << "\n";
     std::string rendererStr = (const char*)glGetString(GL_RENDERER);
     if (rendererStr.find("llvmpipe") != std::string::npos) {
-        std::cerr << "[main15_gpu] WARNING: still on llvmpipe (software). "
+        std::cerr << "[main16_gpu] WARNING: still on llvmpipe (software). "
                      "Run via ./run_gpu.sh or set __GLX_VENDOR_LIBRARY_NAME=nvidia.\n";
     }
 
     ProcessMenu(1);   // smoothing/blending (same as main15)
     initGL();
     createUI();
-    Setup();          // one-time: sigma transforms, refreshTriangulation, STL
+    Setup();          // one-time: t=0 sigma + STL, then reset cube to identity
 
     g_program = buildProgram();
     if (!g_program) {
-        std::cerr << "[main15_gpu] shader program build failed; aborting.\n";
+        std::cerr << "[main16_gpu] shader program build failed; aborting.\n";
         return 1;
     }
-    uploadVertexLattice();   // static VBO, uploaded once
+    initAnimatedBuffers();   // capture identity lattice once; create dynamic VBO
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutMouseFunc(mouseButton);
     glutMotionFunc(mouseMotion);
     glutKeyboardFunc(keyboard);
+    glutKeyboardUpFunc(keyboardUp);
+    glutTimerFunc(33, animTimer, 0);   // ~30 Hz animation clock
 
     glutMainLoop();
     return 0;
@@ -497,14 +715,17 @@ void reshape(int w, int h) {
 void drawHUD() {
     if (!g_showHelp) return;
     const char* lines[] = {
-        "L-drag: Rotate",
-        "M-drag: Pan",
-        "R-drag/Wheel: Zoom",
+        "[C]: Toggle Car / Orbit camera",
+        "Car: W/S throttle | A/D steer (steer while moving)",
+        "L-drag: Rotate (orbit cam)",
+        "M-drag: Pan (orbit cam)",
+        "R-drag/Wheel: Zoom (orbit cam)",
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
         "[F]: Toggle Fisheye Mode",
         "[]: Fisheye Strength -/+",
         "[i/I j/J k/K]: Change <ii,jj,kk> (GPU rebuild)",
+        "[Space]: Pause/Resume inversion animation",
         "Right-click: UI Menu",
         "[Esc]: Quit"
     };
@@ -532,6 +753,16 @@ void drawHUD() {
     for (const char* c = status; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
+    // animation status line — pass-1 oscillation z + run state
+    y -= 0.05f;
+    char anim[160];
+    sprintf(anim, "inv: center=(0,0,%.2f)  pass2=subcell(1,1,1)  %s",
+            0.1 * sin(g_animTime), g_animPaused ? "PAUSED" : "RUNNING");
+    glColor3f(0.2f, 0.6f, 0.2f);
+    glRasterPos2f(0.02f, y);
+    for (const char* c = anim; *c; ++c)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+
     if (g_fisheyeMode) {
         y -= 0.05f;
         char fs[100];
@@ -539,6 +770,18 @@ void drawHUD() {
         glColor3f(0.2f, 0.2f, 0.8f);
         glRasterPos2f(0.02f, y);
         for (const char* c = fs; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+
+    // car status line — speed / heading / identity-space position
+    if (g_carMode) {
+        y -= 0.05f;
+        char car[180];
+        sprintf(car, "CAR  speed=%.2f  heading=%.0f deg  pos=(%.2f, %.2f) on skin y=%.2f",
+                g_carSpeed, g_carHeading * 180.0 / M_PI, g_carX, g_carZ, g_idYmax);
+        glColor3f(0.8f, 0.4f, 0.0f);
+        glRasterPos2f(0.02f, y);
+        for (const char* c = car; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
 
@@ -553,15 +796,54 @@ void drawHUD() {
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Fixed-function modelview — same as main15. This drives the axes/HUD and
-    // is also read back to build the shader's uMVP (guaranteeing positional parity).
+    // Recompute the animated inversion lattice and stream it into the VBO before
+    // drawing. When paused, the last computed frame is kept (we skip the update so
+    // the frozen geometry stays exactly as-is, and the timer stops advancing t).
+    if (!g_animPaused) updateAnimatedGeometry();
+
+    // Fixed-function modelview. This is read back to build the shader's uMVP, so
+    // whatever camera we set here (car or orbit) lands on screen with no shader
+    // changes. The HUD is drawn in its own ortho projection, unaffected.
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glTranslatef(g_panX, g_panY, -5.0f * (g_zoom / g_surfaceZoomFactor));
-    glRotatef(g_angleX, 1, 0, 0);
-    glRotatef(g_angleY, 0, 1, 0);
 
-    drawAxes(10.0f);
+    if (g_carMode) {
+        // --- Car camera (cockpit/first-person on the blob's outer skin) ---
+        // The car lives in identity space on the top face. Map it to world space
+        // with the SAME composeSigma that deformed the mesh this frame, and lift
+        // its orientation through the deformation's Jacobian (finite differences).
+        SigmaParams sp = currentSigmaParams(g_animTime);
+        Vector3D pId(g_carX, (double)g_idYmax, g_carZ);
+        Vector3D pW = composeSigmaAt(pId, sp);                 // world point on the skin
+
+        const double e = 1e-4;
+        Vector3D jx = (composeSigmaAt(pId + Vector3D(e, 0, 0), sp) - pW) / e;
+        Vector3D jy = (composeSigmaAt(pId + Vector3D(0, e, 0), sp) - pW) / e;
+        Vector3D jz = (composeSigmaAt(pId + Vector3D(0, 0, e), sp) - pW) / e;
+
+        // identity up = +Y (top-face normal) -> world skin normal via the Jacobian.
+        Vector3D worldUp = unit(jy);
+        // identity forward = heading in the X-Z plane -> world, then re-orthogonalise
+        // against the skin normal so it stays tangent to the surface.
+        Vector3D fwdId(cos(g_carHeading), 0.0, sin(g_carHeading));
+        Vector3D worldFwd = fwdId.x() * jx + fwdId.z() * jz;   // J * fwdId (y term ~ 0)
+        worldFwd = worldFwd - (worldFwd * worldUp) * worldUp;   // (* = dot; scalar*vec)
+        worldFwd = unit(worldFwd);
+
+        Vector3D eye = pW + 0.01 * worldUp;                    // cockpit: on the skin
+        g_carEye[0] = (float)eye.x(); g_carEye[1] = (float)eye.y(); g_carEye[2] = (float)eye.z();
+        Vector3D aim = eye + worldFwd;
+        gluLookAt(eye.x(), eye.y(), eye.z(),
+                  aim.x(), aim.y(), aim.z(),
+                  worldUp.x(), worldUp.y(), worldUp.z());
+    } else {
+        // --- Orbit camera (original main15/main16 behaviour) ---
+        glTranslatef(g_panX, g_panY, -5.0f * (g_zoom / g_surfaceZoomFactor));
+        glRotatef(g_angleX, 1, 0, 0);
+        glRotatef(g_angleY, 0, 1, 0);
+    }
+
+    //drawAxes(10.0f);
     drawGPU();   // shader + VBO/IBO replaces the ~264K glBegin/glEnd loop
     drawHUD();
 
@@ -604,6 +886,11 @@ void mouseMotion(int x, int y) {
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
+        case ' ':
+            g_animPaused = !g_animPaused;
+            printf("Animation: %s\n", g_animPaused ? "PAUSED" : "RUNNING");
+            glutPostRedisplay();
+            break;
         case 'g': case 'G':
             g_glassMode = !g_glassMode;
             printf("Glass mode: %s\n", g_glassMode ? "ON" : "OFF");
@@ -639,7 +926,37 @@ void keyboard(unsigned char key, int x, int y) {
         case 'j': jj += 1; g_selectionDirty = true; std::cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n"; glutPostRedisplay(); break;
         case 'J': jj -= 1; g_selectionDirty = true; std::cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n"; glutPostRedisplay(); break;
 
+        // --- Car camera (main17) ---
+        case 'c': case 'C':
+            g_carMode = !g_carMode;
+            if (g_carMode) {  // entering car mode: re-centre on the top face, at rest
+                g_carX = 0.5 * (g_idXmin + g_idXmax);
+                g_carZ = 0.5 * (g_idZmin + g_idZmax);
+                g_carHeading = 0.0;
+                g_carSpeed   = 0.0;
+            }
+            printf("Car camera: %s\n", g_carMode ? "ON (cockpit on skin)" : "OFF (orbit)");
+            glutPostRedisplay();
+            break;
+        case 'w': case 'W': g_keyW = true; break;
+        case 's': case 'S': g_keyS = true; break;
+        case 'a': case 'A': g_keyA = true; break;
+        case 'd': case 'D': g_keyD = true; break;
+
         case 27: exit(0); break;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Key release — clears the held drive keys so throttle/steer stop cleanly.
+//-----------------------------------------------------------------------------
+void keyboardUp(unsigned char key, int x, int y) {
+    (void)x; (void)y;
+    switch (key) {
+        case 'w': case 'W': g_keyW = false; break;
+        case 's': case 'S': g_keyS = false; break;
+        case 'a': case 'A': g_keyA = false; break;
+        case 'd': case 'D': g_keyD = false; break;
     }
 }
 

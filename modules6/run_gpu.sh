@@ -6,4 +6,4 @@ set -euo pipefail
 cd "$(dirname "$0")"
 export DISPLAY="${DISPLAY:-:0.0}"
 export __GLX_VENDOR_LIBRARY_NAME=nvidia
-exec ./main15_gpu "$@"
+exec ./main17_gpu "$@"
