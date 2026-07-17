@@ -82,6 +82,21 @@ Quaternion cross(const Quaternion& n, const Quaternion& z);
 Quaternion rotate(const Quaternion& p, const Quaternion& normal, const Quaternion& J);
 Quaternion lerp(double t, const Quaternion& p, Quaternion& q) noexcept;
 
+/* --- rotation / parallel-transport helpers --------------------------------
+ * q-prefixed names avoid clashing with Vector3D::unit / Vector3D::abs.
+ * Used by the surface-following car camera in main17_gpu.cpp.
+ */
+double    qabs(const Quaternion& q) noexcept;          // norm sqrt(r² + ‖v‖²)
+Quaternion qunit(const Quaternion& q);                  // normalized copy; identity if ~0
+Quaternion qFromToRotation(const Vector3D& from,       // shortest-arc quaternion that
+                           const Vector3D& to);         // rotates unit(from) onto unit(to)
+Vector3D   qRotateVec(const Quaternion& q,             // q v q⁻¹ sandwich (q auto-normalized),
+                      const Vector3D& v);               // returning a Vector3D directly
+Quaternion qslerp(const Quaternion& a,                 // shortest-path spherical lerp
+                  const Quaternion& b, double t);
+Quaternion qFromBasis(const Vector3D& forward,         // unit quaternion R with R*(0,0,1)=forward
+                      const Vector3D& up);              // and R*(0,1,0)=up (up re-orthogonalized)
+
 istream& operator >> (istream& is, Quaternion& a);
 ostream& operator << (ostream& os, const Quaternion& a);
 

@@ -17,27 +17,28 @@
 
 //////////////////////////////////////
 //
-//  main17_gpu.cpp  —  car camera that drives on the mesh surface.
+//  main17_gpu.cpp  —  flight-simulator camera through the inversion blob.
 //
 //  Builds on main16_gpu.cpp (the realtime-animated inversion build). The mesh is a
 //  3D checkerboard of small subcell-cubes warped each frame by two sphere-inversions
 //  (composeSigma) into an inflating/contracting blob. The inversion is applied to a
 //  STATIC identity lattice (g_identityPositions); the Cube object never moves.
 //
-//  New in main17: a "car camera". The car lives in IDENTITY space — it drives on the
-//  flat top face of the identity cube (y = yMax, x,z within the cube extent). Each
-//  frame, the SAME composeSigma that deforms the mesh maps the car's identity-space
-//  position + orientation (via a finite-difference Jacobian) into world space, so the
-//  camera rides the blob's outer skin exactly — sticking to the surface through every
-//  inflation/contraction with no mesh-topology/adjacency work.
+//  New in main17: a 6DOF flight-simulator camera. The craft's orientation is a single
+//  unit quaternion (g_flightOrient) maintained by quaternion delta-rotations — no Euler
+//  angles, so no gimbal lock and full loops are possible. Position (g_flightEye) integrates
+//  velocity along the craft's forward, and each move is ray-tested against the RENDERED
+//  deformed triangles (rayCastMesh) so the craft slides along the surface instead of
+//  passing through. The original main15/16 orbit camera is kept and toggled with C.
 //
-//    Controls:  W/S throttle | A/D steer | C toggles car<->orbit cam | Esc quit
-//    View: cockpit/first-person on the skin; starts at rest in the centre of the face.
+//    Controls:  Mouse look | A/D roll | W/S throttle | R boost | Q/E yaw | X reset
+//               | C toggles flight<->orbit cam | Esc quit
+//    View: free-flying first-person; starts outside the blob looking at the origin.
 //
 //  Inherited from main16_gpu (unchanged): the NVIDIA GLX backend force, the dynamic
 //  VBO upload path, the index buffer rebuilt only on ii/jj/kk change, the #version 460
 //  core shader, and the fixed-function matrix stack that the shader's uMVP is read back
-//  from (so the car camera lands correctly with no shader changes).
+//  from (so the flight camera lands correctly with no shader changes).
 //
 //////////////////////////////////////
 
@@ -160,6 +161,7 @@ static void loadGL() {
 //==============================================================================
 static GLuint g_vbo = 0;       // vertex positions (n^3 * 8 verts, static)
 static GLuint g_ibo = 0;       // triangle indices (rebuilt on selection change)
+static std::vector<unsigned int> g_cpuIndices; // CPU mirror of g_ibo for ray-drop queries
 static GLuint g_program = 0;   // linked shader program
 static GLint  g_locMVP = -1, g_locLightDir = -1, g_locCamPos = -1, g_locMode = -1;
 static GLsizei g_indexCount = 0;
@@ -188,30 +190,50 @@ static bool  g_leftDown = false, g_middleDown = false, g_rightDown = false;
 static bool  g_showHelp = true;
 
 //==============================================================================
-// Car camera (main17). The car lives in IDENTITY space — it drives on the flat
-// top face of the identity cube. Each frame the same composeSigma that deforms the
-// mesh maps the car into world space, so it sticks to the blob's outer skin through
-// every inflation/contraction. See display() for the mapping + Jacobian.
+// Flight-simulator camera (main17). A free 6DOF craft flying through the blob's
+// space. Orientation is a single unit quaternion (g_flightOrient) maintained with
+// quaternion delta-rotations — no Euler angles, so no gimbal lock and full loops are
+// possible. Position (g_flightEye) integrates velocity; each move is ray-tested against
+// the RENDERED deformed triangles (rayCastMesh) and the craft slides along the surface
+// instead of passing through. 'C' toggles between this flight camera and the original
+// orbit camera. Physics runs even while the animation is paused so you can fly on a
+// frozen mesh. See animTimer() for the physics + collision, display() for the view.
 //==============================================================================
-static bool   g_carMode    = true;     // ON by default; 'C' toggles back to orbit cam
-static double g_carX       = 0.0;      // position on identity top face (y = g_idYmax)
-static double g_carZ       = 0.0;
-static double g_carHeading = 0.0;      // radians, measured in the X-Z plane
-static double g_carSpeed   = 0.0;      // identity-space units / second
-// identity-space bounding box of the lattice (filled once in initAnimatedBuffers)
-static float  g_idXmin = 0, g_idXmax = 0, g_idYmax = 0, g_idZmin = 0, g_idZmax = 0;
-// drive keys (set in keyboard(), cleared in keyboardUp()) — consumed by animTimer()
-static bool   g_keyW = false, g_keyS = false, g_keyA = false, g_keyD = false;
-// world-space eye computed each frame in display(), read by drawGPU() for uCamPos
-static float  g_carEye[3] = {0.0f, 0.0f, 0.0f};
+static bool       g_flightMode = true;                       // C toggles flight <-> orbit cam
+static Vector3D   g_flightEye(0.0, 0.6, 3.0);                // world-space camera position
+static Quaternion g_flightOrient(1.0, Vector3D(0.0,0.0,0.0));// orientation; forward = R*(0,0,1)
+static Vector3D   g_flightVel(0.0, 0.0, 0.0);                 // world-space velocity (units/s)
+// Mouse-look accumulators: passive motion adds to these, animTimer consumes them.
+// Yaw is about WORLD up; pitch is about the craft's LOCAL right — full 6DOF.
+static double g_flightMouseDX = 0.0, g_flightMouseDY = 0.0;
+// Flight keys (set in keyboard(), cleared in keyboardUp()) — consumed by animTimer().
+static bool g_keyW = false, g_keyS = false, g_keyA = false, g_keyD = false;
+static bool g_keyYawL = false, g_keyYawR = false;            // Q/E keyboard yaw fallback
+static bool g_keyBoost = false;                              // R hold = boost (≈3× max speed)
+// Active world-space eye, set each frame by whichever camera is active, read by
+// drawGPU() for the shader's uCamPos uniform.
+static float g_camEye[3] = {0.0f, 0.0f, 0.0f};
+// Flight tuning (all adjustable here):
+static const double g_flightAccel    = 1.2;   // thrust along forward per second
+static const double g_flightDrag     = 0.92;  // velocity decay per tick (friction)
+static const double g_flightMaxSpeed  = 0.9;   // cruise speed (×g_flightBoost while boosting)
+static const double g_flightRollRate = 1.8;   // A/D roll rate (rad/s)
+static const double g_flightYawRate  = 1.4;   // Q/E yaw rate (rad/s)
+static const double g_mouseSens      = 0.0025;// mouse-look radians per pixel
+static const double g_flightBoost    = 3.0;   // max-speed multiplier while R is held
+static const double g_flightRadius   = 0.03;  // collision cushion (craft radius)
 
 static void drawAxes(float length);
+static bool rayCastMesh(const Vector3D& origin, const Vector3D& dir, double maxT,
+                        double& outT, Vector3D& outNormal);
+void initFlightCamera();
 void Setup();
 void initGL();
 void reshape(int w, int h);
 void display();
 void mouseButton(int button, int state, int x, int y);
 void mouseMotion(int x, int y);
+void flightMouseMotion(int x, int y);
 void keyboard(unsigned char key, int x, int y);
 void keyboardUp(unsigned char key, int x, int y);
 void drawHUD();
@@ -382,6 +404,18 @@ void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double r
     std::cout << "  Triangulation refreshed for cube\n";
 }
 
+//-----------------------------------------------------------------------------
+// Initialise / reset the flight-simulator camera to a default viewpoint outside the
+// blob, looking toward the origin. Called once from Setup() and on the X reset key.
+//-----------------------------------------------------------------------------
+void initFlightCamera() {
+    g_flightEye  = Vector3D(0.0, 0.6, 3.0);
+    g_flightVel  = Vector3D(0.0, 0.0, 0.0);
+    Vector3D fwd = unit(Vector3D(0.0, 0.0, 0.0) - g_flightEye);   // look at origin
+    g_flightOrient = qFromBasis(fwd, Vector3D(0.0, 1.0, 0.0));
+    g_flightMouseDX = g_flightMouseDY = 0.0;
+}
+
 void Setup() {
     if (ciclo != 0) return;
 
@@ -398,7 +432,7 @@ void Setup() {
     applySigmaTransformationToCube(cube, Vector3D{0, 0, 0}, 0.5);
     applySigmaTransformationToCube(cube, cube.getSubcellCenter(1, 1, 1),
                                          cube.getSubcellRadius(1, 1, 1));
-    cube.writeSTL_s("/home/mike666/Downloads/mesh_output_gpu.stl", "MyCube", "checkerboard", ii, kk, jj);
+    cube.writeSTL_s("/home/ubuntu/Downloads/mesh_output_gpu.stl", "MyCube", "checkerboard", ii, kk, jj);
     cube.subdivide(N);   // reset to pristine identity lattice
     std::cout << "[main16_gpu] cube reset to identity lattice for realtime loop\n";
 }
@@ -421,29 +455,13 @@ static void initAnimatedBuffers() {
               << " identity verts captured ("
               << (g_identityPositions.size() * sizeof(float) / (1024.0 * 1024.0))
               << " MB)\n";
-
-    // Identity-space bounding box of the lattice. The car drives on the top face
-    // (y = g_idYmax), clamped to the x/z extents, so the bounds must match the
-    // actual cube placement (cube_dim / center) rather than being hard-coded.
-    g_idXmin = g_idXmax = g_identityPositions[0];
-    g_idYmax = g_identityPositions[1];
-    g_idZmin = g_idZmax = g_identityPositions[2];
-    float yMin = g_idYmax;
-    for (size_t i = 0; i + 2 < g_identityPositions.size(); i += 3) {
-        float x = g_identityPositions[i], y = g_identityPositions[i+1], z = g_identityPositions[i+2];
-        if (x < g_idXmin) g_idXmin = x; if (x > g_idXmax) g_idXmax = x;
-        if (y < yMin)     yMin     = y; if (y > g_idYmax) g_idYmax = y;
-        if (z < g_idZmin) g_idZmin = z; if (z > g_idZmax) g_idZmax = z;
-    }
-    std::cout << "[main17_gpu] identity bounds X[" << g_idXmin << "," << g_idXmax
-              << "] Y[" << yMin << "," << g_idYmax << "] Z[" << g_idZmin << "," << g_idZmax
-              << "]  car drives on top face y=" << g_idYmax << "\n";
 }
 
 static void rebuildIndexBuffer() {
     std::vector<unsigned int> indices;
     cube.fillCheckerboardIndices(ii, kk, jj, indices);  // same call order as getCheckerboardFacets(ii,kk,jj)
     g_indexCount = (GLsizei)indices.size();
+    g_cpuIndices = indices;  // keep a CPU copy so rayDropToMesh() can iterate the rendered triangles
     if (g_ibo == 0) glGenBuffers(1, &g_ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
@@ -513,6 +531,77 @@ static void updateAnimatedGeometry() {
 }
 
 //==============================================================================
+// Ray-cast the flight craft against the rendered mesh. Casts a ray from `origin`
+// along (unit) `dir` against the deformed triangles (g_deformedPositions indexed by
+// g_cpuIndices) and returns the nearest hit whose distance t lies in (0, maxT], plus
+// that triangle's raw (unoriented) normal. Used by animTimer() for slide-along-surface
+// collision: each move is tested with maxT = |move| + g_flightRadius so the craft stops
+// at ~radius from the surface. Full scan — triangle counts here are modest, and a
+// vertical-only prune wouldn't apply to an arbitrary flight direction.
+//==============================================================================
+static bool rayCastMesh(const Vector3D& origin, const Vector3D& dir, double maxT,
+                        double& outT, Vector3D& outNormal) {
+    if (g_cpuIndices.empty() || g_deformedPositions.empty()) return false;
+    const float* P = g_deformedPositions.data();
+    const size_t triCount = g_cpuIndices.size() / 3;
+
+    // Direction is assumed unit; renormalize defensively.
+    double dl = sqrt(dir * dir);
+    if (dl < 1e-12) return false;
+    double dx = dir.x() / dl, dy = dir.y() / dl, dz = dir.z() / dl;
+    double ox = origin.x(), oy = origin.y(), oz = origin.z();
+
+    bool   gotAny = false;
+    double bestT = maxT;
+    Vector3D bestNormal(0, 1, 0);
+
+    for (size_t t = 0; t < triCount; ++t) {
+        unsigned int i0 = g_cpuIndices[3*t + 0];
+        unsigned int i1 = g_cpuIndices[3*t + 1];
+        unsigned int i2 = g_cpuIndices[3*t + 2];
+        double v0x = P[3*i0 + 0], v0y = P[3*i0 + 1], v0z = P[3*i0 + 2];
+        double v1x = P[3*i1 + 0], v1y = P[3*i1 + 1], v1z = P[3*i1 + 2];
+        double v2x = P[3*i2 + 0], v2y = P[3*i2 + 1], v2z = P[3*i2 + 2];
+
+        // Möller–Trumbore with the (general) ray direction D = (dx,dy,dz).
+        // edge1 = v1-v0, edge2 = v2-v0, h = D × edge2, a = edge1 · h.
+        double e1x = v1x - v0x, e1y = v1y - v0y, e1z = v1z - v0z;
+        double e2x = v2x - v0x, e2y = v2y - v0y, e2z = v2z - v0z;
+        double hx = dy * e2z - dz * e2y;
+        double hy = dz * e2x - dx * e2z;
+        double hz = dx * e2y - dy * e2x;
+        double a = e1x * hx + e1y * hy + e1z * hz;
+        if (fabs(a) < 1e-12) continue;                 // ray parallel to triangle
+        double invA = 1.0 / a;
+        // s = origin - v0
+        double sx = ox - v0x, sy = oy - v0y, sz = oz - v0z;
+        double u = invA * (sx * hx + sy * hy + sz * hz);
+        if (u < 0.0 || u > 1.0) continue;
+        // q = s × edge1
+        double qx = sy * e1z - sz * e1y;
+        double qy = sz * e1x - sx * e1z;
+        double qz = sx * e1y - sy * e1x;
+        double v = invA * (dx * qx + dy * qy + dz * qz);   // D · q
+        if (v < 0.0 || (u + v) > 1.0) continue;
+        double tt = invA * (e2x * qx + e2y * qy + e2z * qz); // edge2 · q
+        if (tt <= 1e-6 || tt >= bestT) continue;          // must be in front, within range, nearest
+
+        // Hit. Raw triangle normal (edge1 × edge2) — left unoriented; the caller flips
+        // it to point against the motion direction.
+        double nx = e1y * e2z - e1z * e2y;
+        double ny = e1z * e2x - e1x * e2z;
+        double nz = e1x * e2y - e1y * e2x;
+        bestT = tt;
+        bestNormal = unit(Vector3D(nx, ny, nz));
+        gotAny = true;
+    }
+    if (!gotAny) return false;
+    outT = bestT;
+    outNormal = bestNormal;
+    return true;
+}
+
+//==============================================================================
 // DRAW — replaces ProcessingProto()/Draw()/drawFacetMainCStyle() loop.
 //==============================================================================
 static void drawGPU() {
@@ -531,9 +620,9 @@ static void drawGPU() {
     // set with identity modelview in initGL — see comment in main).
     float invR[16]; buildInvRotation(view, invR);
     float camPos[3];
-    if (g_carMode) {
-        // display() already computed the car eye in world space.
-        camPos[0] = g_carEye[0]; camPos[1] = g_carEye[1]; camPos[2] = g_carEye[2];
+    if (g_flightMode) {
+        // display() already wrote the flight eye in world space.
+        camPos[0] = g_camEye[0]; camPos[1] = g_camEye[1]; camPos[2] = g_camEye[2];
     } else {
         // Orbit camera: recover the world-space eye from the orbit modelview.
         xformPoint(invR, -g_panX, -g_panY, 5.0f * g_zoom, camPos);
@@ -595,25 +684,62 @@ void drawAxes(float length) {
 static void animTimer(int /*value*/) {
     if (!g_animPaused) g_animTime += g_timeStep;
 
-    // Car physics, integrated in IDENTITY space (the flat top face). Time-based via
-    // g_timeStep so behaviour is independent of the frame rate. The world-space
-    // mapping happens later in display() via composeSigma, so this stays simple.
-    if (g_carMode && !g_animPaused) {
-        const double accel = 0.6, drag = 0.9, maxSpeed = 0.6, turnRate = 1.6;
-        double throttle = (g_keyW ? 1.0 : 0.0) - (g_keyS ? 1.0 : 0.0);
-        double steer    = (g_keyA ? 1.0 : 0.0) - (g_keyD ? 1.0 : 0.0);
-        g_carSpeed += throttle * accel * g_timeStep;
-        g_carSpeed *= drag;                                   // friction / natural stop
-        g_carSpeed = fmax(-maxSpeed, fmin(maxSpeed, g_carSpeed));
-        if (fabs(g_carSpeed) > 1e-4)                          // only steer while moving
-            g_carHeading += steer * turnRate * g_timeStep * (g_carSpeed > 0 ? 1.0 : -1.0);
-        g_carX += g_carSpeed * cos(g_carHeading) * g_timeStep;
-        g_carZ += g_carSpeed * sin(g_carHeading) * g_timeStep;
-        // clamp to the top face; zero speed on hit so the car "bumps" the edge
-        if (g_carX < g_idXmin) { g_carX = g_idXmin; g_carSpeed = 0; }
-        if (g_carX > g_idXmax) { g_carX = g_idXmax; g_carSpeed = 0; }
-        if (g_carZ < g_idZmin) { g_carZ = g_idZmin; g_carSpeed = 0; }
-        if (g_carZ > g_idZmax) { g_carZ = g_idZmax; g_carSpeed = 0; }
+    // Flight-simulator physics, integrated in WORLD space. Time-based via g_timeStep
+    // so behaviour is independent of frame rate. Orientation is a single unit
+    // quaternion updated by delta-rotations (mouse look + roll/yaw keys); position
+    // integrates velocity along the craft's forward, and each move is ray-tested
+    // against the rendered mesh so the craft slides along the surface instead of
+    // passing through. Runs even while paused so you can fly on a frozen mesh; only
+    // the inflation clock (g_animTime) freezes.
+    if (g_flightMode) {
+        // 1) Mouse look: consume accumulators from flightMouseMotion().
+        //    Yaw about WORLD up (left-multiply), pitch about LOCAL right (right-multiply).
+        //    No pitch clamp — full 6DOF, no gimbal lock (pure quaternion).
+        if (fabs(g_flightMouseDX) > 1e-7)
+            g_flightOrient = Qan(-g_flightMouseDX, Vector3D(0.0, 1.0, 0.0)) * g_flightOrient;
+        if (fabs(g_flightMouseDY) > 1e-7) {
+            Vector3D right = qRotateVec(g_flightOrient, Vector3D(1.0, 0.0, 0.0));
+            g_flightOrient = g_flightOrient * Qan(-g_flightMouseDY, right);
+        }
+        g_flightOrient = qunit(g_flightOrient);          // guard against float drift
+        g_flightMouseDX = g_flightMouseDY = 0.0;
+
+        // 2) Roll (A/D, about local forward) + keyboard yaw (Q/E, about world up).
+        double roll = (g_keyA ? 1.0 : 0.0) - (g_keyD ? 1.0 : 0.0);
+        double yawk = (g_keyYawL ? 1.0 : 0.0) - (g_keyYawR ? 1.0 : 0.0);
+        if (fabs(roll) > 1e-7)
+            g_flightOrient = g_flightOrient * Qan(roll * g_flightRollRate * g_timeStep,
+                                                 Vector3D(0.0, 0.0, 1.0));
+        if (fabs(yawk) > 1e-7)
+            g_flightOrient = Qan(yawk * g_flightYawRate * g_timeStep,
+                                 Vector3D(0.0, 1.0, 0.0)) * g_flightOrient;
+        g_flightOrient = qunit(g_flightOrient);
+
+        // 3) Throttle (W/S) along current forward; drag + clamp (boost widens the clamp).
+        double thr = (g_keyW ? 1.0 : 0.0) - (g_keyS ? 1.0 : 0.0);
+        Vector3D fwd = qRotateVec(g_flightOrient, Vector3D(0.0, 0.0, 1.0));
+        g_flightVel = g_flightVel + (thr * g_flightAccel * g_timeStep) * fwd;
+        g_flightVel = g_flightDrag * g_flightVel;        // friction / natural coast
+        double vmax = g_flightMaxSpeed * (g_keyBoost ? g_flightBoost : 1.0);
+        double sp = sqrt(g_flightVel * g_flightVel);     // Vector3D * Vector3D = dot
+        if (sp > vmax) g_flightVel = (vmax / sp) * g_flightVel;
+
+        // 4) Integrate with slide-along-surface collision.
+        Vector3D move = g_timeStep * g_flightVel;
+        double mlen = sqrt(move * move);
+        if (mlen > 1e-7) {
+            Vector3D dir = (1.0 / mlen) * move;
+            double maxT = mlen + g_flightRadius, hitT;
+            Vector3D n;
+            if (rayCastMesh(g_flightEye, dir, maxT, hitT, n)) {
+                if ((dir * n) > 0.0) n = -n;               // normal against motion
+                Vector3D contact = g_flightEye + (hitT * dir);
+                g_flightEye = contact - (g_flightRadius * n);      // push out to radius
+                g_flightVel = g_flightVel - (g_flightVel * n) * n; // slide: drop normal comp
+            } else {
+                g_flightEye = g_flightEye + move;
+            }
+        }
     }
 
     glutPostRedisplay();
@@ -656,11 +782,14 @@ int main(int argc, char** argv) {
         return 1;
     }
     initAnimatedBuffers();   // capture identity lattice once; create dynamic VBO
+    initFlightCamera();       // default flight-simulator viewpoint + orientation
+    glutSetCursor(GLUT_CURSOR_NONE); // flight mode is the default: hide the cursor for free-look
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
     glutMouseFunc(mouseButton);
     glutMotionFunc(mouseMotion);
+    glutPassiveMotionFunc(flightMouseMotion);   // mouse-look while flying (no button held)
     glutKeyboardFunc(keyboard);
     glutKeyboardUpFunc(keyboardUp);
     glutTimerFunc(33, animTimer, 0);   // ~30 Hz animation clock
@@ -715,8 +844,8 @@ void reshape(int w, int h) {
 void drawHUD() {
     if (!g_showHelp) return;
     const char* lines[] = {
-        "[C]: Toggle Car / Orbit camera",
-        "Car: W/S throttle | A/D steer (steer while moving)",
+        "[C]: Toggle Flight / Orbit camera",
+        "Flight: Mouse look | A/D roll | W/S throttle | R boost | Q/E yaw | X reset",
         "L-drag: Rotate (orbit cam)",
         "M-drag: Pan (orbit cam)",
         "R-drag/Wheel: Zoom (orbit cam)",
@@ -773,15 +902,17 @@ void drawHUD() {
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
 
-    // car status line — speed / heading / identity-space position
-    if (g_carMode) {
+    // flight status line — speed / position / boost
+    if (g_flightMode) {
         y -= 0.05f;
-        char car[180];
-        sprintf(car, "CAR  speed=%.2f  heading=%.0f deg  pos=(%.2f, %.2f) on skin y=%.2f",
-                g_carSpeed, g_carHeading * 180.0 / M_PI, g_carX, g_carZ, g_idYmax);
+        double sp = sqrt(g_flightVel * g_flightVel);
+        char flt[200];
+        sprintf(flt, "FLIGHT  spd=%.2f%s  pos=(%.2f, %.2f, %.2f)",
+                sp, g_keyBoost ? "  BOOST" : "",
+                g_flightEye.x(), g_flightEye.y(), g_flightEye.z());
         glColor3f(0.8f, 0.4f, 0.0f);
         glRasterPos2f(0.02f, y);
-        for (const char* c = car; *c; ++c)
+        for (const char* c = flt; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
 
@@ -802,38 +933,25 @@ void display() {
     if (!g_animPaused) updateAnimatedGeometry();
 
     // Fixed-function modelview. This is read back to build the shader's uMVP, so
-    // whatever camera we set here (car or orbit) lands on screen with no shader
+    // whatever camera we set here (flight or orbit) lands on screen with no shader
     // changes. The HUD is drawn in its own ortho projection, unaffected.
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    if (g_carMode) {
-        // --- Car camera (cockpit/first-person on the blob's outer skin) ---
-        // The car lives in identity space on the top face. Map it to world space
-        // with the SAME composeSigma that deformed the mesh this frame, and lift
-        // its orientation through the deformation's Jacobian (finite differences).
-        SigmaParams sp = currentSigmaParams(g_animTime);
-        Vector3D pId(g_carX, (double)g_idYmax, g_carZ);
-        Vector3D pW = composeSigmaAt(pId, sp);                 // world point on the skin
-
-        const double e = 1e-4;
-        Vector3D jx = (composeSigmaAt(pId + Vector3D(e, 0, 0), sp) - pW) / e;
-        Vector3D jy = (composeSigmaAt(pId + Vector3D(0, e, 0), sp) - pW) / e;
-        Vector3D jz = (composeSigmaAt(pId + Vector3D(0, 0, e), sp) - pW) / e;
-
-        // identity up = +Y (top-face normal) -> world skin normal via the Jacobian.
-        Vector3D worldUp = unit(jy);
-        // identity forward = heading in the X-Z plane -> world, then re-orthogonalise
-        // against the skin normal so it stays tangent to the surface.
-        Vector3D fwdId(cos(g_carHeading), 0.0, sin(g_carHeading));
-        Vector3D worldFwd = fwdId.x() * jx + fwdId.z() * jz;   // J * fwdId (y term ~ 0)
-        worldFwd = worldFwd - (worldFwd * worldUp) * worldUp;   // (* = dot; scalar*vec)
-        worldFwd = unit(worldFwd);
-
-        Vector3D eye = pW + 0.01 * worldUp;                    // cockpit: on the skin
-        g_carEye[0] = (float)eye.x(); g_carEye[1] = (float)eye.y(); g_carEye[2] = (float)eye.z();
-        Vector3D aim = eye + worldFwd;
-        gluLookAt(eye.x(), eye.y(), eye.z(),
+    if (g_flightMode) {
+        // --- Flight-simulator camera (free 6DOF craft) ---
+        // Orientation and position are maintained in animTimer(); here we just turn
+        // the quaternion frame into a look-at. forward/up are the images of the
+        // reference basis (0,0,1)/(0,1,0) under g_flightOrient. No slerp, no surface
+        // projection — the orientation is already the truth (pure quaternion, no
+        // gimbal lock). The eye is g_flightEye (collision-resolved in animTimer).
+        Vector3D worldFwd = qRotateVec(g_flightOrient, Vector3D(0.0, 0.0, 1.0));
+        Vector3D worldUp  = qRotateVec(g_flightOrient, Vector3D(0.0, 1.0, 0.0));
+        g_camEye[0] = (float)g_flightEye.x();
+        g_camEye[1] = (float)g_flightEye.y();
+        g_camEye[2] = (float)g_flightEye.z();
+        Vector3D aim = g_flightEye + worldFwd;
+        gluLookAt(g_flightEye.x(), g_flightEye.y(), g_flightEye.z(),
                   aim.x(), aim.y(), aim.z(),
                   worldUp.x(), worldUp.y(), worldUp.z());
     } else {
@@ -854,6 +972,7 @@ void display() {
 // Mouse (same as main15)
 //-----------------------------------------------------------------------------
 void mouseButton(int button, int state, int x, int y) {
+    if (g_flightMode) { g_lastX = x; g_lastY = y; return; }   // orbit-only; flight uses passive motion
     if (button == GLUT_LEFT_BUTTON)        g_leftDown   = (state == GLUT_DOWN);
     else if (button == GLUT_MIDDLE_BUTTON) g_middleDown = (state == GLUT_DOWN);
     else if (button == GLUT_RIGHT_BUTTON)  g_rightDown  = (state == GLUT_DOWN);
@@ -863,6 +982,7 @@ void mouseButton(int button, int state, int x, int y) {
 }
 
 void mouseMotion(int x, int y) {
+    if (g_flightMode) { g_lastX = x; g_lastY = y; return; }   // flight look is passive, not drag
     int dx = x - g_lastX;
     int dy = y - g_lastY;
     if (g_leftDown) {
@@ -878,6 +998,24 @@ void mouseMotion(int x, int y) {
     }
     g_lastX = x; g_lastY = y;
     glutPostRedisplay();
+}
+
+//-----------------------------------------------------------------------------
+// Passive (no-button) mouse motion — flight-simulator free-look. Accumulates the
+// offset from the window centre into g_flightMouse{DX,DY} (consumed by animTimer)
+// and recenters the pointer so turning is unlimited. The recenter induces one more
+// motion event at the centre, which we ignore (offset ≈ 0). Inactive in orbit mode.
+//-----------------------------------------------------------------------------
+void flightMouseMotion(int x, int y) {
+    if (!g_flightMode) return;
+    int cx = glutGet(GLUT_WINDOW_WIDTH)  / 2;
+    int cy = glutGet(GLUT_WINDOW_HEIGHT) / 2;
+    int dx = x - cx, dy = y - cy;
+    if (dx > -1 && dx < 1 && dy > -1 && dy < 1) return;   // recenter-induced / idle
+    g_flightMouseDX += dx * g_mouseSens;
+    g_flightMouseDY += dy * g_mouseSens;
+    glutWarpPointer(cx, cy);
+    g_lastX = cx; g_lastY = cy;
 }
 
 //-----------------------------------------------------------------------------
@@ -926,29 +1064,43 @@ void keyboard(unsigned char key, int x, int y) {
         case 'j': jj += 1; g_selectionDirty = true; std::cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n"; glutPostRedisplay(); break;
         case 'J': jj -= 1; g_selectionDirty = true; std::cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n"; glutPostRedisplay(); break;
 
-        // --- Car camera (main17) ---
+        // --- Flight-simulator camera (main17) ---
+        // C toggles the 6DOF flight camera <-> the orbit camera. Entering flight mode
+        // hides the cursor and recenters the pointer (so the first mouse-look delta is
+        // clean); entering orbit restores the cursor.
         case 'c': case 'C':
-            g_carMode = !g_carMode;
-            if (g_carMode) {  // entering car mode: re-centre on the top face, at rest
-                g_carX = 0.5 * (g_idXmin + g_idXmax);
-                g_carZ = 0.5 * (g_idZmin + g_idZmax);
-                g_carHeading = 0.0;
-                g_carSpeed   = 0.0;
+            g_flightMode = !g_flightMode;
+            if (g_flightMode) {
+                glutSetCursor(GLUT_CURSOR_NONE);
+                glutWarpPointer(glutGet(GLUT_WINDOW_WIDTH)/2, glutGet(GLUT_WINDOW_HEIGHT)/2);
+                g_flightMouseDX = g_flightMouseDY = 0.0;
+            } else {
+                glutSetCursor(GLUT_CURSOR_INHERIT);
             }
-            printf("Car camera: %s\n", g_carMode ? "ON (cockpit on skin)" : "OFF (orbit)");
+            printf("Camera: %s\n", g_flightMode ? "FLIGHT (6DOF free-fly)" : "ORBIT");
             glutPostRedisplay();
             break;
+        // Flight controls (held): W/S throttle, A/D roll, Q/E yaw, R boost.
         case 'w': case 'W': g_keyW = true; break;
         case 's': case 'S': g_keyS = true; break;
         case 'a': case 'A': g_keyA = true; break;
         case 'd': case 'D': g_keyD = true; break;
+        case 'q': case 'Q': g_keyYawL = true; break;
+        case 'e': case 'E': g_keyYawR = true; break;
+        case 'r': case 'R': g_keyBoost = true; break;
+        // X resets the flight camera to the default viewpoint/orientation.
+        case 'x': case 'X':
+            initFlightCamera();
+            printf("Flight camera reset.\n");
+            glutPostRedisplay();
+            break;
 
         case 27: exit(0); break;
     }
 }
 
 //-----------------------------------------------------------------------------
-// Key release — clears the held drive keys so throttle/steer stop cleanly.
+// Key release — clears the held flight keys so throttle/roll/yaw/boost stop cleanly.
 //-----------------------------------------------------------------------------
 void keyboardUp(unsigned char key, int x, int y) {
     (void)x; (void)y;
@@ -957,6 +1109,9 @@ void keyboardUp(unsigned char key, int x, int y) {
         case 's': case 'S': g_keyS = false; break;
         case 'a': case 'A': g_keyA = false; break;
         case 'd': case 'D': g_keyD = false; break;
+        case 'q': case 'Q': g_keyYawL = false; break;
+        case 'e': case 'E': g_keyYawR = false; break;
+        case 'r': case 'R': g_keyBoost = false; break;
     }
 }
 

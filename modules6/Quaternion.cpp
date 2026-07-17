@@ -227,6 +227,92 @@ Quaternion lerp(
     return Quaternion(u, v);
 }
 
+/* ---------- rotation / parallel-transport helpers ------------------------- */
+
+// Norm of a quaternion, sqrt(r² + ‖v‖²).
+double qabs(const Quaternion& q) noexcept {
+    double rr = q.r() * q.r();
+    double vv = q.V() * q.V();            // dot product (operator*)
+    return std::sqrt(rr + vv);
+}
+
+// Normalized copy; identity (1,0,0,0) if the norm is ~0.
+Quaternion qunit(const Quaternion& q) {
+    double n = qabs(q);
+    if (n < 1e-12)
+        return Quaternion(1.0, Vector3D(0.0, 0.0, 0.0));
+    return Quaternion(q.r() / n, q.V() / n);
+}
+
+// Shortest-arc quaternion rotating unit(from) onto unit(to).
+Quaternion qFromToRotation(const Vector3D& from, const Vector3D& to) {
+    Vector3D f = unit(from);
+    Vector3D t = unit(to);
+    double d = f * t;                     // dot (operator*)
+    if (d > 1.0 - 1e-12)                  // already aligned → identity
+        return Quaternion(1.0, Vector3D(0.0, 0.0, 0.0));
+    if (d < -1.0 + 1e-12) {               // antiparallel → 180° about any ⊥ axis
+        Vector3D axis = (std::fabs(f.x()) < 0.9) ? cruz(f, Vector3D(1.0, 0.0, 0.0))
+                                                : cruz(f, Vector3D(0.0, 1.0, 0.0));
+        return Quaternion(0.0, unit(axis));   // (cos 90°, sin 90°·n̂) = (0, n̂)
+    }
+    // General case: q = (1 + f·t, f×t) normalized → unit shortest-arc quaternion.
+    Quaternion q(1.0 + d, cruz(f, t));
+    return qunit(q);
+}
+
+// Rotate a 3-vector by a quaternion via the q v q⁻¹ sandwich (q auto-normalized).
+Vector3D qRotateVec(const Quaternion& q, const Vector3D& v) {
+    Quaternion u = qunit(q);              // unit ⇒ inverse == conjugate
+    Quaternion p(0.0, v);                  // pure-vector quaternion
+    Quaternion r = u * p * u.conjugate();
+    return r.V();
+}
+
+// Shortest-path spherical interpolation between two quaternions.
+Quaternion qslerp(const Quaternion& a, const Quaternion& b, double t) {
+    Quaternion qa = qunit(a);
+    Quaternion qb = qunit(b);
+    double dot = qa.r() * qb.r() + (qa.V() * qb.V());
+    if (dot < 0.0) {                       // take the shorter arc
+        qb = Quaternion(-qb.r(), -qb.V());
+        dot = -dot;
+    }
+    constexpr double EPS = 1e-9;
+    if (dot > 1.0 - EPS) {                 // nearly parallel → lerp + normalize
+        double u  = qa.r() + t * (qb.r() - qa.r());
+        Vector3D v = line(t, qa.V(), qb.V());
+        return qunit(Quaternion(u, v));
+    }
+    double theta = std::acos(dot);
+    double s = std::sin(theta);
+    double wa = std::sin((1.0 - t) * theta) / s;
+    double wb = std::sin(t * theta) / s;
+    return qunit(Quaternion(wa * qa.r() + wb * qb.r(),
+                            wa * qa.V() + wb * qb.V()));
+}
+
+// Build a unit quaternion R such that R maps the reference frame
+//   refForward = (0,0,1),  refUp = (0,1,0)
+// onto the given (forward, up), with up re-orthogonalized against forward.
+// Used to (re)build the car camera's tangent frame from a look direction + normal.
+Quaternion qFromBasis(const Vector3D& forward, const Vector3D& up) {
+    Vector3D f = unit(forward);
+    Vector3D u = up - (up * f) * f;          // make up ⟂ forward
+    u = unit(u);
+    // Step 1: rotate refForward onto f.
+    Quaternion q1 = qFromToRotation(Vector3D(0.0, 0.0, 1.0), f);
+    // Step 2: refUp now lands on u1; roll about f to bring u1 onto u.
+    Vector3D u1 = qRotateVec(q1, Vector3D(0.0, 1.0, 0.0));
+    double cosA = u1 * u;
+    double sinA = (u1 % u) * f;              // signed sin (cross component along f)
+    double roll = std::atan2(sinA, cosA);
+    if (std::fabs(roll) < 1e-10)             // no roll needed (Qan(0,·) is not identity)
+        return qunit(q1);
+    Quaternion q2 = Qan(roll, f);
+    return qunit(q2 * q1);
+}
+
 
 ostream& operator << (ostream& os, const Quaternion& a) {
 
