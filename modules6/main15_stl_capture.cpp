@@ -10,6 +10,9 @@
 #include "FacetBox.hpp"
 #include "Dodecahedron.hpp"
 #include "Cube.hpp"
+#include <ctime>
+#include <cstdlib>
+#include <sys/stat.h>   // mkdir()
 
 //////////////////////////////////////
 //                                  
@@ -47,6 +50,9 @@ int g_currentOrientation = 0;  // 0=XY, 1=YZ, 2=XZ
 int g_currentLayer = 4;        // Current layer within the selected orientation
 int g_maxLayers = 8;           // Maximum layers available (matches cube2/cube3 subdivision)
 
+// STL snapshot counter — each press of 'c' writes a uniquely-named file to ~/Downloads
+int g_snapshotCount = 0;
+
 //////////////////////////////////////
 //
 //
@@ -78,106 +84,6 @@ void drawSphere(const Vector3D& pos, float radius, int slices, int stacks);
 void drawAxes(float length);
 void drawText3D(const Vector3D& pos, const char* text);
 
-Vector3D d_ui(1.0, 0.0, 0.0);
-Vector3D e_ui(0.0, 1.0, 0.0);
-Vector3D f_ui(0.0, 0.0, 1.0);
-Facet f_1(d_ui, e_ui, f_ui);
-
-// ==================== CUBE INSTANCES ====================
-int N = 11; // Number of subdivision levels
-double cube_dim = 2.0;
-// Basic cube: radius=1.0 (side length=2.0), positioned right of center
-// This creates a simple cube with 12 triangular faces (2 triangles per face × 6 faces)
-Cube cube1(1.0, Vector3D{2.5,0,0});
-
-// Subdivided cube: radius=0.8, positioned left of center, with 2 subdivision levels
-// This creates 2³=8 subcubes, each triangulated with regular 12 triangle mesh
-// Total faces: 8 subcubes × 12 triangular faces = 96 triangles
-Cube cube2(cube_dim, Vector3D{0,0,0}, N);
-
-// Define a Cube Configuration Structure
-struct CubeConfig {
-    double radius;
-    Vector3D position;
-    int subdivisionLevels;
-    Vector3D transformCenter;  // For sigma transformation
-    double transformRadius;    // For sigma transformation
-    
-    // Constructor for easy initialization
-    CubeConfig(double r, Vector3D pos, int subdiv, Vector3D tCenter, double tRadius)
-        : radius(r), position(pos), subdivisionLevels(subdiv), 
-          transformCenter(tCenter), transformRadius(tRadius) {}
-};
-
-// ==================== FACET STORAGE ====================
-// Storage for cube triangle collections
-FacetBox cube_facets_1;  // Basic cube triangulation
-FacetBox cube_facets_2;  // Subdivided cube triangulation
-FacetBox cube_facets_3;  // Advanced subdivision demos
-
-// Advanced subdivision control demos
-//FacetBox single_subcell;     // Single subcell rendering demo
-FacetBox plane_subcells;     // Plane rendering demo
-//FacetBox plane_subcells_2;
-//FacetBox selected_subcells;  // Selective rendering demo
-
-//double ra = 0.0;
-//Vector3D ce = Vector3D{0,0,0};
-
-//==============================================================================
-// Camera Collision Detection Structure
-//==============================================================================
-struct CameraCollision {
-    Vector3D position;
-    Vector3D direction;
-    float distance;
-    bool hasCollision;
-    Vector3D normal;
-};
-
-//==============================================================================
-// Simple Cube Reflection Function
-//==============================================================================
-
-/**
- * @brief Reflect a subdivided cube using checkboard pattern (i+j+k)%2
- * @param cube Target cube to modify and update
- * @param center Center of the reflection sphere
- * @param radius Radius of the reflection sphere
- * @returns void
- */
-void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double radius) {
-    if (!cube.hasSubdivision()) {
-        return;
-    }
-    
-    int n = cube.getSubdivisionLevels();
-    int centerIdx = n / 2;
-    
-    // Apply transformation to all vertices
-    for (int i = -centerIdx; i < centerIdx + 1; i++) {
-        for (int j = -centerIdx; j < centerIdx + 1; j++) {
-            for (int k = -centerIdx; k < centerIdx + 1; k++) {
-                for (int l = 0; l < 8; l++) {
-                    Vector3D v_p = cube.getSubCell(i, j, k).vertices[l];
-                    Vector3D new_pos = sigma(v_p, center, radius);
-                    cube.updateSubCellVertex(i, j, k, l, new_pos);
-                }
-            }
-        }
-    }
-    
-    // Refresh triangulation
-    cube.refreshTriangulation();
-    cout << "  Triangulation refreshed for cube\n";
-}
-
-
-// Global reflection parameters for simple approach
-Vector3D g_reflection_center{0, 0, 0};
-double g_reflection_radius = 1.0;
-bool g_show_reflection = true;
-
 // Helper: convert HSV→RGB (all in [0,1])                                                  
 struct Color { float r, g, b; };
 Color hsv2rgb(float h, float s, float v) {
@@ -196,24 +102,6 @@ Color hsv2rgb(float h, float s, float v) {
       default:return {v, p, q};
     }
 }
-
-// Subdivide each triangle in `initial` n times, returning only the final mesh.
-//FacetBox refine(const FacetBox& initial, int n) {
-//    FacetBox curr = initial;
-//    FacetBox next;
-//
-//    for (int pass = 0; pass < n; ++pass) {
-//        next.clear();  // throw away last level
-//        for (size_t i = 0; i < curr.size(); ++i) {
-//            // fromFacet() returns 3 new sub-triangles around the centroid
-//            FacetBox tiny = FacetBox::fromFacet(curr[i]);
-//            next += tiny;  // append those three
-//        }
-//        std::swap(curr, next);
-//    }
-//
-//    return curr;  // only the final, fully-refined mesh
-//}
 
 //==============================================================================
 // Fisheye Camera Functions
@@ -257,229 +145,132 @@ void applyFisheyeProjection(int w, int h) {
     }
 }
 
-//==============================================================================
-// Surface Collision Detection and Zoom
-//==============================================================================
+/*---------------------------------------
+Global setup parameters 
+-----------------------------------------*/
+int cube_dim = 2.0;
+int N = 37 ;
+Cube cube(cube_dim, Vector3D{0,0.0001,0}, N);
+FacetBox plane_subcells;
 
-//-----------------------------------------------------------------------------
-// Check collision with all cube faces
-//-----------------------------------------------------------------------------
-CameraCollision checkCameraCollision(const Vector3D& cameraPos, const Vector3D& cameraDir) {
-    CameraCollision result;
-    result.hasCollision = false;
-    result.distance = 1000.0f;
+double scal = 0.0;
+double radi = 0.0;
+
+//==============================================================================
+// Simple Cube Reflection Function
+//==============================================================================
     
-    // Check collision with main cubes
-    std::vector<FacetBox*> cubes = {&cube_facets_2, &cube_facets_3};
+/**
+ * @brief Reflect a subdivided cube using checkboard pattern (i+j+k)%2
+ * @param cube Target cube to modify and update
+ * @param center Center of the reflection sphere 
+ * @param radius Radius of the reflection sphere
+ * @returns void
+ */
+void applySigmaTransformationToCube(Cube& cube, const Vector3D& center, double radius) {
+    if (!cube.hasSubdivision()) {
+        return;
+    }
     
-    for (auto* cubeBox : cubes) {
-        if (cubeBox->size() == 0) continue;
-        
-        for (size_t i = 0; i < cubeBox->size(); ++i) {
-            const Facet& face = (*cubeBox)[i];
-            
-            // Ray-triangle intersection test
-            Vector3D v0 = face[0];
-            Vector3D v1 = face[1]; 
-            Vector3D v2 = face[2];
-            
-            // Calculate triangle normal
-            Vector3D edge1 = v1 - v0;
-            Vector3D edge2 = v2 - v0;
-            Vector3D normal = edge1 % edge2;
-            
-            // Normalize normal if not zero
-            float normalLength = abs(normal);
-            if (normalLength < 1e-6) continue;
-            normal = normal / normalLength;
-            
-            // Ray-plane intersection
-            float denom = normal * cameraDir;
-            if (fabs(denom) < 1e-6) continue; // Ray parallel to plane
-            
-            Vector3D p0l0 = v0 - cameraPos;
-            float t = (p0l0*normal) / denom;
-            
-            if (t < 0.01f) continue; // Intersection too close or behind camera
-            
-            // Point of intersection
-            Vector3D intersectionPoint = cameraPos + cameraDir * t;
-            
-            // Check if point is inside triangle (barycentric coordinates)
-            Vector3D v0v1 = v1 - v0;
-            Vector3D v0v2 = v2 - v0;
-            Vector3D v0p = intersectionPoint - v0;
-            
-            float dot00 = v0v2*v0v2;
-            float dot01 = v0v2*v0v1;
-            float dot02 = v0v2*v0p;
-            float dot11 = v0v1*v0v1;
-            float dot12 = v0v1*v0p;
-            
-            float invDenom = 1.0f / (dot00 * dot11 - dot01 * dot01);
-            if (fabs(invDenom) > 1e6) continue; // Degenerate triangle
-            
-            float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-            float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
-            
-            if (u >= -0.1f && v >= -0.1f && u + v <= 1.1f) {
-                // We have a collision (with small tolerance)
-                if (t < result.distance) {
-                    result.hasCollision = true;
-                    result.distance = t;
-                    result.position = intersectionPoint;
-                    result.normal = normal;
-                    result.direction = cameraDir;
+    int n = cube.getSubdivisionLevels();
+    int centerIdx = n / 2;
+    // Apply transformation to all vertices
+    for (int i = -centerIdx; i < centerIdx+1; i++) {
+        for (int j = -centerIdx; j < centerIdx+1; j++) {
+            for (int k = -centerIdx; k < centerIdx+1; k++) {
+                for (int l = 0; l < 8; l++) {
+                    Vector3D v_p = cube.getSubCell(i, j, k).vertices[l];
+                    Vector3D new_pos = sigma(v_p, center, radius);
+                    cube.updateSubCellVertex(i, j, k, l, new_pos);
                 }
             }
         }
     }
     
-    return result;
+    // Refresh triangulation
+    cube.refreshTriangulation();
+    cout << "  Triangulation refreshed for cube\n";                                                                                                                                     
 }
 
-//-----------------------------------------------------------------------------
-// Calculate surface zoom based on proximity
-//-----------------------------------------------------------------------------
-float calculateSurfaceZoom() {
-    static float g_angleX = 20.0f, g_angleY = -30.0f;
-    if (!g_enableSurfaceZoom) return 1.0f;
-    
-    // Calculate camera direction based on current rotation
-    float radX = g_angleX * M_PI / 180.0f;
-    float radY = g_angleY * M_PI / 180.0f;
-    
-    // Camera looks down negative Z in view space
-    Vector3D cameraDir(
-        sin(radY) * cos(radX),
-        -sin(radX),
-        -cos(radY) * cos(radX)
-    );
-   
-   static float g_zoom   = 1.0f;
-    // Camera position in world space (approximate)
-    Vector3D cameraPos(0, 0, 5.0f * g_zoom);
-    
-    // Apply rotation to camera position
-    float cosX = cos(radX), sinX = sin(radX);
-    float cosY = cos(radY), sinY = sin(radY);
-    
-    Vector3D rotatedCameraPos(
-        cameraPos.x() * cosY + cameraPos.z() * sinY,
-        cameraPos.x() * sinX * sinY + cameraPos.y() * cosX - cameraPos.z() * sinX * cosY,
-        -cameraPos.x() * cosX * sinY + cameraPos.y() * sinX + cameraPos.z() * cosX * cosY
-    );
-    
-    CameraCollision collision = checkCameraCollision(rotatedCameraPos, cameraDir);
-    
-    if (collision.hasCollision && collision.distance < 8.0f) {
-        // Calculate zoom factor based on distance
-        float normalizedDistance = collision.distance / 8.0f; // Normalize to 0-1
-        normalizedDistance = fmaxf(0.05f, normalizedDistance); // Prevent division by zero
-        
-        // Smooth zoom curve - more aggressive zoom as we get closer
-        float zoomFactor = 1.0f + (1.0f - normalizedDistance * normalizedDistance) * 4.0f;
-        
-        return fminf(zoomFactor, 8.0f); // Cap maximum zoom
-    }
-    
-    return 1.0f;
-}
-
-//Create Dynamic Cube Management System
-
-class CubeManager {
-private:
-    std::vector<Cube> cubes;           // Dynamic array of cubes
-    std::vector<CubeConfig> configs;   // Configuration for each cube
-
-public:
-    // Add a cube configuration
-    void addCubeConfig(const CubeConfig& config) {
-        configs.push_back(config);
-    }
-
-    // Initialize all cubes based on configurations
-    void initializeCubes() {
-        cubes.clear();  // Clear existing cubes
-        cubes.reserve(configs.size());  // Pre-allocate memory for efficiency
-
-        for (const auto& config : configs) {
-            // Create cube with basic parameters
-            cubes.emplace_back(config.radius, config.position, config.subdivisionLevels);
-
-            // Apply sigma transformation
-            applySigmaTransformationToCube(cubes.back(), config.transformCenter, config.transformRadius);
-            applySigmaTransformationToCube(cubes.back(), Vector3D{0, 0, 0}, config.transformRadius);
-            applySigmaTransformationToCube(cubes.back(), Vector3D{0, 1, 0}, config.transformRadius);
-        }
-
-        std::cout << "Initialized " << cubes.size() << " cubes\n";
-    }
-
-    // Get cube by index
-    Cube& getCube(size_t index) {
-        if (index >= cubes.size()) {
-            throw std::out_of_range("Cube index out of range");
-        }
-        return cubes[index];
-    }
-
-    // Get number of cubes
-    size_t size() const {
-        return cubes.size();
-    }
-
-    /**
-     * @brief Export all managed cubes to a single STL file.
-     * 
-     * Writes all cubes in the manager's collection to one STL file,
-     * creating a unified model suitable for 3D printing or visualization.
-     * 
-     * @param filename Path to output STL file.
-     * @param objectName Custom name for the STL object (default: "CubeCollection").
-     */
-    void exportToSTL(const std::string& filename, const std::string& objectName = "CubeCollection") const {
-        if (cubes.empty()) {
-            throw std::runtime_error("CubeManager::exportToSTL: No cubes to export");
-        }
-        
-        // Use the static method from Cube class
-        Cube::writeMultiSTL(filename, cubes, objectName);
-        
-        std::cout << "Exported " << cubes.size() << " cubes to " << filename << std::endl;
-    }
-
-    /**
-     * @brief Export all managed cubes to STL with pattern support.
-     * 
-     * @param filename Path to output STL file.
-     * @param objectName Custom name for the STL object.
-     * @param mode Extraction mode for facets.
-     * @param layer Layer index for plane modes.
-     */
-    void exportToSTL_m(const std::string& filename, 
-                    const std::string& objectName = "CubeCollection",
-                    const std::string& mode = "full",
-                    int ii = 0, int jj = 0, int kk = 0) const {
-        if (cubes.empty()) {
-            throw std::runtime_error("CubeManager::exportToSTL: No cubes to export");
-        }
-        
-        Cube::writeMultiSTL_m(filename, cubes, objectName, mode, ii, jj, kk);
-        
-        std::cout << "Exported " << cubes.size() << " cubes (" << mode << " mode) to " 
-                  << filename << std::endl;
-    }
-
-};
-
+// ii, jj, kk : integers that represent the module action on the subecube lattice for cube.
 int ii = 4;
-int jj = 4;
-int kk = 4;
+int jj = 5;
+int kk = 9;
 
-// Global cube manager
-CubeManager g_cubeManager;
+//==============================================================================
+// Realtime inversion animation — CPU port of main17_gpu's updateAnimatedGeometry.
+//   pass 1 center = Vector3D(0, 0, 0.1*sin(t)), radius = 0.5   (oscillates in z)
+//   pass 2 center/radius fixed at subcell (1,1,1) — as in main15 Setup()
+// The cube's PRISTINE identity lattice is captured once; each frame the composed
+// sigma is recomputed from it (never in-place) so frame-over-frame compounding is
+// avoided. The CPU render path reads the Cube's subcell vertices directly
+// (getCheckerboardFacets), so updateAnimatedGeometry() just writes the deformed
+// vertices back into the subcells — no per-frame retriangulation. Triangulation
+// is refreshed only on an STL snapshot ('c') so writeSTL() sees the current frame.
+//==============================================================================
+struct SigmaParams { Vector3D c1; double r1; Vector3D c2; double r2; };
+
+static std::vector<float> g_identityPositions;  // pristine identity lattice (captured once)
+static double g_animTime   = 0.0;               // animation clock (advanced by the timer)
+static bool   g_animPaused = false;
+static const double g_timeStep = 0.02;           // animTime advance per ~33ms tick (main17_gpu)
+
+// Same animated inversion parameters as main17_gpu::currentSigmaParams(t).
+static SigmaParams currentSigmaParams(double t) {
+    SigmaParams s;
+    s.c1 = Vector3D(0.0, 0.0, 0.1 * sin(t));   // inversion point oscillates in z
+    s.r1 = 0.5;
+    s.c2 = cube.getSubcellCenter(1, 1, 1);
+    s.r2 = cube.getSubcellRadius(1, 1, 1);
+    return s;
+}
+// Two-pass sphere inversion with a singular-center guard (the free sigma() in
+// Vector3D.cpp throws when a vertex coincides with a center; here we leave it
+// untouched instead, so the animation never crashes).
+static inline Vector3D composeSigma(const Vector3D& p, const SigmaParams& s) {
+    Vector3D d1 = p - s.c1;  double ds1 = d1 * d1;
+    Vector3D q  = (ds1 < 1e-12) ? p : s.c1 + (s.r1 * s.r1 / ds1) * d1;  // pass 1
+    Vector3D d2 = q - s.c2;  double ds2 = d2 * d2;
+    return (ds2 < 1e-12) ? q : s.c2 + (s.r2 * s.r2 / ds2) * d2;        // pass 2
+}
+
+// Capture the pristine identity lattice ONCE, before any deformation.
+static void captureIdentityLattice() {
+    cube.fillVertexLattice(g_identityPositions);  // n^3*8*3 floats — same call as main17_gpu
+    cout << "[anim] identity lattice captured: " << (g_identityPositions.size() / 3)
+         << " verts (" << (g_identityPositions.size() * sizeof(float) / (1024.0 * 1024.0))
+         << " MB)\n";
+}
+
+// Recompose the two animated inversions from the identity lattice and push the
+// deformed vertices back into the Cube's subcells (same iteration order
+// fillVertexLattice() uses: physical [0,n)^3, vertex 0..7).
+static void updateAnimatedGeometry() {
+    SigmaParams sp = currentSigmaParams(g_animTime);
+    const int n = cube.getSubdivisionLevels();
+    const int center = n / 2;
+    const float* id = g_identityPositions.data();
+    size_t idx = 0;
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+            for (int k = 0; k < n; ++k) {
+                const int lx = i - center, ly = j - center, lz = k - center;
+                for (int l = 0; l < 8; ++l) {
+                    Vector3D p(id[idx], id[idx + 1], id[idx + 2]);
+                    cube.updateSubCellVertex(lx, ly, lz, l, composeSigma(p, sp));
+                    idx += 3;
+                }
+            }
+}
+
+// ~30 Hz animation clock. Advances the inversion time and requests a redraw.
+// The lattice deformation itself runs in display(); [Space] pauses/resumes.
+static void animTimer(int /*value*/) {
+    if (!g_animPaused) g_animTime += g_timeStep;
+    glutPostRedisplay();
+    glutTimerFunc(33, animTimer, 0);
+}
+
 void Setup() {
 
 	if (ciclo == 0) {
@@ -511,55 +302,33 @@ void Setup() {
         cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠠⠁⠋⢣⠓⡍⣫⠹⣿⣿⣷⡿⠯⠺⠁⠁⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
         cout << "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠋⢀⠋⢈⡿⠿⠁⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n";
         cout << "                              ~[Cube Class Example - Enhanced Camera]\n\n";
-        
+                                                                                                                                                                                        
         // ==================== CUBE SETUP ====================
+        cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
         // ==================== ADVANCED SUBDIVISION DEMOS - Reflection of the subdivision in Spheres ====================
-        cout << "\n--- Advanced Subdivision Control Demos ---\n";
-        cout << "Demo 4: Vertex Manipulation\n";
-        // Configure cubes you want to create
-        
-        int n = cube2.getSubdivisionLevels();
-        int center = n / 2;                                                                                                                                                                                                               
-        // Get original position of vertex (l) in subcell (i,j,k)
-        for (int i = -center; i < center; i++) 
-        for (int j = -center; j < center; j++) 
-        for (int k = -center; k < center; k++) {
-            double radi = abs(Vector3D{(double)i, (double)j, (double)k});
-
-            if (abs(radi) < 1.5)
-                g_cubeManager.addCubeConfig(CubeConfig(cube_dim, Vector3D{0,0,0}, N,
-                                                  cube2.getSubcellCenter(i,j,k),
-                                                  cube2.getSubcellRadius(i,j,k)));
-    }
-        // Initialize all cubes
-        g_cubeManager.initializeCubes();
-        
-        cout << "\nWriting cubes to STL\n";
-        g_cubeManager.exportToSTL_m("/home/mike666/Downloads/my_cube_collection_1.stl", 
-                                    "CheckerCollection", 
-                                    "checkerboard", ii, jj, kk);//exportToSTL("/home/mike666/Downloads/my_cube_collection.stl", "MyDesign");
+        // Capture the pristine identity lattice once, then deform to the t=0 state.
+        // The animation (animTimer advances g_animTime; display() deforms each frame)
+        // recomputes this every frame; at t=0 it equals the two baked reflections
+        // main15 used to apply here.
+        captureIdentityLattice();
+        updateAnimatedGeometry();
+        cube.writeSTL_s("/home/mike666/Downloads/mesh_output.stl", "MyCube", "checkerboard", ii, kk, jj);
     }
 }
 
 ///////////////////     DRAW       ///////////////////////
-
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere
     static int ciclo = 1;  // or however you manage visibility
 	if (ciclo > 0) {
-        /*Draw here with OpenGL*/	
-        //// ==================== ADVANCED SUBDIVISION DEMOS RENDERING ====================
-        for (size_t s = 0; s < g_cubeManager.size(); s++) {
-            plane_subcells = g_cubeManager.getCube(s).getCheckerboardFacets(ii, jj, kk);//getPlaneFacets(g_currentOrientation, g_currentLayer);
-            // Draw reflected cube using checkboard pattern
-            for (size_t i = 0; i < plane_subcells.size(); ++i) {
-                drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
-            }
+        /*Draw here with OpenGL*/
+        // In your draw‐all loop:
+        plane_subcells = cube.getCheckerboardFacets(ii, kk, jj);
+        for (size_t i = 0; i < plane_subcells.size(); ++i) {
+            drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
         }
-
-
-	}
+    }
 }
 
 void ProcessingProto() {
@@ -826,8 +595,11 @@ int main(int argc, char** argv)
     initGL();
     createUI();
     
-    // Objects setup
+    // Objects setup (captures the identity lattice, deforms to t=0)
     Setup();
+
+    // Start the ~30 Hz inversion-animation clock (advances g_animTime)
+    glutTimerFunc(33, animTimer, 0);
 
     // Register callbacks
     glutDisplayFunc(display);
@@ -900,13 +672,14 @@ void drawHUD() {
     if (!g_showHelp) return;
     const char* lines[] = {
         "L-drag: Rotate",
-        "M-drag: Pan", 
+        "M-drag: Pan",
         "R-drag/Wheel: Zoom",
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
+        "[C]: Save STL Snapshot (~/Downloads)",
+        "[Space]: Pause/Resume Anim",
         "[F]: Toggle Fisheye Mode",
         "[[]: Fisheye Strength -/+",
-        "[S]: Toggle Surface Zoom",
         "[O]: Cycle Orientation (XY/YZ/XZ)",
         "[+/-]: Change Layer",
         "[R]: Toggle Reflection",
@@ -937,24 +710,6 @@ void drawHUD() {
     for(const char* c=status; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
-    // Display reflection status
-    y -= 0.05f;
-    char reflectionStatus[150];
-    sprintf(reflectionStatus, "Reflection: %s (Checkboard)", g_show_reflection ? "ON" : "OFF");
-    glColor3f(0.2f, 0.8f, 0.2f);  // Green color for reflections
-    glRasterPos2f(0.02f, y);
-    for(const char* c=reflectionStatus; *c; ++c)
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
-
-    // Show reflection parameters
-    y -= 0.03f;
-    char refParams[100];
-    sprintf(refParams, "  Center: (%.2f, %.2f, %.2f)", g_reflection_center.x(), g_reflection_center.y(), g_reflection_center.z());
-    glColor3f(0.0f, 0.6f, 0.0f);
-    glRasterPos2f(0.02f, y);
-    for(const char* c=refParams; *c; ++c)
-        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, *c);
-
     // Add fisheye status
     if (g_fisheyeMode) {
         y -= 0.05f;
@@ -965,18 +720,19 @@ void drawHUD() {
         for(const char* c=fisheyeStatus; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
-    
-    // Add surface zoom status
-    if (g_enableSurfaceZoom && g_surfaceZoomFactor > 1.01f) {
+
+    // Animation status: inversion clock + pause state
+    {
         y -= 0.05f;
-        char zoomStatus[100];
-        sprintf(zoomStatus, "Surface Zoom: %.1fx", g_surfaceZoomFactor);
-        glColor3f(0.8f, 0.5f, 0.0f);  // Orange color for zoom
+        char animStatus[120];
+        sprintf(animStatus, "Anim: %s  t=%.3f  c1.z=%.4f",
+                g_animPaused ? "PAUSED" : "RUNNING", g_animTime, 0.1 * sin(g_animTime));
+        glColor3f(0.0f, 0.5f, 0.0f);  // green
         glRasterPos2f(0.02f, y);
-        for(const char* c=zoomStatus; *c; ++c)
+        for(const char* c=animStatus; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
-
+    
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
@@ -990,9 +746,6 @@ void display()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    // Calculate surface zoom factor
-    g_surfaceZoomFactor = calculateSurfaceZoom();
-    
     // Apply surface zoom to the base zoom
     float effectiveZoom = g_zoom / g_surfaceZoomFactor;
     
@@ -1002,6 +755,11 @@ void display()
     // Apply rotations
     glRotatef(g_angleX, 1, 0, 0);
     glRotatef(g_angleY, 0, 1, 0);
+
+    // Drive the realtime inversion animation: the timer advances g_animTime;
+    // here we deform the lattice to the current frame before rendering it
+    // (mirrors main17_gpu, which deforms in display() and advances in the timer).
+    if (!g_animPaused) updateAnimatedGeometry();
 
     // Draw axes at origin
     drawAxes(10.0f);
@@ -1066,6 +824,49 @@ void mouseMotion(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
+// Capture an STL snapshot of the ENTIRE mesh to ~/Downloads
+// Bound to the 'c' key. writeSTL() exports every triangular face of the cube
+// (all active subcells), i.e. the full mesh — not just the checkerboard
+// selection that writeSTL_s(...,"checkerboard",...) in Setup() exports.
+// Each snapshot gets a unique timestamped + counted filename so repeated
+// presses never overwrite previous captures.
+//-----------------------------------------------------------------------------
+void captureSTLSnapshot()
+{
+    // Resolve ~/Downloads from $HOME (fall back to the hardcoded path used elsewhere)
+    const char* home = getenv("HOME");
+    std::string dir = home ? (std::string(home) + "/Downloads") : "/home/mike666/Downloads";
+
+    // Best-effort: ensure the directory exists (ignore "already exists")
+    mkdir(dir.c_str(), 0755);
+
+    // Build a unique filename: YYYYMMDD_HHMMSS + per-session counter
+    time_t now = time(nullptr);
+    struct tm* lt = localtime(&now);
+    char ts[32];
+    strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", lt);
+
+    char fname[256];
+    snprintf(fname, sizeof(fname), "mesh_snapshot_%s_%03d.stl", ts, g_snapshotCount++);
+
+    std::string path = dir + "/" + fname;
+
+    try {
+        // writeSTL() reads facets_, which only reflects the current animated
+        // state after a retriangulation. updateAnimatedGeometry() updates the
+        // subcell vertices but deliberately skips this (expensive) step; do it
+        // here so the snapshot captures exactly the frame the user sees now.
+        cube.refreshTriangulation();
+        cube.writeSTL(path);
+        cout << "[snapshot] entire mesh saved -> " << path
+             << "  (facets: " << cube.getFacets().size() << ")"
+             << "  (t=" << g_animTime << ", " << (g_animPaused ? "PAUSED" : "running") << ")\n";
+    } catch (const std::exception& e) {
+        cerr << "[snapshot] FAILED: " << e.what() << "\n";
+    }
+}
+
+//-----------------------------------------------------------------------------
 // Keyboard handler with fisheye and surface zoom controls
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int x, int y) {
@@ -1081,6 +882,18 @@ void keyboard(unsigned char key, int x, int y) {
         case 'H':
             g_showHelp = !g_showHelp;
             glutPostRedisplay();
+            break;
+
+        // Save an STL snapshot of the ENTIRE mesh to ~/Downloads
+        case 'c':
+        case 'C':
+            captureSTLSnapshot();
+            break;
+
+        // Pause/resume the inversion animation (t holds while paused)
+        case ' ':
+            g_animPaused = !g_animPaused;
+            printf("Animation: %s (t=%.3f)\n", g_animPaused ? "PAUSED" : "RUNNING", g_animTime);
             break;
 
         // Fisheye controls
@@ -1110,50 +923,39 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
             
-        // Surface zoom control
-        case 's':
-        case 'S':
-            g_enableSurfaceZoom = !g_enableSurfaceZoom;
-            printf("Surface zoom: %s\n", g_enableSurfaceZoom ? "ON" : "OFF");
+        // Switch 'k' module
+        case 'k':
+            kk += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
-
-        // Plane orientation controls
-        case 'o':
-            kk += 1;                                                                                                                                
-            glutPostRedisplay();
-            break;
-        case 'O':
+        case 'K':
             kk -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
 
-        // Layer controls
-        case '+':
+        // Switch 'i' module
+        case 'i':
             ii += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
-        case '=':
-            g_currentLayer = (g_currentLayer + 1) % g_maxLayers;
-            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
-            glutPostRedisplay();
-            break;
-        case '-':
+        case 'I':
             ii -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
 
-        case '_':
-            g_currentLayer = (g_currentLayer - 1 + g_maxLayers) % g_maxLayers;
-            printf("Layer: %d/%d\n", g_currentLayer, g_maxLayers-1);
+        // Switch 'j' module
+        case 'j':
+            jj += 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
-
-        // Reflection controls
-        case 'r':
-        case 'R':
-            g_show_reflection = !g_show_reflection;
-            printf("Reflection: %s\n", g_show_reflection ? "ON" : "OFF");
+        case 'J':
+            jj -= 1;
+            cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
 
