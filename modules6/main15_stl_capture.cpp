@@ -13,6 +13,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <sys/stat.h>   // mkdir()
+#include <fstream>      // std::ofstream for the snapshot writer
 
 //////////////////////////////////////
 //                                  
@@ -824,12 +825,40 @@ void mouseMotion(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
-// Capture an STL snapshot of the ENTIRE mesh to ~/Downloads
-// Bound to the 'c' key. writeSTL() exports every triangular face of the cube
-// (all active subcells), i.e. the full mesh — not just the checkerboard
-// selection that writeSTL_s(...,"checkerboard",...) in Setup() exports.
-// Each snapshot gets a unique timestamped + counted filename so repeated
-// presses never overwrite previous captures.
+// Write an arbitrary FacetBox to an ASCII STL file (same format as Cube::writeSTL).
+//-----------------------------------------------------------------------------
+static void writeFacetBoxSTL(const FacetBox& facets, const std::string& path,
+                             const char* name) {
+    std::ofstream stl(path);
+    if (!stl.is_open())
+        throw std::runtime_error("captureSTLSnapshot: cannot create " + path);
+    stl << "solid " << name << "\n";
+    for (size_t i = 0; i < facets.size(); ++i) {
+        const Facet& f = facets[i];
+        Vector3D n = f.getNormal();
+        Vector3D a = f[0], b = f[1], c = f[2];
+        stl << "facet normal " << std::scientific
+            << n.x() << " " << n.y() << " " << n.z() << "\n";
+        stl << "\touter loop\n";
+        stl << "\t\tvertex " << a.x() << " " << a.y() << " " << a.z() << "\n";
+        stl << "\t\tvertex " << b.x() << " " << b.y() << " " << b.z() << "\n";
+        stl << "\t\tvertex " << c.x() << " " << c.y() << " " << c.z() << "\n";
+        stl << "\tendloop\n";
+        stl << "endfacet\n";
+    }
+    stl << "endsolid " << name << "\n";
+}
+
+//-----------------------------------------------------------------------------
+// Capture an STL snapshot of EXACTLY what is on screen to ~/Downloads.
+// Bound to the 'c' key. The render (Draw()) shows the checkerboard selection
+// cube.getCheckerboardFacets(ii, kk, jj) — predicate (i%ii==0 && k%jj==0) || j%kk==0,
+// i.e. the cells selected by the current <ii,jj,kk> modular-algebra values. The
+// snapshot builds that SAME FacetBox (same call, same current animated subcell
+// vertices) and writes it, so the STL matches the OpenGL render triangle-for-
+// triangle — NOT the full mesh.
+// Each snapshot gets a unique timestamped + counted filename so repeated presses
+// never overwrite previous captures.
 //-----------------------------------------------------------------------------
 void captureSTLSnapshot()
 {
@@ -852,14 +881,15 @@ void captureSTLSnapshot()
     std::string path = dir + "/" + fname;
 
     try {
-        // writeSTL() reads facets_, which only reflects the current animated
-        // state after a retriangulation. updateAnimatedGeometry() updates the
-        // subcell vertices but deliberately skips this (expensive) step; do it
-        // here so the snapshot captures exactly the frame the user sees now.
-        cube.refreshTriangulation();
-        cube.writeSTL(path);
-        cout << "[snapshot] entire mesh saved -> " << path
-             << "  (facets: " << cube.getFacets().size() << ")"
+        // EXACTLY the render's selection: Draw() does getCheckerboardFacets(ii, kk, jj).
+        // getCheckerboardFacets() reads the current (animated) subcell vertices
+        // directly, so this matches the last rendered frame — no refreshTriangulation
+        // needed, and the STL matches what OpenGL shows triangle-for-triangle.
+        FacetBox sel = cube.getCheckerboardFacets(ii, kk, jj);
+        writeFacetBoxSTL(sel, path, "MyCube");
+        cout << "[snapshot] rendered selection saved -> " << path
+             << "  (facets: " << sel.size()
+             << ", ii/jj/kk=" << ii << "/" << jj << "/" << kk << ")"
              << "  (t=" << g_animTime << ", " << (g_animPaused ? "PAUSED" : "running") << ")\n";
     } catch (const std::exception& e) {
         cerr << "[snapshot] FAILED: " << e.what() << "\n";
