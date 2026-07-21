@@ -1479,6 +1479,187 @@ public:
         }
     }
 
+    /**
+     * @brief Build a flat octagonal (truncated-cube) vertex lattice for the checkerboard
+     *        selection — the VBO counterpart of getCheckerboardFacetsOctagonal().
+     *
+     * Mirrors getCheckerboardFacetsOctagonal(x,y,z,hollow) but, instead of pushing
+     * 152 Facet objects, expands each selected subcell into a fixed block of 126
+     * generated vertices (the same outer/inner/centroid/corner points that
+     * pushOctagonalCubeFacets computes) and appends them to a flat float buffer.
+     * Use fillCheckerboardIndicesOctagonal() to get the matching triangle index
+     * buffer; the two share the identical iteration order, predicate, active-cell
+     * filter, and a per-cell 126-vertex layout so vertex-block base = selOrd*126
+     * aligns with index base = selOrd*126.
+     *
+     * Per-cell vertex layout (126 verts, 3 floats each):
+     *   faces f in 0..5, block at offset f*17 (17 verts/face):
+     *     outer[0..7] at f*17+0..7, inner[0..7] at f*17+8..15, centroid at f*17+16
+     *   corners c in 0..7, block at offset 102 + c*3: cut-points 0,1,2
+     * (hollow does NOT change the vertex set — it only drops the center-fan
+     * triangles in the index buffer — so 126 verts/cell regardless of hollow.)
+     *
+     * @param x Modulo divisor for i (clamped to >= 1).
+     * @param y Modulo divisor for j (clamped to >= 1).
+     * @param z Modulo divisor for k (clamped to >= 1).
+     * @param positions Output flat vertex buffer (cleared and filled), 126*3 floats
+     *                  per selected active cell. Pass through to glBufferSubData().
+     * @param hollow Currently unused for the vertex set (kept for API symmetry with
+     *               fillCheckerboardIndicesOctagonal and getCheckerboardFacetsOctagonal).
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillOctagonalVertexLattice(int x, int y, int z,
+                                    std::vector<float>& positions, bool hollow) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillOctagonalVertexLattice: no subdivision available");
+        }
+        if (x < 1) x = 1;
+        if (y < 1) y = 1;
+        if (z < 1) z = 1;
+
+        const int n = subdivision_levels_;
+        const double trunc      = default_trunc_;
+        const double innerScale = default_inner_scale_;
+        positions.clear();
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if (!((i % x == 0 && k % z == 0) || j % y == 0)) continue;
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const std::array<Vector3D, 8>& v = cell.vertices;
+
+                    // 6 faces: outer[8], inner[8], centroid[1] = 17 verts/face.
+                    for (int f = 0; f < 6; ++f) {
+                        const int* F = octagonal_faces_[f];
+                        Vector3D P[4] = { v[F[0]], v[F[1]], v[F[2]], v[F[3]] };
+                        Vector3D C = (P[0] + P[1] + P[2] + P[3]) / 4.0;   // face centroid
+                        Vector3D outer[8];
+                        for (int a = 0; a < 4; ++a) {
+                            int nxt = (a + 1) & 3;
+                            outer[2*a]     = P[a]   + trunc * (P[nxt] - P[a]);    // F[a]
+                            outer[2*a + 1] = P[nxt] + trunc * (P[a]   - P[nxt]); // B[nxt]
+                        }
+                        Vector3D inner[8];
+                        for (int a = 0; a < 8; ++a)
+                            inner[a] = C + innerScale * (outer[a] - C);
+
+                        for (int a = 0; a < 8; ++a) {
+                            positions.push_back((float)outer[a].x());
+                            positions.push_back((float)outer[a].y());
+                            positions.push_back((float)outer[a].z());
+                        }
+                        for (int a = 0; a < 8; ++a) {
+                            positions.push_back((float)inner[a].x());
+                            positions.push_back((float)inner[a].y());
+                            positions.push_back((float)inner[a].z());
+                        }
+                        positions.push_back((float)C.x());
+                        positions.push_back((float)C.y());
+                        positions.push_back((float)C.z());
+                    }
+                    // 8 corners: 3 cut-points each (order = corner_neighbors_[c]).
+                    for (int c = 0; c < 8; ++c) {
+                        const int* nn = corner_neighbors_[c];
+                        Vector3D Vc = v[c];
+                        Vector3D cp[3] = {
+                            Vc + trunc * (v[nn[0]] - Vc),
+                            Vc + trunc * (v[nn[1]] - Vc),
+                            Vc + trunc * (v[nn[2]] - Vc)
+                        };
+                        for (int p = 0; p < 3; ++p) {
+                            positions.push_back((float)cp[p].x());
+                            positions.push_back((float)cp[p].y());
+                            positions.push_back((float)cp[p].z());
+                        }
+                    }
+                }
+            }
+        }
+        (void)hollow;  // vertex set is independent of hollow (only triangle set changes)
+    }
+
+    /**
+     * @brief Build the triangle index buffer for the octagonal checkerboard lattice.
+     *
+     * Emits 152 (solid) or 104 (hollow) triangle indices per selected active cell,
+     * referencing the 126-vertex-per-cell layout produced by
+     * fillOctagonalVertexLattice(). Iteration order, predicate
+     * (i%x==0 && k%z==0) || j%y==0, and the active-cell filter are identical to
+     * fillOctagonalVertexLattice, and a running selected-cell ordinal sets
+     * base = selOrd*126 so the indices line up with the vertex buffer. Winding
+     * matches pushOctagonalCubeFacets exactly (same fb.push() order), so the
+     * rendered geometry is byte-for-byte the same as getCheckerboardFacetsOctagonal
+     * — only the per-frame Facet construction is eliminated.
+     *
+     * Independent of deformation (depends only on selection + hollow), so rebuild
+     * only when ii/jj/kk or hollow changes.
+     *
+     * @param indices Output index buffer (cleared and filled). 456 (solid) or
+     *                312 (hollow) unsigned ints per selected active cell.
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillCheckerboardIndicesOctagonal(int x, int y, int z,
+                                           std::vector<unsigned int>& indices,
+                                           bool hollow) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillCheckerboardIndicesOctagonal: no subdivision available");
+        }
+        if (x < 1) x = 1;
+        if (y < 1) y = 1;
+        if (z < 1) z = 1;
+
+        const int n = subdivision_levels_;
+        const unsigned int VPV  = 126;   // verts per cell
+        const unsigned int FACE = 17;    // verts per face block (8 outer + 8 inner + 1 centroid)
+        indices.clear();
+        unsigned int sel = 0;            // running selected-cell ordinal (matches fillOctagonalVertexLattice)
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if (!((i % x == 0 && k % z == 0) || j % y == 0)) continue;
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const unsigned int base = sel * VPV;
+
+                    // Per face: 16 annular + (8 center-fan unless hollow).
+                    for (int f = 0; f < 6; ++f) {
+                        unsigned int fb = base + (unsigned int)f * FACE;  // outer @ +0..7, inner @ +8..15, C @ +16
+                        for (int a = 0; a < 8; ++a) {
+                            int b = (a + 1) & 7;
+                            unsigned int oa = fb + (unsigned int)a;
+                            unsigned int ob = fb + (unsigned int)b;
+                            unsigned int ia = fb + 8u + (unsigned int)a;
+                            unsigned int ib = fb + 8u + (unsigned int)b;
+                            // push(outer[a], outer[b], inner[b])
+                            indices.push_back(oa); indices.push_back(ob); indices.push_back(ib);
+                            // push(outer[a], inner[b], inner[a])
+                            indices.push_back(oa); indices.push_back(ib); indices.push_back(ia);
+                        }
+                        if (!hollow) {
+                            unsigned int cc = fb + 16u;
+                            for (int a = 0; a < 8; ++a) {
+                                int b = (a + 1) & 7;
+                                unsigned int ia = fb + 8u + (unsigned int)a;
+                                unsigned int ib = fb + 8u + (unsigned int)b;
+                                // push(C, inner[a], inner[b])
+                                indices.push_back(cc); indices.push_back(ia); indices.push_back(ib);
+                            }
+                        }
+                    }
+                    // 8 corner triangles: cut-points at base+102 + c*3 + 0..2.
+                    for (int c = 0; c < 8; ++c) {
+                        unsigned int cb = base + 102u + (unsigned int)c * 3u;
+                        indices.push_back(cb + 0u);
+                        indices.push_back(cb + 1u);
+                        indices.push_back(cb + 2u);
+                    }
+                    ++sel;
+                }
+            }
+        }
+    }
+
     /* === STRING-BASED PLANE ACCESS === */
     
     /**

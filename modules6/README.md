@@ -410,6 +410,129 @@ the `c` key), not the full mesh.
 
 ---
 
+## 🧊 Tesselated Truncated cubic möbius honeycomb — `main15_slow_inversion_truncated_cube_gpu`
+
+`main15_slow_inversion_truncated_cube_gpu.cpp` is a **GPU-rasterized, truncated-cube (octagonal-mesh) version** of the slow-inversion animation. It keeps the same `37×37×37` subdivided cube, the same three-pass sphere-inversion animation, and the same keyboard controls as `main15_slow_inversion_truncated_cube`, but it replaces the CPU immediate-mode facet loop with a modern OpenGL VBO/IBO + GLSL shader path — exactly like `main15_gpu` did for `main15`. The visual result is a tessellated truncated-cubic honeycomb whose cells morph through a Möbius-style sphere-inversion cycle, rendered with flat gray facets and black triangle outlines.
+
+### What it does
+
+- Builds a `37³` subdivided cube (radius `2.0`) centered at `(0, 0.0001, 0)`.
+- Selects a **checkerboard subset** of active subcells with the modular predicate `((i % ii == 0 && k % jj == 0) || j % kk == 0)`, defaulting to `ii=4, jj=5, kk=9` (same as the CPU version; note the predicate arguments are passed as `(ii, kk, jj)` in code).
+- Expands **every selected subcell into an octagonal truncated cube**: each of the 6 square faces becomes an outer octagon ring + inner octagon ring + center fan, plus 8 corner triangles. This yields **126 generated vertices and 152 triangles per selected subcell** (104 if `--hollow` omits the center fans).
+- Runs the **slow sequential sphere-inversion animation** (`g_invProgress ∈ [0,6)`): inversion 1 ramps up, then inversion 2, then inversion 3, then undoes them in reverse order, looping forever. The original simultaneous mode can be toggled with `M` or `--original`.
+- Uses the same **Blinn-Phong gray shader** as `main15_gpu` (`#version 460 core`, flat face normals from `dFdx/dFdy`, gray base `200/255`, ambient `0.3`, diffuse `0.7`, specular `1.0`, shininess `128`, black outline pass), so the on-screen look matches the CPU reference.
+
+### How the GPU render path works
+
+The CPU still owns the deformation math. Every animation tick the program:
+
+1. **Captures the pristine identity lattice once** (`captureIdentityLattice()` — `Cube::fillVertexLattice`).
+2. **Recomputes the deformed subcell vertices from the identity lattice** every frame (`updateAnimatedGeometry`). The composition is a three-pass blend `out_i = (1−α_i)·in_i + α_i·σ_i(in_i)` where `(α1,α2,α3)` comes from `currentAlphas(g_invProgress)`. At `(1,1,1)` this is identical to the original all-at-once inversion; at `(0,0,0)` it is the identity mesh.
+3. **Expands the deformed subcells into a flat VBO** (`updateOctagonalGeometry` → `Cube::fillOctagonalVertexLattice`). Each selected subcell emits 126 vertices (6 faces × 17 vertices + 8 corners × 3 cut-points).
+4. **Draws two indexed passes per frame** (`drawGPU`):
+   - a gray lit fill pass with `glPolygonOffset(1,1)` and `GL_POLYGON_OFFSET_FILL`;
+   - a black outline pass with `glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)`.
+   The shader MVP is built by reading back the fixed-function `PROJECTION` and `MODELVIEW` matrices and multiplying them, so the camera (orbit rotate/pan/zoom/fisheye) behaves exactly like the CPU version.
+
+Key implementation details:
+
+- **No GLEW / GLFW.** Modern GL entry points (`glGenBuffers`, `glCreateShader`, `glUniform*`, `glVertexAttribPointer`, …) are loaded at runtime with a tiny `glXGetProcAddressARB` loader inside the source file.
+- **No CUDA / nvcc.** The acceleration comes from GPU-side OpenGL rasterization + shaders, not compute kernels.
+- **VBO is dynamic** (re-uploaded each frame because the geometry deforms). The **IBO is static** and is only rebuilt when `ii/jj/kk` or `--hollow` changes.
+- `Cube.hpp` gained two additive methods for this program: `fillOctagonalVertexLattice(...)` and `fillCheckerboardIndicesOctagonal(...)`. They follow the same selection predicate and triangulation as the CPU `writeSTL_s_octagonal` path.
+
+### How to execute
+
+```bash
+cd /home/ubuntu/Documents/K-Dimensional-blade.../modules6
+
+# Compile (pure g++ + GL libs; no CUDA, no GLEW needed)
+g++ -std=c++17 -O2 -o main15_slow_inversion_truncated_cube_gpu \
+    main15_slow_inversion_truncated_cube_gpu.cpp \
+    -lGL -lGLU -lglut -lm
+
+# Run on the Tesla T4 (selects the NVIDIA GLX backend)
+DISPLAY=:0.0 __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    ./main15_slow_inversion_truncated_cube_gpu
+```
+
+The program self-selects the NVIDIA backend via `setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 1)` before `glutInit`, so the environment variable is belt-and-suspenders. On this server it prints something like:
+
+```
+[slow-inv] mode=SLOW  speed=0.500  (per-inversion ~6.7s)  hollow=OFF
+[trunc-gpu] IBO: 1429560 triangles (9405 cells); VBO: 1185030 verts (13.5616 MB)
+```
+
+> A display is required (real GLUT window). On a headless box use `xvfb-run …` or an EGL headless context.
+
+### Command-line flags
+
+| Flag | Effect |
+|---|---|
+| `[speed]` (positional number) | Inversion speed rate, e.g. `2.0` |
+| `--speed <v>` | Same as positional speed; clamped to `[1e-4, 10]` |
+| `--mode slow\|original` | Slow sequential (default) or original simultaneous |
+| `--slow` / `--original` | Shortcuts for `--mode` |
+| `--hollow` | Omit the center-fan triangles per face, leaving an octagonal hole (104 tris/cell instead of 152) |
+| `--capture-cycle` (alias `--capture`) | Write one STL per frame for a full cycle, then exit |
+| `--outdir <dir>` | Output directory for the frame sequence (default `~/Downloads/cycle_truncated_<timestamp>/`) |
+| `--binary` (alias `--binary-stl`) | Write **binary** STL instead of ASCII |
+
+Examples:
+
+```bash
+# Real-time, faster inversion, hollow cells
+DISPLAY=:0.0 __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    ./main15_slow_inversion_truncated_cube_gpu --speed 2.0 --hollow
+
+# Original simultaneous mode (no slow ramps)
+DISPLAY=:0.0 __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    ./main15_slow_inversion_truncated_cube_gpu --original
+
+# Capture one full slow-mode cycle to binary STL, then exit
+DISPLAY=:0.0 __GLX_VENDOR_LIBRARY_NAME=nvidia \
+    ./main15_slow_inversion_truncated_cube_gpu --capture-cycle --binary --speed 2 --outdir ./truncated_cycle
+```
+
+### Size / performance notes
+
+With the default selection `ii=4, jj=5, kk=9`, the on-screen octagonal mesh is:
+
+| mode | triangles | cells | VBO vertices |
+|---|---|---|---|
+| Solid (`--hollow` off) | ~1,429,560 | ~9,405 | ~1,185,030 |
+| Hollow (`--hollow` on) | ~977,520 | ~9,405 | ~1,185,030 |
+
+The VBO is ~13.6 MB and is re-uploaded every animated frame; the IBO is ~16 MB and only rebuilds on selection changes. At ~1.4 M triangles the program is heavy but comfortably interactive on the Tesla T4 because rasterization and flat-normal computation run in the shader, and the CPU only deforms the lattice and expands vertices.
+
+### Keyboard controls
+
+Same as `main15_slow_inversion_truncated_cube`:
+
+| Key | Action |
+|---|---|
+| `M` | toggle slow-sequential vs original simultaneous |
+| `s` / `S` | inversion speed up / down (step `0.1`) |
+| `Space` | pause/resume animation |
+| `O` | toggle hollow (octagonal hole per face) at runtime |
+| `c` | save an STL snapshot of the on-screen mesh to `~/Downloads` |
+| `H` / `F` / `[` `]` / `i I j J k K` | HUD · fisheye · fisheye strength · modular selection |
+| `Esc` | quit |
+
+The HUD shows `Inv: SLOW|ORIG  speed=…  phase=…  a=(α1,α2,α3)` plus `Hollow: ON|OFF`.
+
+### Per-frame cycle capture (`--capture-cycle`)
+
+Renders one full slow-mode cycle to STL — one file per animation frame, named `frame_000000.stl`, `frame_000001.stl`, … — using the same on-screen checkerboard selection. The program exits automatically when the phase clock wraps from `6` back to `0`. Frame count is approximately `600 / speed + 1` (the `+1` is the initial identity frame). Use `--binary` for ~4.6× smaller files and faster writes.
+
+### Troubleshooting
+
+- **`RENDERER = llvmpipe` / nothing visible** — make sure you exported `__GLX_VENDOR_LIBRARY_NAME=nvidia` and are pointing at the real X server (`DISPLAY=:0.0`). The program needs an OpenGL 4.6 context.
+- **Shader compile/link error printed to stderr** — the active GL context is < 4.6 or the NVIDIA backend was not selected.
+- **Long startup pause** — `Setup()` writes a one-time baked STL to `~/Downloads/mesh_output_truncated.stl`. This file can be ~230 MB for the solid default selection; the window appears quickly but the first geometry upload happens after that write completes.
+
+---
+
 ## Cube Class Usage
 
 The `Cube.hpp` header provides a complete cube implementation with triangulation and subdivision capabilities, featuring **full subdivision control** for real-time manipulation and selective rendering.
