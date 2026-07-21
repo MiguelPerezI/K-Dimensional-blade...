@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <sys/stat.h>   // mkdir()
 #include <fstream>      // std::ofstream for the snapshot writer
+#include <cstdint>      // uint32_t/uint16_t for binary STL
 
 //////////////////////////////////////
 //                                  
@@ -216,6 +217,34 @@ static double g_animTime   = 0.0;               // animation clock (advanced by 
 static bool   g_animPaused = false;
 static const double g_timeStep = 0.02;           // animTime advance per ~33ms tick (main17_gpu)
 
+// --- Slow sequential inversion (new feature) ---
+// The three inversions ramp up one at a time via per-pass blends alpha in [0,1],
+// then ping-pong back (undo in reverse: 3->2->1). g_invProgress in [0,6) is the
+// phase clock (6 ramps per cycle). g_invSpeed is a RATE: larger = faster.
+// Per-tick advance = INV_RATE_PER_TICK * g_invSpeed; at ~30 Hz that's
+// ~0.3*g_invSpeed/sec, so at speed=1.0 one inversion ramp (~1.0 unit) takes
+// ~3.3 s, full cycle ~20 s. Default 0.5 => ~6.7 s per inversion (visibly slow).
+static bool   g_slowMode      = true;    // true=slow sequential, false=original simultaneous
+static double g_invSpeed      = 0.5;     // inversion advance rate (larger=faster); CLI/keyboard adjustable
+static double g_invProgress   = 0.0;    // slow-mode phase clock in [0,6)
+static const double INV_RATE_PER_TICK = 0.01;
+static const double g_invSpeedStep    = 0.1;  // keyboard step for s/S
+struct InvBlend { double a1, a2, a3; };
+
+// --- Per-frame STL capture for one slow-mode cycle (new) ---
+// --capture-cycle: write one STL per animation frame for a full 6-phase cycle,
+// then exit. --outdir <dir>: where to write frame_XXXXXX.stl (default
+// ~/Downloads/cycle_<timestamp>/). Captures the SAME checkerboard selection the
+// render shows (cube.getCheckerboardFacets(ii,kk,jj)), matching the 'c' key.
+static bool        g_captureCycle = false;  // --capture-cycle flag
+static std::string g_captureDir;           // --outdir target directory
+static bool        g_capturing    = false; // active capture state (true while capturing)
+static int         g_frameIndex   = 0;    // current frame number (0-based)
+static double      g_prevProgress = -1.0;  // progress at last captured frame (-1 = none yet)
+static bool        g_animStepped  = false; // set by animTimer when it advanced, consumed in display
+static bool        g_binarySTL    = false; // --binary: write binary STL (else ASCII)
+static bool        g_hollow       = false; // --hollow / [O]: omit center-fan tris (octagonal hole per face)
+
 // Same animated inversion parameters as main17_gpu::currentSigmaParams(t).
 static SigmaParams currentSigmaParams(double t) {
     SigmaParams s;
@@ -227,19 +256,51 @@ static SigmaParams currentSigmaParams(double t) {
     s.r3 = cube.getSubcellRadius(-1, -1, -1);
     return s;
 }
-// Two-pass sphere inversion with a singular-center guard (the free sigma() in
-// Vector3D.cpp throws when a vertex coincides with a center; here we leave it
-// untouched instead, so the animation never crashes).
-static inline Vector3D composeSigma(const Vector3D& p, const SigmaParams& s) {
+// Map the slow-mode phase clock g_invProgress in [0,6) to per-pass blends
+// (a1,a2,a3). Forward: inv1 up, inv2 up, inv3 up (reaches full composition at
+// p=3). Reverse undo: inv3 down, inv2 down, inv1 down (back to identity at
+// p=6 ~ 0). Continuous at every boundary; each a is in [0,1] by construction.
+static InvBlend currentAlphas(double progress) {
+    progress = fmod(progress, 6.0);  if (progress < 0.0) progress += 6.0;
+    if      (progress < 1.0) return {progress,        0.0,       0.0};       // inv1 up
+    else if (progress < 2.0) return {1.0, progress - 1.0,       0.0};       // inv2 up
+    else if (progress < 3.0) return {1.0, 1.0,        progress - 2.0};      // inv3 up
+    else if (progress < 4.0) return {1.0, 1.0,        4.0 - progress};      // undo inv3
+    else if (progress < 5.0) return {1.0, 5.0 - progress, 0.0};             // undo inv2
+    else                     return {6.0 - progress, 0.0, 0.0};            // undo inv1
+}
+static const char* phaseName(double progress) {
+    progress = fmod(progress, 6.0);  if (progress < 0.0) progress += 6.0;
+    if (progress < 1.0) return "inv1->";
+    if (progress < 2.0) return "inv2->";
+    if (progress < 3.0) return "inv3->";
+    if (progress < 4.0) return "<-inv3";
+    if (progress < 5.0) return "<-inv2";
+    return "<-inv1";
+}
+
+// Three-pass sphere inversion with a singular-center guard, generalized with a
+// per-pass blend alpha in [0,1]: out_i = (1-a_i)*in_i + a_i*sigma_i(in_i).
+// (The free sigma() in Vector3D.cpp throws on a singular center; here we leave
+// the point untouched instead, so the animation never crashes.) At a=(1,1,1)
+// this is identical to the original all-at-once composed inversion.
+static inline Vector3D composeSigmaBlended(const Vector3D& p, const SigmaParams& s, const InvBlend& b) {
+    // pass 1: out = (1-a1)*p + a1*sigma1(p)
     Vector3D d1 = p - s.c1;  double ds1 = d1 * d1;
-    Vector3D q  = (ds1 < 1e-12) ? p : s.c1 + (s.r1 * s.r1 / ds1) * d1;  
-  // pass 1                                                                   
-        Vector3D d2 = q   - s.c2;  double ds2 = d2 * d2;                      
-        Vector3D r2v = (ds2 < 1e-12) ? q   : s.c2 + (s.r2 * s.r2 / ds2) * d2; 
-  // pass 2                                                                   
-        Vector3D d3 = r2v - s.c3;  double ds3 = d3 * d3;                      
-        return (ds3 < 1e-12) ? r2v : s.c3 + (s.r3 * s.r3 / ds3) * d3;         
-  // pass 3
+    Vector3D s1v = (ds1 < 1e-12) ? p : s.c1 + (s.r1 * s.r1 / ds1) * d1;
+    Vector3D q  = p + b.a1 * (s1v - p);
+    // pass 2: out = (1-a2)*q + a2*sigma2(q)
+    Vector3D d2 = q - s.c2;  double ds2 = d2 * d2;
+    Vector3D s2v = (ds2 < 1e-12) ? q : s.c2 + (s.r2 * s.r2 / ds2) * d2;
+    Vector3D r2v = q + b.a2 * (s2v - q);
+    // pass 3: out = (1-a3)*r2v + a3*sigma3(r2v)
+    Vector3D d3 = r2v - s.c3; double ds3 = d3 * d3;
+    Vector3D s3v = (ds3 < 1e-12) ? r2v : s.c3 + (s.r3 * s.r3 / ds3) * d3;
+    return r2v + b.a3 * (s3v - r2v);
+}
+// Original behavior: all three passes at full strength (slow mode disabled).
+static inline Vector3D composeSigma(const Vector3D& p, const SigmaParams& s) {
+    return composeSigmaBlended(p, s, {1.0, 1.0, 1.0});
 }
 
 // Capture the pristine identity lattice ONCE, before any deformation.
@@ -250,11 +311,15 @@ static void captureIdentityLattice() {
          << " MB)\n";
 }
 
-// Recompose the two animated inversions from the identity lattice and push the
+// Recompose the three animated inversions from the identity lattice and push the
 // deformed vertices back into the Cube's subcells (same iteration order
-// fillVertexLattice() uses: physical [0,n)^3, vertex 0..7).
+// fillVertexLattice() uses: physical [0,n)^3, vertex 0..7). In slow mode each
+// pass is blended by currentAlphas(g_invProgress); in original mode all three
+// passes run at full strength (== the original composeSigma(p, sp)).
 static void updateAnimatedGeometry() {
     SigmaParams sp = currentSigmaParams(g_animTime);
+    const InvBlend blend = g_slowMode ? currentAlphas(g_invProgress)
+                                      : InvBlend{1.0, 1.0, 1.0};
     const int n = cube.getSubdivisionLevels();
     const int center = n / 2;
     const float* id = g_identityPositions.data();
@@ -265,7 +330,7 @@ static void updateAnimatedGeometry() {
                 const int lx = i - center, ly = j - center, lz = k - center;
                 for (int l = 0; l < 8; ++l) {
                     Vector3D p(id[idx], id[idx + 1], id[idx + 2]);
-                    cube.updateSubCellVertex(lx, ly, lz, l, composeSigma(p, sp));
+                    cube.updateSubCellVertex(lx, ly, lz, l, composeSigmaBlended(p, sp, blend));
                     idx += 3;
                 }
             }
@@ -273,8 +338,15 @@ static void updateAnimatedGeometry() {
 
 // ~30 Hz animation clock. Advances the inversion time and requests a redraw.
 // The lattice deformation itself runs in display(); [Space] pauses/resumes.
+// In slow mode also advances the phase clock g_invProgress by speed-scaled
+// ticks (currentAlphas fmods it into [0,6), so no manual wrap is needed).
 static void animTimer(int /*value*/) {
-    if (!g_animPaused) g_animTime += g_timeStep;
+    if (!g_animPaused) {
+        g_animTime += g_timeStep;
+        if (g_slowMode)
+            g_invProgress = fmod(g_invProgress + INV_RATE_PER_TICK * g_invSpeed, 6.0);  // wraps 6->0 so the cycle-completion detector (g_invProgress < g_prevProgress) fires
+        g_animStepped = true;   // a new animation step occurred (drives per-frame capture)
+    }
     glutPostRedisplay();
     glutTimerFunc(33, animTimer, 0);
 }
@@ -320,7 +392,7 @@ void Setup() {
         // main15 used to apply here.
         captureIdentityLattice();
         updateAnimatedGeometry();
-        cube.writeSTL_s("/home/mike666/Downloads/mesh_output.stl", "MyCube", "checkerboard", ii, kk, jj);
+        cube.writeSTL_s_octagonal("/home/mike666/Downloads/mesh_output_truncated.stl", "MyTruncatedCube", "checkerboard", ii, kk, jj, g_hollow);
     }
 }
 
@@ -332,7 +404,7 @@ void Draw() {
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/
         // In your draw‐all loop:
-        plane_subcells = cube.getCheckerboardFacets(ii, kk, jj);
+        plane_subcells = cube.getCheckerboardFacetsOctagonal(ii, kk, jj, g_hollow);
         for (size_t i = 0; i < plane_subcells.size(); ++i) {
             drawFacetMainCStyle(plane_subcells[i], (int)(i + 500));
         }
@@ -590,13 +662,72 @@ void keyboard(unsigned char key, int x, int y);
 //-----------------------------------------------------------------------------
 // Main
 //-----------------------------------------------------------------------------
+// Parse slow-inversion options: --speed <v>, --mode slow|original, --slow,
+// --original, or a bare positional number (=> speed). Defaults: slow, 0.5.
+// Called after glutInit so GLUT has already stripped its own flags from argv.
+// Create a directory path (like mkdir -p); ignores already-exists errors.
+static void ensureDir(const std::string& path) {
+    std::string cur;
+    for (char c : path) {
+        cur += c;
+        if (c == '/') mkdir(cur.c_str(), 0755);   // create each prefix ending in '/'
+    }
+    mkdir(path.c_str(), 0755);                     // final component
+}
+
+static void parseArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if      (a == "--speed" && i + 1 < argc)  g_invSpeed = atof(argv[++i]);
+        else if (a == "--mode"  && i + 1 < argc)  g_slowMode = (std::string(argv[++i]) != "original");
+        else if (a == "--slow")                   g_slowMode = true;
+        else if (a == "--original")               g_slowMode = false;
+        else if (a == "--capture-cycle" || a == "--capture")  g_captureCycle = true;
+        else if (a == "--outdir" && i + 1 < argc)             g_captureDir = argv[++i];
+        else if (a == "--binary" || a == "--binary-stl")      g_binarySTL = true;
+        else if (a == "--hollow")                             g_hollow = true;   // omit inner octagon (hollow)
+        else { char* end = nullptr; double v = strtod(argv[i], &end);  // positional => speed
+               if (end != argv[i] && *end == '\0') g_invSpeed = v; }
+    }
+    if (g_invSpeed < 1e-4) g_invSpeed = 1e-4;   // never stall
+    if (g_invSpeed > 10.0) g_invSpeed = 10.0;
+
+    // --capture-cycle: per-frame STL dump for one slow-mode cycle, then exit.
+    if (g_captureCycle) {
+        if (!g_slowMode) printf("[capture] --capture-cycle needs slow mode; enabling SLOW.\n");
+        g_slowMode = true;                                  // the cycle is a slow-mode concept
+        if (g_captureDir.empty()) {                          // default: grouped, timestamped subfolder
+            const char* home = getenv("HOME");
+            std::string base = home ? (std::string(home) + "/Downloads") : "/home/mike666/Downloads";
+            time_t now = time(nullptr);
+            struct tm* lt = localtime(&now);
+            char ts[32];
+            strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", lt);
+            g_captureDir = base + "/cycle_truncated_" + ts;
+        }
+        ensureDir(g_captureDir);
+        g_capturing = true;                                  // start capturing on the first display
+        long expect = (long)(6.0 / (INV_RATE_PER_TICK * g_invSpeed) + 0.5);
+        printf("[capture] per-frame %s STL for one cycle -> %s\n",
+               g_binarySTL ? "BINARY" : "ASCII", g_captureDir.c_str());
+        printf("[capture] ~%ld frames expected (speed=%.3f); program exits when the cycle wraps.\n",
+               expect, g_invSpeed);
+    }
+
+    printf("[slow-inv] mode=%s  speed=%.3f  (per-inversion ~%.1fs)  hollow=%s\n",
+           g_slowMode ? "SLOW" : "ORIGINAL", g_invSpeed,
+           g_slowMode ? 1.0 / (INV_RATE_PER_TICK * 30.0 * g_invSpeed) : 0.0,
+           g_hollow ? "ON" : "OFF");
+}
+
 int main(int argc, char** argv)
 {
     srand((unsigned)time(nullptr));
     glutInit(&argc, argv);
+    parseArgs(argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(720, 720);
-    glutCreateWindow(" JAZ 4D Enhanced Camera U.U ");
+    glutCreateWindow(" JAZ 4D Enhanced Camera U.U  (Truncated Cube)");
 
     // Enable smoothing & blending by default
     ProcessMenu(1);
@@ -686,6 +817,9 @@ void drawHUD() {
         "[G]: Toggle Glass Mode",
         "[C]: Save STL Snapshot (~/Downloads)",
         "[Space]: Pause/Resume Anim",
+        "[M]: Toggle Slow/Original Inversion",
+        "[s/S]: Inversion speed +/-",
+        "[O]: Toggle Hollow (octagonal hole per face)",
         "[F]: Toggle Fisheye Mode",
         "[[]: Fisheye Strength -/+",
         "[O]: Cycle Orientation (XY/YZ/XZ)",
@@ -740,6 +874,31 @@ void drawHUD() {
         for(const char* c=animStatus; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
+
+    // Slow-inversion status: mode, speed, phase, and the three per-pass blends
+    {
+        y -= 0.05f;
+        char invStatus[160];
+        const char* ph = g_slowMode ? phaseName(g_invProgress) : "orig";
+        InvBlend b = g_slowMode ? currentAlphas(g_invProgress) : InvBlend{1.0, 1.0, 1.0};
+        sprintf(invStatus, "Inv: %s  speed=%.2f  phase=%s  a=(%.2f,%.2f,%.2f)",
+                g_slowMode ? "SLOW" : "ORIG", g_invSpeed, ph, b.a1, b.a2, b.a3);
+        glColor3f(0.6f, 0.3f, 0.6f);  // purple
+        glRasterPos2f(0.02f, y);
+        for(const char* c=invStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+
+    // Hollow-truncated-cube status (octagonal holes per face)
+    {
+        y -= 0.05f;
+        char hollowStatus[100];
+        sprintf(hollowStatus, "Hollow: %s", g_hollow ? "ON (octagonal holes)" : "OFF (solid)");
+        glColor3f(0.2f, 0.6f, 0.6f);  // teal
+        glRasterPos2f(0.02f, y);
+        for(const char* c=hollowStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
     
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
     glMatrixMode(GL_PROJECTION); glPopMatrix();
@@ -749,6 +908,9 @@ void drawHUD() {
 //-----------------------------------------------------------------------------
 // Main display with surface zoom and fisheye
 //-----------------------------------------------------------------------------
+// Forward decl: defined after writeFacetBoxSTL (used here for per-frame cycle capture).
+static void maybeCaptureFrame();
+
 void display()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -768,6 +930,10 @@ void display()
     // here we deform the lattice to the current frame before rendering it
     // (mirrors main17_gpu, which deforms in display() and advances in the timer).
     if (!g_animPaused) updateAnimatedGeometry();
+
+    // Per-frame STL capture for one cycle (if --capture-cycle). Done after the
+    // mesh is deformed so the STL matches the rendered frame.
+    if (g_capturing) maybeCaptureFrame();
 
     // Draw axes at origin
     drawAxes(10.0f);
@@ -856,6 +1022,87 @@ static void writeFacetBoxSTL(const FacetBox& facets, const std::string& path,
     stl << "endsolid " << name << "\n";
 }
 
+// Write the FacetBox as BINARY STL (little-endian, 50 bytes/triangle) to `path`.
+// ~4.8x smaller than ASCII; Blender auto-detects binary via file size (80+4+50*N).
+static void writeFacetBoxSTLBinary(const FacetBox& facets, const std::string& path,
+                                   const char* /*name*/) {
+    std::ofstream stl(path, std::ios::binary);
+    if (!stl.is_open())
+        throw std::runtime_error("writeFacetBoxSTLBinary: cannot create " + path);
+    const char header[80] = "Binary STL - main15_slow_inversion";  // rest padded with '\0' -> 80 bytes
+    stl.write(header, 80);
+    const uint32_t n = (uint32_t)facets.size();
+    stl.write(reinterpret_cast<const char*>(&n), 4);
+    for (size_t i = 0; i < facets.size(); ++i) {
+        const Facet& f = facets[i];
+        Vector3D nv = f.getNormal();
+        Vector3D a = f[0], b = f[1], c = f[2];
+        float vals[12] = {
+            (float)nv.x(), (float)nv.y(), (float)nv.z(),
+            (float)a.x(),  (float)a.y(),  (float)a.z(),
+            (float)b.x(),  (float)b.y(),  (float)b.z(),
+            (float)c.x(),  (float)c.y(),  (float)c.z()
+        };
+        stl.write(reinterpret_cast<const char*>(vals), 48);
+        const uint16_t attr = 0;
+        stl.write(reinterpret_cast<const char*>(&attr), 2);
+    }
+}
+
+// Dispatch to ASCII or binary STL based on the --binary flag.
+static void writeFacetBox(const FacetBox& facets, const std::string& path, const char* name) {
+    if (g_binarySTL) writeFacetBoxSTLBinary(facets, path, name);
+    else             writeFacetBoxSTL(facets, path, name);
+}
+
+// Write the current on-screen mesh (checkerboard selection, same as Draw()/'c')
+// as STL (ASCII or binary per --binary) to <g_captureDir>/frame_NNNNNN.stl.
+static void captureFrameSTL(int frameIndex) {
+    char fname[64];
+    snprintf(fname, sizeof(fname), "frame_%06d.stl", frameIndex);
+    std::string path = g_captureDir + "/" + fname;
+    try {
+        FacetBox sel = cube.getCheckerboardFacetsOctagonal(ii, kk, jj, g_hollow);  // matches Draw()/captureSTLSnapshot()
+        writeFacetBox(sel, path, "MyTruncatedCube");
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[capture] FAILED frame %d -> %s: %s -- aborting capture.\n",
+                frameIndex, path.c_str(), e.what());
+        g_capturing = false;
+        exit(1);
+    }
+}
+
+// Drive per-frame capture for one cycle. Called once per display() after the
+// mesh is deformed. Frame 0 is the identity (progress 0, captured on the first
+// display). Each subsequent animation step captures one frame; when the phase
+// clock wraps (g_invProgress decreases) one full cycle is complete and we exit.
+static void maybeCaptureFrame() {
+    if (g_prevProgress < 0.0) {
+        // First frame of the run: mesh is at progress 0 (identity). Capture once.
+        captureFrameSTL(g_frameIndex);
+        printf("[capture] frame %06d  progress=%.3f  -> %s/frame_%06d.stl\n",
+               g_frameIndex, g_invProgress, g_captureDir.c_str(), g_frameIndex);
+        g_frameIndex++;
+        g_prevProgress = 0.0;
+        return;
+    }
+    if (!g_animStepped) return;  // skip non-animation displays (resize/expose)
+    if (g_invProgress < g_prevProgress) {
+        // Phase clock wrapped past 6 -> one full cycle complete. The wrapped frame
+        // would be the identity again (duplicate of frame 0), so stop without it.
+        printf("[capture] cycle complete: %d frames written to %s -- exiting.\n",
+               g_frameIndex, g_captureDir.c_str());
+        fflush(stdout);
+        exit(0);
+    }
+    captureFrameSTL(g_frameIndex);
+    if (g_frameIndex % 100 == 0)
+        printf("[capture] frame %06d  progress=%.3f\n", g_frameIndex, g_invProgress);
+    g_frameIndex++;
+    g_prevProgress = g_invProgress;
+    g_animStepped = false;
+}
+
 //-----------------------------------------------------------------------------
 // Capture an STL snapshot of EXACTLY what is on screen to ~/Downloads.
 // Bound to the 'c' key. The render (Draw()) shows the checkerboard selection
@@ -883,7 +1130,7 @@ void captureSTLSnapshot()
     strftime(ts, sizeof(ts), "%Y%m%d_%H%M%S", lt);
 
     char fname[256];
-    snprintf(fname, sizeof(fname), "mesh_snapshot_%s_%03d.stl", ts, g_snapshotCount++);
+    snprintf(fname, sizeof(fname), "mesh_snapshot_truncated_%s_%03d.stl", ts, g_snapshotCount++);
 
     std::string path = dir + "/" + fname;
 
@@ -892,8 +1139,8 @@ void captureSTLSnapshot()
         // getCheckerboardFacets() reads the current (animated) subcell vertices
         // directly, so this matches the last rendered frame — no refreshTriangulation
         // needed, and the STL matches what OpenGL shows triangle-for-triangle.
-        FacetBox sel = cube.getCheckerboardFacets(ii, kk, jj);
-        writeFacetBoxSTL(sel, path, "MyCube");
+        FacetBox sel = cube.getCheckerboardFacetsOctagonal(ii, kk, jj, g_hollow);
+        writeFacetBox(sel, path, "MyTruncatedCube");
         cout << "[snapshot] rendered selection saved -> " << path
              << "  (facets: " << sel.size()
              << ", ii/jj/kk=" << ii << "/" << jj << "/" << kk << ")"
@@ -993,6 +1240,40 @@ void keyboard(unsigned char key, int x, int y) {
         case 'J':
             jj -= 1;
             cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
+            glutPostRedisplay();
+            break;
+
+        // Toggle slow-sequential vs original simultaneous inversion mode
+        case 'm':
+        case 'M':
+            if (g_capturing) {
+                printf("Inversion mode locked to SLOW during cycle capture.\n");
+                break;
+            }
+            g_slowMode = !g_slowMode;
+            printf("Inversion mode: %s\n", g_slowMode ? "SLOW sequential" : "ORIGINAL simultaneous");
+            glutPostRedisplay();
+            break;
+
+        // Inversion speed: 's' faster, 'S' slower (lower=+ matches i/I, j/J, k/K)
+        case 's':
+            g_invSpeed = fmin(10.0, g_invSpeed + g_invSpeedStep);
+            printf("Inversion speed: %.3f (per-inversion ~%.1fs)\n", g_invSpeed,
+                   1.0 / (INV_RATE_PER_TICK * 30.0 * g_invSpeed));
+            glutPostRedisplay();
+            break;
+        case 'S':
+            g_invSpeed = fmax(1e-4, g_invSpeed - g_invSpeedStep);
+            printf("Inversion speed: %.3f\n", g_invSpeed);
+            glutPostRedisplay();
+            break;
+
+        // Toggle hollow truncated cubes: omit the 8 center-fan triangles per face,
+        // leaving an octagonal hole in each face so the cube is hollow.
+        case 'o':
+        case 'O':
+            g_hollow = !g_hollow;
+            printf("Hollow truncated cubes: %s\n", g_hollow ? "ON (octagonal holes)" : "OFF (solid)");
             glutPostRedisplay();
             break;
 

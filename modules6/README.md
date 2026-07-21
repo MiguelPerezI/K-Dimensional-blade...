@@ -267,6 +267,149 @@ render path** (legacy).
 
 ---
 
+## 🐌 Slow Inversion Animation — `main15_slow_inversion`
+
+`main15_slow_inversion.cpp` is a copy of `main15_stl_capture.cpp` that adds a new
+**slow sequential inversion** mode. Instead of applying all three sphere
+inversions every frame, the inversions **ramp up one at a time** — so you can
+watch the regular mesh gradually transform into its inverted counterpart — then
+**ping-pong back** undoing them in reverse order, looping forever. Every
+original feature of `main15_stl_capture` (STL snapshot on `c`, pause, fisheye,
+modular selection, camera, HUD) is preserved, and the original simultaneous
+mode remains available as a toggle.
+
+### How the slow inversion works
+
+Each sphere inversion is an involution and the mesh is recomputed from a
+pristine identity lattice every frame, so a per-pass blend
+`out_i = (1-α_i)·in_i + α_i·σ_i(in_i)` is a strict generalization of the
+original `composeSigma`: `(α1,α2,α3) = (1,1,1)` reproduces the original
+byte-for-byte; `(0,0,0)` is the identity mesh. A phase clock
+`g_invProgress ∈ [0,6)` drives six ramps per cycle:
+
+| phase | progress | `(α1, α2, α3)` | meaning |
+|---|---|---|---|
+| 0 | 0 → 1 | `(p, 0, 0)` | inversion 1 ramps up |
+| 1 | 1 → 2 | `(1, p−1, 0)` | inversion 2 ramps up (1 held) |
+| 2 | 2 → 3 | `(1, 1, p−2)` | inversion 3 ramps up → full composition (peak) |
+| 3 | 3 → 4 | `(1, 1, 4−p)` | undo inversion 3 |
+| 4 | 4 → 5 | `(1, 5−p, 0)` | undo inversion 2 |
+| 5 | 5 → 6 | `(6−p, 0, 0)` | undo inversion 1 → identity, then loop |
+
+One **cycle** = identity → inv1 → inv2 → inv3 (peak) → undo inv3 → undo inv2 →
+undo inv1 → identity. The inversion **radii (and centers) stay static**; only
+the blend weights move, so each vertex travels a straight path from its identity
+position to its inverted position (a pathwise transformation). The phase clock is
+`fmod`-ed to `[0,6)`, so the wrap is seamless.
+
+### Compile and run
+
+```bash
+g++ -std=c++17 -o main15_slow_inversion main15_slow_inversion.cpp -lGL -lGLU -lglut -lm
+./main15_slow_inversion                 # slow mode, default speed 0.5
+
+# Truncated-cube (octagonal mesh) variant — same lattice + slow inversion, but each
+# subcell's 6 square faces become octagons (152 tris/subcell vs 12):
+g++ -std=c++17 -o main15_slow_inversion_truncated_cube main15_slow_inversion_truncated_cube.cpp -lGL -lGLU -lglut -lm
+./main15_slow_inversion_truncated_cube  # ~12.7x more triangles -> lower FPS; use --capture-cycle for STL-only
+# Hollow truncated cubes: omit the 8 center-fan triangles per face so each face has
+# an octagonal hole (104 tris/subcell). Start hollow with --hollow, or press O at runtime:
+./main15_slow_inversion_truncated_cube --hollow
+```
+
+A display is required (it opens a GLUT window); on a headless box use
+`xvfb-run ./main15_slow_inversion …`.
+
+### Command-line flags
+
+| Flag | Effect |
+|---|---|
+| `[speed]` (positional number) | inversion speed, e.g. `./main15_slow_inversion 2.0` |
+| `--speed <v>` | inversion speed (a rate: larger = faster) |
+| `--mode slow\|original` | slow sequential (default) or original simultaneous |
+| `--slow` / `--original` | shortcuts for `--mode` |
+| `--capture-cycle` (alias `--capture`) | write one STL per frame for a full cycle, then exit |
+| `--outdir <dir>` | output directory for the frame sequence (default `~/Downloads/cycle_<timestamp>/`) |
+| `--binary` (alias `--binary-stl`) | write **binary** STL (default ASCII) |
+
+`--capture-cycle` forces slow mode (the cycle is a slow-mode concept) and locks
+the `M` key during capture. Speed is clamped to `[1e-4, 10]`. Examples:
+
+```bash
+./main15_slow_inversion --speed 2.0                       # ~1.7s per inversion
+./main15_slow_inversion --original                        # identical to main15_stl_capture
+./main15_slow_inversion --capture-cycle --binary --speed 2 --outdir ./cycle_frames
+```
+
+Startup prints the chosen mode/speed and, for capture, the expected frame count.
+
+### Speed and timing
+
+`g_invSpeed` is a rate (larger = faster). One inversion ramp takes
+`≈ 3.33 / g_invSpeed` seconds; one full cycle (6 ramps) takes
+`≈ 20 / g_invSpeed` seconds. Defaults: `speed=0.5` → ~6.7 s per inversion,
+~40 s per cycle.
+
+### Keyboard controls
+
+Inherited from `main15_stl_capture`, plus two new ones:
+
+| Key | Action |
+|---|---|
+| `M` | toggle slow-sequential vs original simultaneous mode (locked to SLOW during capture) |
+| `s` / `S` | inversion speed up / down (step 0.1) |
+| `Space` | pause/resume the animation |
+| `c` | save an STL snapshot of the on-screen mesh to `~/Downloads` |
+| `H` / `F` / `[` `]` / `i I j J k K` | HUD · fisheye · fisheye strength · modular selection |
+| `Esc` | quit |
+
+The HUD shows `Inv: SLOW|ORIG  speed=…  phase=…  a=(α1,α2,α3)`.
+
+### Per-frame cycle capture (`--capture-cycle`)
+
+Renders one full slow-mode cycle to a sequence of STL files — one file per
+animation frame, named `frame_000000.stl`, `frame_000001.stl`, … (zero-padded,
+sortable), containing the same on-screen checkerboard selection the `c` key
+captures. The program **exits on its own** when the cycle wraps, printing
+`[capture] cycle complete: N frames written … exiting.`
+
+```bash
+./main15_slow_inversion --capture-cycle --binary --speed 2 --outdir ./cycle_frames
+# -> ./cycle_frames/frame_000000.stl … frame_000300.stl
+```
+
+Frame count = `600 / speed` animation frames **plus 1 initial identity frame**
+(e.g. `speed=10` → 61 files, `speed=2` → 301, `speed=0.5` → 1201). Frame 0 is
+the identity mesh; the peak (full three-inversion composition) is at the
+midpoint; the last frame returns to identity, so the sequence loops seamlessly.
+
+### Binary STL (`--binary`) and Blender
+
+With `--binary`, STL is written in the standard binary format (80-byte header +
+4-byte little-endian triangle count + 50 bytes/triangle, little-endian) — about
+**4.6× smaller** than ASCII and faster to write. **Blender 4.3.x imports it
+natively**: the STL importer (*File ▸ Import ▸ STL*, operator
+`bpy.ops.wm.stl_import`) auto-detects binary vs ASCII by file size
+(`80 + 4 + 50×N`), so no format toggle is needed. The same flag also makes the
+interactive `c`-key snapshot write binary.
+
+### Size / performance notes
+
+With the default selection `ii=4, jj=5, kk=9`, the on-screen mesh is
+**~112,860 facets per frame**, so per-frame file sizes are:
+
+| format | per-frame size | notes |
+|---|---|---|
+| ASCII STL | ~26 MB | default |
+| binary STL | ~5.4 MB | with `--binary` |
+
+At this facet count, writing is the bottleneck (~1 frame/s for ASCII, faster for
+binary). Use a higher `--speed` for fewer frames, or `--binary` for smaller,
+faster files. The capture writes the on-screen checkerboard selection (matching
+the `c` key), not the full mesh.
+
+---
+
 ## Cube Class Usage
 
 The `Cube.hpp` header provides a complete cube implementation with triangulation and subdivision capabilities, featuring **full subdivision control** for real-time manipulation and selective rendering.

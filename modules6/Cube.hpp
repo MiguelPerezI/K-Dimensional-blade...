@@ -1635,6 +1635,192 @@ public:
         getSubCellMutable(x, y, z).active = active;  // Set the active/inactive state flag
     }
 
+    /* === OCTAGONAL (TRUNCATED-CUBE) MESH — a second method for building a cube ===
+     * Each face becomes an octagon (outer ring + inner ring + center fan = 24
+     * triangles) and 8 corner triangles close the solid => 152 triangles/cube.
+     * Derived on the fly from the same 8 corner vertices the plain 12-triangle
+     * path uses, so the slow-inversion animation is identical. The truncation
+     * (default_trunc_) and inner scale (default_inner_scale_) are fixed; edit
+     * those constexpr to tune the look. FacetBox results are returned by value.
+     */
+
+    /**
+     * @brief Rebuild this cube's stored facets as an octagonal (truncated-cube) mesh.
+     *
+     * Second method for building a cube's surface, parallel to buildFacets():
+     * populates facets_ from the 8 main-cube vertices (verts_) using the
+     * truncated-cube octagonal mesh (152 triangles). For a basic (non-subdivided)
+     * cube only; for subdivided cubes prefer the on-the-fly getters below, since
+     * storing 152*n^3 facets is expensive.
+     */
+    void buildFacetsOctagonal(bool hollow = false) {
+        facets_.clear();
+        std::array<Vector3D, 8> v;
+        for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();   // Quaternion -> Vector3D
+        pushOctagonalCubeFacets(facets_, v, default_trunc_, default_inner_scale_, hollow);
+    }
+
+    /**
+     * @brief Build a fresh FacetBox of this cube as an octagonal (truncated-cube) mesh.
+     *
+     * For a non-subdivided cube, builds from the 8 main vertices (verts_). For a
+     * subdivided cube, iterates all active subcells. Returns by value (freshly
+     * built), matching getCheckerboardFacets' contract (not the const-ref of getFacets).
+     */
+    FacetBox getFacetsOctagonal(bool hollow = false) const {
+        FacetBox fb;
+        if (!hasSubdivision()) {
+            std::array<Vector3D, 8> v;
+            for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();
+            pushOctagonalCubeFacets(fb, v, default_trunc_, default_inner_scale_, hollow);
+        } else {
+            const int n = subdivision_levels_;
+            for (int i = 0; i < n; ++i)
+                for (int j = 0; j < n; ++j)
+                    for (int k = 0; k < n; ++k) {
+                        const SubCell& cell = subcells_[i][j][k];
+                        if (!cell.active) continue;
+                        pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+                    }
+        }
+        return fb;
+    }
+
+    /**
+     * @brief Checkerboard subcells as an octagonal (truncated-cube) mesh.
+     *
+     * Same subcell selection as getCheckerboardFacets(x,y,z) (unchanged predicate),
+     * but each selected active subcell is triangulated as a truncated cube via
+     * pushOctagonalCubeFacets instead of the 12-triangle cube_triangles_ table.
+     * This is the render path used by main15_slow_inversion_truncated_cube.
+     */
+    FacetBox getCheckerboardFacetsOctagonal(int x, int y, int z, bool hollow = false) const {
+        auto cells = getCheckerboardSubcells(x, y, z);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief A 2D plane of subcells as an octagonal (truncated-cube) mesh.
+     *
+     * Same selection as getPlane(axis, layer); each active subcell is triangulated
+     * as a truncated cube.
+     */
+    FacetBox getPlaneFacetsOctagonal(int axis, int layer, bool hollow = false) const {
+        auto cells = getPlane(axis, layer);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief One subcell as an octagonal (truncated-cube) mesh (152 triangles).
+     */
+    FacetBox getSubCellFacetsOctagonal(int x, int y, int z, bool hollow = false) const {
+        const SubCell& cell = getSubCell(x, y, z);
+        FacetBox fb;
+        if (!cell.active) return fb;
+        pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+        return fb;
+    }
+
+    /**
+     * @brief Rebuild stored facets from subcells as an octagonal mesh.
+     *
+     * WARNING: stores 152*n^3 Facets (~1 GB at n=37). Not used by the slow-inversion
+     * live path (which reads subcells on the fly via getCheckerboardFacetsOctagonal);
+     * provided only for API parity with refreshTriangulation.
+     */
+    void refreshTriangulationOctagonal(bool hollow = false) {
+        if (!hasSubdivision()) return;
+        facets_.clear();
+        const int n = subdivision_levels_;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    pushOctagonalCubeFacets(facets_, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+                }
+    }
+
+    /**
+     * @brief Write this cube's octagonal (truncated-cube) mesh to an STL file.
+     *
+     * Parallel to writeSTL_s (6-arg): same modes and ASCII format. "checkerboard"
+     * -> getCheckerboardFacetsOctagonal(x,y,z) (or getFacetsOctagonal if not
+     * subdivided); "full" -> getFacetsOctagonal; "plane_xy/xz/yz" ->
+     * getPlaneFacetsOctagonal. Only active subcells are included.
+     *
+     * @param filename Path to output STL file (created or overwritten).
+     * @param objectName Name to use in the STL header.
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param x Checkerboard X modulo, or plane layer for plane modes.
+     * @param y Checkerboard Y modulo (default 9).
+     * @param z Checkerboard Z modulo (default 2).
+     * @param hollow If true, omit the 8 center-fan triangles per face so each face
+     *               has an octagonal hole (hollow truncated cubes); default false (solid).
+     * @throws std::runtime_error if the file cannot be created.
+     * @throws std::invalid_argument if mode is invalid or a plane mode is used without subdivision.
+     */
+    void writeSTL_s_octagonal(const std::string& filename,
+                              const std::string& objectName,
+                              const std::string& mode,
+                              int x,
+                              int y = 9,
+                              int z = 2,
+                              bool hollow = false) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_octagonal: Cannot create file " + filename);
+
+        stl << "solid " << objectName << "\n";
+
+        FacetBox facetsToWrite;
+        if (mode == "full") {
+            facetsToWrite = getFacetsOctagonal(hollow);
+        } else if (mode == "checkerboard") {
+            if (!hasSubdivision()) facetsToWrite = getFacetsOctagonal(hollow);
+            else                  facetsToWrite = getCheckerboardFacetsOctagonal(x, y, z, hollow);
+        } else if (mode == "plane_xy") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsOctagonal(2, x, hollow);
+        } else if (mode == "plane_xz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsOctagonal(1, x, hollow);
+        } else if (mode == "plane_yz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsOctagonal(0, x, hollow);
+        } else {
+            throw std::invalid_argument("Invalid mode: " + mode +
+                ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+        }
+
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
 
 private:
     // === CORE DATA MEMBERS ===
@@ -1665,6 +1851,116 @@ private:
         // Top face (y = +radius) - divided into 2 triangles from vertices 2,3,6,7
         {3, 2, 6}, {6, 7, 3}   // Triangle 11: vertices (3,2,6), Triangle 12: vertices (6,7,3)
     };
+
+    // === OCTAGONAL (TRUNCATED-CUBE) MESH TABLES ===
+    // A second way to build a cube's surface: each of the 6 square faces becomes
+    // an octagon (a "truncated cube"), triangulated as an outer octagon ring + an
+    // inner octagon ring + a center fan (24 triangles per face) plus 8 corner
+    // triangles that close the solid => 152 triangles per cube. It is built on
+    // the fly from the SAME 8 corner vertices the plain cube_triangles_ path uses,
+    // so it deforms with the lattice under inversion exactly like the 12-triangle
+    // mesh and needs no extra storage.
+    //
+    // octagonal_faces_: the 4 corner indices of each face in CCW-OUTWARD order
+    // (the same winding convention as cube_triangles_ above).
+    static constexpr int octagonal_faces_[6][4] = {
+        {0, 1, 2, 3},  // Front  (z = +radius, outward +z)
+        {4, 7, 6, 5},  // Back   (z = -radius, outward -z)
+        {1, 5, 6, 2},  // Right  (x = +radius, outward +x)
+        {0, 3, 7, 4},  // Left   (x = -radius, outward -x)
+        {3, 2, 6, 7},  // Top    (y = +radius, outward +y)
+        {0, 4, 5, 1}   // Bottom (y = -radius, outward -y)
+    };
+    // corner_neighbors_: for each cube corner, its 3 edge-neighbours ordered so the
+    // corner triangle (Pa, Pb, Pc) with Pa = Vc + t*(n0 - Vc), Pb = Vc + t*(n1 - Vc),
+    // Pc = Vc + t*(n2 - Vc) has an OUTWARD normal (along Vc - cubeCenter). Winding is
+    // fixed by this table, so no runtime dot-check is needed and the result does not
+    // depend on cell.center (which goes stale under inversion).
+    static constexpr int corner_neighbors_[8][3] = {
+        {1, 3, 4},  // 0: (-,-,+)
+        {0, 5, 2},  // 1: (+,-,+)
+        {3, 1, 6},  // 2: (+,+,+)   <-- NOT {1,3,6}; that winding is inward
+        {2, 7, 0},  // 3: (-,+,+)
+        {5, 0, 7},  // 4: (-,-,-)
+        {4, 6, 1},  // 5: (+,-,-)
+        {7, 2, 5},  // 6: (+,+,-)
+        {6, 4, 3}   // 7: (-,+,-)
+    };
+    // Regular octagon: truncation t = 1/(2+sqrt(2)) makes the 4 long outer edges
+    // (2r(1-2t)) equal to the 4 short cut-corner edges (2rt*sqrt(2)). Hardcoded as
+    // a literal because std::sqrt is not constexpr until C++26 and M_SQRT2 is not
+    // guaranteed under -std=c++17 (strict). innerScale shrinks the inner ring
+    // toward the face centroid (a homothety, so the inner octagon stays regular).
+    static constexpr double default_trunc_       = 0.2928932188134524;  // = 1/(2+sqrt(2))
+    static constexpr double default_inner_scale_  = 0.5;
+
+    /**
+     * @brief Push the 152 triangles of one truncated cube (octagonal mesh) into a FacetBox.
+     *
+     * Given the 8 corner vertices of a (possibly deformed) cube, emits:
+     *   - 6 octagonal faces, 24 triangles each: an outer octagon (truncated square)
+     *     and an inner octagon scaled toward the face centroid by innerScale,
+     *     joined by 16 annular triangles, plus an 8-triangle center fan.
+     *   - 8 corner triangles (one per truncated corner) to close the solid.
+     * All winding is fixed by octagonal_faces_ and corner_neighbors_ (outward),
+     * matching the cube_triangles_ convention; the Facet constructor computes the
+     * deformed normal eagerly from the current vertex positions.
+     *
+     * @param fb Destination FacetBox (appended to; FacetBox has no reserve, so
+     *            reallocations occur — fine for the sizes used here).
+     * @param v  The 8 cube corners in standard order (same as initVertices/SubCell).
+     * @param trunc Corner-cut fraction in (0, 0.5); pass default_trunc_ for a regular octagon.
+     * @param innerScale Inner ring scale toward the face centroid in (0, 1).
+     */
+    static void pushOctagonalCubeFacets(FacetBox& fb,
+                                        const std::array<Vector3D, 8>& v,
+                                        double trunc,
+                                        double innerScale,
+                                        bool hollow) {
+        for (int f = 0; f < 6; ++f) {
+            const int* F = octagonal_faces_[f];
+            Vector3D P[4] = { v[F[0]], v[F[1]], v[F[2]], v[F[3]] };
+            Vector3D C = (P[0] + P[1] + P[2] + P[3]) / 4.0;   // face centroid
+
+            // Outer octagon ring in CCW-outward order: [F0, B1, F1, B2, F2, B3, F3, B0]
+            // where F[i] = P[i] + t*(P[i+1] - P[i]) (forward along edge i -> i+1)
+            // and   B[i] = P[i] + t*(P[i-1] - P[i]) (backward along edge i -> i-1).
+            Vector3D outer[8];
+            for (int i = 0; i < 4; ++i) {
+                int nxt = (i + 1) & 3;
+                outer[2 * i]     = P[i]   + trunc * (P[nxt] - P[i]);    // F[i]
+                outer[2 * i + 1] = P[nxt] + trunc * (P[i]   - P[nxt]); // B[nxt]
+            }
+            // Inner ring = homothety of the outer ring toward the face centroid C.
+            Vector3D inner[8];
+            for (int i = 0; i < 8; ++i)
+                inner[i] = C + innerScale * (outer[i] - C);
+
+            // 16 annular triangles between the outer and inner rings (outward).
+            for (int i = 0; i < 8; ++i) {
+                int j = (i + 1) & 7;
+                fb.push(outer[i], outer[j], inner[j]);
+                fb.push(outer[i], inner[j], inner[i]);
+            }
+            // 8 center-fan triangles filling the inner octagon (outward). Skipped
+            // when hollow=true, leaving an octagonal hole in each face so the
+            // truncated cube is hollow (you can see through the face centers).
+            if (!hollow) {
+                for (int i = 0; i < 8; ++i) {
+                    int j = (i + 1) & 7;
+                    fb.push(C, inner[i], inner[j]);
+                }
+            }
+        }
+        // 8 corner triangles closing the truncated cube (outward, fixed winding).
+        for (int c = 0; c < 8; ++c) {
+            const int* n = corner_neighbors_[c];
+            Vector3D Vc = v[c];
+            fb.push(Vc + trunc * (v[n[0]] - Vc),
+                    Vc + trunc * (v[n[1]] - Vc),
+                    Vc + trunc * (v[n[2]] - Vc));
+        }
+    }
 
     /* === PRIVATE HELPER METHODS === */
 
