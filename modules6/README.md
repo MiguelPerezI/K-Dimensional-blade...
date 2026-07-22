@@ -533,6 +533,117 @@ Renders one full slow-mode cycle to STL — one file per animation frame, named 
 
 ---
 
+## 🖱️ Mouse-driven single inversion — `main_truncated_octahedron_module`
+
+`main_truncated_octahedron_module.cpp` is a copy of
+`main15_slow_inversion_truncated_octahedron.cpp` with the animation reworked
+around a **mouse-driven inversion center**:
+
+- **No slow transition.** The slow 3-pass blend ramp (`g_slowMode` /
+  `g_invProgress` / `currentAlphas`) is retired from the live path. The lattice
+  starts **already fully inverted** at the center sphere on the first frame — no
+  easing in.
+- **One inversion at the center.** The three composed passes (time-oscillating
+  `c1`, fixed `c2`/`c3` subcell inversions) are collapsed to a **single
+  full-strength sphere inversion** at `g_invCenter` (init `(0, 0, 1e-9)`, i.e. the
+  origin / the desk plane), radius `g_invRadius = 0.5`.
+- **The mouse is the inversion center.** Plain left-drag moves the center in XY
+  on the horizontal plane `z = center.z` (the "desk"); Alt+left-drag moves it in Z.
+- **New camera bindings** (Blender-ish): wheel-click+drag orbits, Shift+left-drag
+  pans, freeing left-drag for the center.
+
+The old slow-transition + `--capture-cycle` code is left in place as **inert
+dead code** (the phase clock is frozen and `g_animStepped` is never set, so the
+cycle recorder never triggers) rather than deleted. The original
+`main15_slow_inversion_truncated_octahedron.cpp` is left untouched.
+
+### Compile and run
+
+```bash
+g++ -std=c++17 -o main_truncated_octahedron_module \
+    main_truncated_octahedron_module.cpp -lGL -lGLU -lglut -lm
+./main_truncated_octahedron_module
+```
+
+A display is required (it opens a GLUT window); on a headless box use
+`xvfb-run ./main_truncated_octahedron_module`. The executable lands in
+`modules6/` next to the source. No Makefile/CMake — it is a one-shot `g++`
+invocation (same as the other `main*.cpp` files).
+
+### Mouse controls
+
+| Action | Effect |
+|---|---|
+| **Left-drag** | move the inversion center in **XY** on the plane `z = center.z` (the desk) |
+| **Alt + left-drag** | move the center in **Z** (XY frozen; drag up = +Z). Release Alt (keep left held) → Z locks, XY drag resumes at that height |
+| **Shift + left-drag** | **drag / pan** the camera (was middle-drag) |
+| **Wheel-click + drag** | **orbit** the camera (was left-drag) |
+| **Wheel roll** | zoom (unchanged) |
+| **Right-drag** | zoom (unchanged) |
+
+A plain left-click (no Shift/Alt) also **snaps** the center under the cursor on
+the current z-plane. The center is mapped via `gluUnProject` (cursor ray ∩ the
+z-plane), so it is accurate with the default perspective projection — disable
+fisheye (`F`) for precise placement.
+
+### Keyboard controls
+
+| Key | Action |
+|---|---|
+| `r` / `R` | grow / shrink the inversion radius (step `0.05`) |
+| `0` | reset the inversion center to `(0,0,1e-9)` and radius to `0.5` |
+| `c` | save an STL snapshot of the on-screen mesh to `~/Downloads` |
+| `O` | toggle hollow (octagonal hole per face) |
+| `-` `=` `+` | morph `s` scrub (0.5 = regular TO, 1.0 = cuboctahedron) |
+| `,` `.` | hollow inset scrub |
+| `i I j J k K` | modular selection (`ii`/`jj`/`kk`) |
+| `H` / `F` / `z` `Z` | HUD · fisheye toggle · fisheye strength |
+| `Space` | (inert) pause toggle — no time animation remains |
+| `m` / `s` / `S` | (inert) slow-transition controls — kept for compatibility, now no-ops |
+| `Esc` | quit |
+
+The HUD shows `InvCenter: (x, y, z)  r=…`, an input-hint line, and a
+`Frame: X ms (~Y fps)` readout.
+
+### Performance
+
+The mesh is ~414k triangles. It is rendered with **batched vertex arrays**
+(one `glDrawArrays` for the fills, one for the outlines) instead of a
+`glBegin/glEnd` per triangle — the old immediate-mode loop issued ~827k GL
+calls/frame, which was the bottleneck. The vertex/normal arrays are **cached**:
+rebuilt only when the selection (`ii/jj/kk/morph/inset/hollow`) or the deformed
+geometry changes, not on camera-only frames (orbit/pan/zoom reuse them). The
+scene is **redrawn only on input**, not on a fixed 30 Hz clock, so idle CPU is
+~0. Startup prints the GL renderer; on hardware GL (e.g. `Mesa Intel HD Graphics
+520`) the batched path is smooth — on software (`llvmpipe`) the remaining cost is
+rasterizing 414k triangles.
+
+### Command-line flags
+
+The geometry flags still apply; the slow-transition flags are inert (kept for
+compatibility):
+
+| Flag | Effect |
+|---|---|
+| `--hollow` | start with hollow faces (frame holes) |
+| `--morph <s>` | truncated-octahedron morph `s` (0.5 = regular, 1.0 = cuboctahedron) |
+| `--inset <v>` | hollow border inset (0,1) |
+| `--binary` (alias `--binary-stl`) | write **binary** STL snapshots (default ASCII) |
+| `--capture-cycle` / `--outdir <dir>` | (inert) — never triggers with the frozen clock |
+| `--speed <v>` / `--mode slow\|original` / `--slow` / `--original` | (inert) |
+
+Startup prints `[inv] single inversion at mouse center; r=…`.
+
+### Output
+
+`Setup()` writes a one-time inverted-lattice STL to
+`~/Downloads/mesh_output_truncated_octahedron_module.stl` (the `_module` suffix
+avoids clobbering the original module's output). `c` writes a timestamped
+snapshot `mesh_snapshot_truncated_octahedron_<ts>_<n>.stl` reflecting the current
+center and radius.
+
+---
+
 ## Cube Class Usage
 
 The `Cube.hpp` header provides a complete cube implementation with triangulation and subdivision capabilities, featuring **full subdivision control** for real-time manipulation and selective rendering.
