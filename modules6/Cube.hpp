@@ -1660,6 +1660,221 @@ public:
         }
     }
 
+    /**
+     * @brief Build a flat truncated-octahedron vertex lattice for the checkerboard
+     *        selection — the VBO counterpart of getCheckerboardFacetsTruncatedOctahedron().
+     *
+     * Mirrors getCheckerboardFacetsTruncatedOctahedron(x,y,z,s) but, instead of
+     * pushing 44 Facet objects, expands each selected active subcell into a fixed
+     * block of 24 generated vertices (the faceCenter + s*(edgeMid-faceCenter)
+     * points) and appends them to a flat float buffer. Use
+     * fillCheckerboardIndicesTruncatedOctahedron() to get the matching triangle
+     * index buffer; the two share the identical iteration order, predicate,
+     * active-cell filter, and a per-cell 24-vertex layout so vertex-block base =
+     * selOrd*24 aligns with index base = selOrd*24.
+     *
+     * Per-cell vertex layout (24 verts, 3 floats each): face f in 0..5, edge e in
+     * 0..3, at flat index f*4+e: faceCenter(f)+s*(edgeMid(f,e)-faceCenter(f)).
+     * Positions depend on s (re-upload the VBO when s changes); the index buffer
+     * is independent of s.
+     *
+     * @param x Modulo divisor for i (clamped to >= 1).
+     * @param y Modulo divisor for j (clamped to >= 1).
+     * @param z Modulo divisor for k (clamped to >= 1).
+     * @param positions Output flat vertex buffer (cleared and filled), 24*3 floats
+     *                  per selected active cell. Pass through to glBufferSubData().
+     * @param s Morph parameter in (0,1] (clamped); default regular TO.
+     * @param hollow If true, emit 96 verts/cell (24 outer + 24 inner-square + 48
+     *               inner-hex) for the hollow frame; false emits 24 outer verts/cell.
+     * @param inset Hollow border inset ratio in (0,1) (clamped); only used when hollow.
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillTruncatedOctahedronVertexLattice(int x, int y, int z,
+                                              std::vector<float>& positions,
+                                              double s = default_to_scale_,
+                                              bool hollow = false,
+                                              double inset = default_to_inset_) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillTruncatedOctahedronVertexLattice: no subdivision available");
+        }
+        if (x < 1) x = 1;
+        if (y < 1) y = 1;
+        if (z < 1) z = 1;
+        if (!(s > 0.0)) s = 0.0001;
+        if (s > 1.0)    s = 1.0;
+        if (hollow) {
+            if (!(inset > 0.0)) inset = 0.0001;
+            if (inset >= 1.0)  inset = 0.9999;
+        }
+
+        const int n = subdivision_levels_;
+        positions.clear();
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if (!((i % x == 0 && k % z == 0) || j % y == 0)) continue;
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const std::array<Vector3D, 8>& v = cell.vertices;
+
+                    // 24 surface verts, flat index = face*4 + edge.
+                    Vector3D vert[24];
+                    for (int f = 0; f < 6; ++f) {
+                        const int* F = octagonal_faces_[f];
+                        Vector3D P[4] = { v[F[0]], v[F[1]], v[F[2]], v[F[3]] };
+                        Vector3D C = (P[0] + P[1] + P[2] + P[3]) / 4.0;   // face center
+                        for (int e = 0; e < 4; ++e) {
+                            int nxt = (e + 1) & 3;
+                            Vector3D em = (P[e] + P[nxt]) / 2.0;        // edge midpoint
+                            vert[f * 4 + e] = C + s * (em - C);
+                        }
+                    }
+                    // emit the 24 outer verts (solid and hollow both).
+                    for (int idx = 0; idx < 24; ++idx) {
+                        positions.push_back((float)vert[idx].x());
+                        positions.push_back((float)vert[idx].y());
+                        positions.push_back((float)vert[idx].z());
+                    }
+                    if (!hollow) continue;
+
+                    // HOLLOW: append inner verts. Per-cell layout after the 24 outer:
+                    //   24 inner-square verts at 24 + f*4 + e   (f in 0..5, e in 0..3)
+                    //   48 inner-hex    verts at 48 + c*6 + i   (c in 0..7, i in 0..5)
+                    // inner = faceCentroid + inset*(outer - faceCentroid), faceCentroid =
+                    // centroid of the face's own outer verts. 96 verts/cell total.
+                    for (int f = 0; f < 6; ++f) {
+                        int b = f * 4;
+                        Vector3D o[4] = { vert[b], vert[b + 1], vert[b + 2], vert[b + 3] };
+                        Vector3D Cf = (o[0] + o[1] + o[2] + o[3]) / 4.0;
+                        for (int e = 0; e < 4; ++e) {
+                            Vector3D p = Cf + inset * (o[e] - Cf);
+                            positions.push_back((float)p.x());
+                            positions.push_back((float)p.y());
+                            positions.push_back((float)p.z());
+                        }
+                    }
+                    for (int c = 0; c < 8; ++c) {
+                        const int* h = to_hex_faces_[c];
+                        Vector3D o[6] = { vert[h[0]], vert[h[1]], vert[h[2]], vert[h[3]], vert[h[4]], vert[h[5]] };
+                        Vector3D Ch = (o[0] + o[1] + o[2] + o[3] + o[4] + o[5]) / 6.0;
+                        for (int i = 0; i < 6; ++i) {
+                            Vector3D p = Ch + inset * (o[i] - Ch);
+                            positions.push_back((float)p.x());
+                            positions.push_back((float)p.y());
+                            positions.push_back((float)p.z());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Build the triangle index buffer for the truncated-octahedron checkerboard lattice.
+     *
+     * Emits 132 (solid) or 432 (hollow) triangle indices per selected active cell,
+     * referencing the 24- (solid) or 96- (hollow) vertex-per-cell layout produced by
+     * fillTruncatedOctahedronVertexLattice(). Solid: 44 triangles (6 squares*2 +
+     * 8 hexagons*4). Hollow: 144 frame triangles (6 squares*8 + 8 hexagons*12), inner
+     * face skipped. Iteration order, predicate (i%x==0 && k%z==0) || j%y==0, and the
+     * active-cell filter are identical to fillTruncatedOctahedronVertexLattice, and a
+     * running selected-cell ordinal sets base = selOrd*VPV (VPV=24 solid, 96 hollow)
+     * so the indices line up with the vertex buffer. Winding matches
+     * pushTruncatedOctahedronFacets exactly (same fb.push() order), so the rendered
+     * geometry is byte-for-byte the same as the CPU path — only the per-frame Facet
+     * construction (cross product + sqrt per Facet) is eliminated.
+     *
+     * Independent of s and of the inset ratio (depends only on selection and hollow),
+     * so rebuild only when ii/jj/kk or hollow change.
+     *
+     * @param indices Output index buffer (cleared and filled). 132 (solid) or 432
+     *                (hollow) unsigned ints per selected active cell.
+     * @param hollow If true, emit the 432 hollow-frame indices (VPV=96); else 132 solid.
+     * @param inset Unused (indices are inset-independent); kept for API symmetry.
+     * @throws std::runtime_error if no subdivision available.
+     */
+    void fillCheckerboardIndicesTruncatedOctahedron(int x, int y, int z,
+                                                    std::vector<unsigned int>& indices,
+                                                    bool hollow = false,
+                                                    double inset = default_to_inset_) const {
+        if (!hasSubdivision()) {
+            throw std::runtime_error("Cube::fillCheckerboardIndicesTruncatedOctahedron: no subdivision available");
+        }
+        if (x < 1) x = 1;
+        if (y < 1) y = 1;
+        if (z < 1) z = 1;
+        (void)inset;   // indices depend only on hollow (topology), not the inset ratio
+
+        const int n = subdivision_levels_;
+        const unsigned int VPV = hollow ? 96u : 24u;   // verts per cell (matches fillTruncatedOctahedronVertexLattice)
+        indices.clear();
+        unsigned int sel = 0;          // running selected-cell ordinal (matches fillTruncatedOctahedronVertexLattice)
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                for (int k = 0; k < n; ++k) {
+                    if (!((i % x == 0 && k % z == 0) || j % y == 0)) continue;
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const unsigned int base = sel * VPV;
+
+                    if (!hollow) {
+                        // SOLID: 6 squares (2 tris) + 8 hexagons (4 fan tris) = 132 indices.
+                        for (int f = 0; f < 6; ++f) {
+                            unsigned int b = base + (unsigned int)f * 4u;
+                            indices.push_back(b + 0u); indices.push_back(b + 1u); indices.push_back(b + 2u);
+                            indices.push_back(b + 0u); indices.push_back(b + 2u); indices.push_back(b + 3u);
+                        }
+                        for (int c = 0; c < 8; ++c) {
+                            const int* h = to_hex_faces_[c];
+                            indices.push_back(base + (unsigned int)h[0]);
+                            indices.push_back(base + (unsigned int)h[1]);
+                            indices.push_back(base + (unsigned int)h[2]);
+                            indices.push_back(base + (unsigned int)h[0]);
+                            indices.push_back(base + (unsigned int)h[2]);
+                            indices.push_back(base + (unsigned int)h[3]);
+                            indices.push_back(base + (unsigned int)h[0]);
+                            indices.push_back(base + (unsigned int)h[3]);
+                            indices.push_back(base + (unsigned int)h[4]);
+                            indices.push_back(base + (unsigned int)h[0]);
+                            indices.push_back(base + (unsigned int)h[4]);
+                            indices.push_back(base + (unsigned int)h[5]);
+                        }
+                    } else {
+                        // HOLLOW: 6 squares (8 tris) + 8 hexagons (12 tris) = 432 indices.
+                        // Layout: outer at base+f*4+e (squares) / base+to_hex_faces_[c][i] (hex);
+                        // inner-square at base+24+f*4+e; inner-hex at base+48+c*6+i.
+                        // Winding (o0,o1,i1),(o0,i1,i0) matches pushTruncatedOctahedronFacets.
+                        for (int f = 0; f < 6; ++f) {
+                            unsigned int of = base + (unsigned int)f * 4u;
+                            unsigned int iff = base + 24u + (unsigned int)f * 4u;
+                            for (int e = 0; e < 4; ++e) {
+                                unsigned int o0 = of + (unsigned int)e;
+                                unsigned int o1 = of + (unsigned int)((e + 1) & 3);
+                                unsigned int i0 = iff + (unsigned int)e;
+                                unsigned int i1 = iff + (unsigned int)((e + 1) & 3);
+                                indices.push_back(o0); indices.push_back(o1); indices.push_back(i1);
+                                indices.push_back(o0); indices.push_back(i1); indices.push_back(i0);
+                            }
+                        }
+                        for (int c = 0; c < 8; ++c) {
+                            const int* h = to_hex_faces_[c];
+                            unsigned int ih = base + 48u + (unsigned int)c * 6u;
+                            for (int i = 0; i < 6; ++i) {
+                                unsigned int o0 = base + (unsigned int)h[i];
+                                unsigned int o1 = base + (unsigned int)h[(i + 1) % 6];
+                                unsigned int i0 = ih + (unsigned int)i;
+                                unsigned int i1 = ih + (unsigned int)((i + 1) % 6);
+                                indices.push_back(o0); indices.push_back(o1); indices.push_back(i1);
+                                indices.push_back(o0); indices.push_back(i1); indices.push_back(i0);
+                            }
+                        }
+                    }
+                    ++sel;
+                }
+            }
+        }
+    }
+
     /* === STRING-BASED PLANE ACCESS === */
     
     /**
@@ -2002,6 +2217,220 @@ public:
         stl.close();
     }
 
+    /* === TRUNCATED-OCTAHEDRON (8 HEXAGONS + 6 SQUARES) MESH — public API ===
+     * Parallel to the octagonal (truncated-cube) family above, but each cube
+     * corner becomes a hexagon and each cube face a square (44 tris/cube). Every
+     * getter takes the morph parameter s (default default_to_scale_ = 0.5, the
+     * regular truncated octahedron); s=1.0 is the cuboctahedron (cube-like end,
+     * corner faces = triangles), s<0.5 stretches the corner hexagons larger.
+     */
+
+    /**
+     * @brief Rebuild this cube's stored facets as a truncated-octahedron mesh.
+     *
+     * Third surface method, parallel to buildFacets()/buildFacetsOctagonal():
+     * populates facets_ from the 8 main-cube vertices (verts_) using the
+     * truncated-octahedron mesh (44 triangles). For a basic (non-subdivided)
+     * cube only; for subdivided cubes prefer the on-the-fly getters below.
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    void buildFacetsTruncatedOctahedron(double s = default_to_scale_,
+                                        bool hollow = false,
+                                        double inset = default_to_inset_) {
+        facets_.clear();
+        std::array<Vector3D, 8> v;
+        for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();   // Quaternion -> Vector3D
+        pushTruncatedOctahedronFacets(facets_, v, s, hollow, inset);
+    }
+
+    /**
+     * @brief Build a fresh FacetBox of this cube as a truncated-octahedron mesh.
+     *
+     * For a non-subdivided cube, builds from the 8 main vertices (verts_). For a
+     * subdivided cube, iterates all active subcells. Returns by value (freshly
+     * built), matching getFacetsOctagonal's contract.
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    FacetBox getFacetsTruncatedOctahedron(double s = default_to_scale_,
+                                          bool hollow = false,
+                                          double inset = default_to_inset_) const {
+        FacetBox fb;
+        if (!hasSubdivision()) {
+            std::array<Vector3D, 8> v;
+            for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();
+            pushTruncatedOctahedronFacets(fb, v, s, hollow, inset);
+        } else {
+            const int n = subdivision_levels_;
+            for (int i = 0; i < n; ++i)
+                for (int j = 0; j < n; ++j)
+                    for (int k = 0; k < n; ++k) {
+                        const SubCell& cell = subcells_[i][j][k];
+                        if (!cell.active) continue;
+                        pushTruncatedOctahedronFacets(fb, cell.vertices, s, hollow, inset);
+                    }
+        }
+        return fb;
+    }
+
+    /**
+     * @brief Checkerboard subcells as a truncated-octahedron mesh.
+     *
+     * Same subcell selection as getCheckerboardFacets(x,y,z) (unchanged
+     * predicate), but each selected active subcell is triangulated as a
+     * truncated octahedron via pushTruncatedOctahedronFacets.
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    FacetBox getCheckerboardFacetsTruncatedOctahedron(int x, int y, int z,
+                                                      double s = default_to_scale_,
+                                                      bool hollow = false,
+                                                      double inset = default_to_inset_) const {
+        auto cells = getCheckerboardSubcells(x, y, z);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushTruncatedOctahedronFacets(fb, cell.vertices, s, hollow, inset);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief A 2D plane of subcells as a truncated-octahedron mesh.
+     *
+     * Same selection as getPlane(axis, layer); each active subcell is triangulated
+     * as a truncated octahedron.
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    FacetBox getPlaneFacetsTruncatedOctahedron(int axis, int layer,
+                                               double s = default_to_scale_,
+                                               bool hollow = false,
+                                               double inset = default_to_inset_) const {
+        auto cells = getPlane(axis, layer);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushTruncatedOctahedronFacets(fb, cell.vertices, s, hollow, inset);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief One subcell as a truncated-octahedron mesh (44 triangles).
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    FacetBox getSubCellFacetsTruncatedOctahedron(int x, int y, int z,
+                                                 double s = default_to_scale_,
+                                                 bool hollow = false,
+                                                 double inset = default_to_inset_) const {
+        const SubCell& cell = getSubCell(x, y, z);
+        FacetBox fb;
+        if (!cell.active) return fb;
+        pushTruncatedOctahedronFacets(fb, cell.vertices, s, hollow, inset);
+        return fb;
+    }
+
+    /**
+     * @brief Rebuild stored facets from subcells as a truncated-octahedron mesh.
+     *
+     * WARNING: stores 44*n^3 Facets (large at high n). Not used by single-shape
+     * demos or the on-the-fly render path (which reads subcells via
+     * getCheckerboardFacetsTruncatedOctahedron); provided only for API parity with
+     * refreshTriangulation / refreshTriangulationOctagonal.
+     *
+     * @param s Morph parameter in (0,1] (default regular TO).
+     */
+    void refreshTriangulationTruncatedOctahedron(double s = default_to_scale_,
+                                                 bool hollow = false,
+                                                 double inset = default_to_inset_) {
+        if (!hasSubdivision()) return;
+        facets_.clear();
+        const int n = subdivision_levels_;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    pushTruncatedOctahedronFacets(facets_, cell.vertices, s, hollow, inset);
+                }
+    }
+
+    /**
+     * @brief Write this cube's truncated-octahedron mesh to an STL file.
+     *
+     * Parallel to writeSTL_s_octagonal: same modes and ASCII format. "checkerboard"
+     * -> getCheckerboardFacetsTruncatedOctahedron(x,y,z,s) (or getFacetsTruncatedOctahedron
+     * if not subdivided); "full" -> getFacetsTruncatedOctahedron; "plane_xy/xz/yz"
+     * -> getPlaneFacetsTruncatedOctahedron. Only active subcells are included.
+     *
+     * @param filename Path to output STL file (created or overwritten).
+     * @param objectName Name to use in the STL header.
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param x Checkerboard X modulo, or plane layer for plane modes.
+     * @param y Checkerboard Y modulo (default 9).
+     * @param z Checkerboard Z modulo (default 2).
+     * @param s Morph parameter in (0,1] (default regular TO).
+     * @param hollow If true, write the hollow frame mesh (144 tris/cube); false=solid (44).
+     * @param inset Hollow border inset ratio in (0,1) (default 0.5); only used when hollow=true.
+     * @throws std::runtime_error if the file cannot be created.
+     * @throws std::invalid_argument if mode is invalid or a plane mode is used without subdivision.
+     */
+    void writeSTL_s_truncated_octahedron(const std::string& filename,
+                                         const std::string& objectName,
+                                         const std::string& mode,
+                                         int x,
+                                         int y = 9,
+                                         int z = 2,
+                                         double s = default_to_scale_,
+                                         bool hollow = false,
+                                         double inset = default_to_inset_) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_truncated_octahedron: Cannot create file " + filename);
+
+        stl << "solid " << objectName << "\n";
+
+        FacetBox facetsToWrite;
+        if (mode == "full") {
+            facetsToWrite = getFacetsTruncatedOctahedron(s, hollow, inset);
+        } else if (mode == "checkerboard") {
+            if (!hasSubdivision()) facetsToWrite = getFacetsTruncatedOctahedron(s, hollow, inset);
+            else                   facetsToWrite = getCheckerboardFacetsTruncatedOctahedron(x, y, z, s, hollow, inset);
+        } else if (mode == "plane_xy") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedOctahedron(2, x, s, hollow, inset);
+        } else if (mode == "plane_xz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedOctahedron(1, x, s, hollow, inset);
+        } else if (mode == "plane_yz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedOctahedron(0, x, s, hollow, inset);
+        } else {
+            throw std::invalid_argument("Invalid mode: " + mode +
+                ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+        }
+
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
 
 private:
     // === CORE DATA MEMBERS ===
@@ -2140,6 +2569,155 @@ private:
             fb.push(Vc + trunc * (v[n[0]] - Vc),
                     Vc + trunc * (v[n[1]] - Vc),
                     Vc + trunc * (v[n[2]] - Vc));
+        }
+    }
+
+    /* === TRUNCATED-OCTAHEDRON MESH — a third method for building a cube ===
+     * Each cube FACE becomes a square and each cube CORNER becomes a hexagon
+     * (8 hexagons + 6 squares = 14 faces, 24 verts, 36 edges, vertex config
+     * 4.6.6) => 44 triangles/cube. Built on the fly from the SAME 8 corner
+     * vertices the plain and octagonal paths use, so it deforms with the lattice
+     * under inversion exactly like them and needs no extra storage.
+     *
+     * Construction: the 24 surface vertices lie on the segments from each
+     * cube-face center to each cube-face-edge midpoint:
+     *   vert(f,e) = faceCenter(f) + s*(edgeMid(f,e) - faceCenter(f))
+     * with morph parameter s in (0,1] (default_to_scale_):
+     *   s=1.0  -> cuboctahedron (rectified cube; corner faces are small
+     *             triangles, the most cube-like end)
+     *   s=0.5  -> regular truncated octahedron (8 regular hexagons + 6 squares)
+     *   s<0.5  -> corner hexagons stretch larger than regular (squares shrink)
+     *   s>1   -> self-intersects (clamped to 1.0)
+     * Faces stay planar + convex and the polyhedron stays globally convex for
+     * every s in (0,1]. Winding is fixed by octagonal_faces_ (CCW-outward
+     * squares) and to_hex_faces_ (CCW-outward hexagons); no runtime dot-check,
+     * and the result does not depend on cell.center (which goes stale under
+     * inversion). FacetBox results are returned by value.
+     */
+
+    // to_hex_faces_: the 6 vertex indices (flat idx = face*4+edge, face order =
+    // octagonal_faces_ [Front,Back,Right,Left,Top,Bottom], edge = consecutive
+    // corner edge of that face) of each corner hexagon, in CCW-OUTWARD order.
+    // Six of the eight required an explicit winding flip vs the natural edge
+    // walk (e.g. H2 must be {11,10,17,16,2,1}, not {1,2,16,17,10,11} which is
+    // inward) — the same "corner-2 gotcha" category as corner_neighbors_
+    // (Cube.hpp:2063). The table stores the verified outward order, so no
+    // runtime dot-check is needed and the result does not depend on cell.center.
+    static constexpr int to_hex_faces_[8][6] = {
+        { 0,  3, 12, 15, 20, 23},  // H0 corner 0 (-,-,+)
+        {23, 22,  8, 11,  1,  0},  // H1 corner 1 (+,-,+)
+        {11, 10, 17, 16,  2,  1},  // H2 corner 2 (+,+,+)
+        {16, 19, 13, 12,  3,  2},  // H3 corner 3 (-,+,+)
+        { 4,  7, 21, 20, 15, 14},  // H4 corner 4 (-,-,-)
+        { 9,  8, 22, 21,  7,  6},  // H5 corner 5 (+,-,-)
+        {18, 17, 10,  9,  6,  5},  // H6 corner 6 (+,+,-)
+        {14, 13, 19, 18,  5,  4}   // H7 corner 7 (-,+,-)
+    };
+
+    // Morph parameter s (see block comment above). 0.5 = regular truncated
+    // octahedron; 1.0 = cuboctahedron (cube-like); (0,0.5) stretches hexagons.
+    static constexpr double default_to_scale_ = 0.5;
+
+    // Hollow border inset ratio in (0,1) (used only when hollow=true): each face is
+    // inset toward its own centroid by this ratio to form a border frame, and the
+    // inner face (the hole) is skipped. inner vertex = faceCentroid + inset*(outer -
+    // faceCentroid). Larger inset = bigger hole / thinner border. 0.5 = medium.
+    static constexpr double default_to_inset_ = 0.5;
+
+    /**
+     * @brief Push the triangles of one truncated octahedron into a FacetBox.
+     *
+     * Given the 8 corner vertices of a (possibly deformed) cube, emits 6 squares
+     * (2 tris each) + 8 hexagons (4 fan tris each) = 44 solid triangles, or — when
+     * hollow=true — 144 frame triangles (each face inset toward its own centroid to
+     * form a border, the inner face skipped as a hole). The 24 surface vertices are
+     * derived as faceCenter + s*(edgeMid - faceCenter) for each of the 6 faces x 4
+     * edges, using octagonal_faces_ for the face corner order. Winding is
+     * CCW-outward (fixed by octagonal_faces_ and to_hex_faces_; the hollow homothety
+     * toward each face centroid preserves that winding, so no frame winding table is
+     * needed).
+     *
+     * @param fb Destination FacetBox (appended to).
+     * @param v  The 8 cube corners in standard order (same as initVertices/SubCell).
+     * @param s  Morph parameter in (0,1]; clamped. 0.5=regular TO, 1.0=cuboctahedron.
+     * @param hollow If true, hollow out each face (inset frame, inner face skipped ->
+     *               144 tris); if false, emit the solid 44-tri mesh.
+     * @param inset Hollow border inset ratio in (0,1) (only used when hollow=true):
+     *              inner vertex = faceCentroid + inset*(outer - faceCentroid).
+     *              Larger inset = bigger hole / thinner border. default_to_inset_=0.5.
+     */
+    static void pushTruncatedOctahedronFacets(FacetBox& fb,
+                                              const std::array<Vector3D, 8>& v,
+                                              double s,
+                                              bool hollow,
+                                              double inset) {
+        if (!(s > 0.0)) s = 0.0001;   // guard: squares collapse to points at s=0
+        if (s > 1.0)    s = 1.0;      // clamp: self-intersects for s>1
+        if (hollow) {
+            if (!(inset > 0.0)) inset = 0.0001;   // guard: border vanishes at inset=0
+            if (inset >= 1.0)  inset = 0.9999;   // clamp: hole vanishes at inset>=1
+        }
+
+        // 24 surface vertices, flat index = face*4 + edge.
+        Vector3D vert[24];
+        for (int f = 0; f < 6; ++f) {
+            const int* F = octagonal_faces_[f];
+            Vector3D P[4] = { v[F[0]], v[F[1]], v[F[2]], v[F[3]] };
+            Vector3D C = (P[0] + P[1] + P[2] + P[3]) / 4.0;        // face center
+            for (int e = 0; e < 4; ++e) {
+                int nxt = (e + 1) & 3;
+                Vector3D em = (P[e] + P[nxt]) / 2.0;              // edge midpoint
+                vert[f * 4 + e] = C + s * (em - C);
+            }
+        }
+
+        if (!hollow) {
+            // SOLID: 6 squares (2 tris each) + 8 corner hexagons (4 fan tris each) = 44 tris.
+            for (int f = 0; f < 6; ++f) {
+                int b = f * 4;
+                fb.push(vert[b + 0], vert[b + 1], vert[b + 2]);
+                fb.push(vert[b + 0], vert[b + 2], vert[b + 3]);
+            }
+            for (int c = 0; c < 8; ++c) {
+                const int* h = to_hex_faces_[c];
+                fb.push(vert[h[0]], vert[h[1]], vert[h[2]]);
+                fb.push(vert[h[0]], vert[h[2]], vert[h[3]]);
+                fb.push(vert[h[0]], vert[h[3]], vert[h[4]]);
+                fb.push(vert[h[0]], vert[h[4]], vert[h[5]]);
+            }
+            return;
+        }
+
+        // HOLLOW: for each face, inset its outer polygon toward that face's own centroid
+        // to form a border frame, and skip the inner face (the hole). 144 tris total
+        // (6 squares*8 + 8 hexagons*12), all CCW-outward — the homothety toward the
+        // centroid preserves each face's outward winding (verified), so no frame
+        // winding table is needed.
+        // 6 squares: inner[e] = Cf + inset*(outer[e] - Cf), Cf = centroid of the 4 verts.
+        for (int f = 0; f < 6; ++f) {
+            int b = f * 4;
+            Vector3D o[4] = { vert[b + 0], vert[b + 1], vert[b + 2], vert[b + 3] };
+            Vector3D Cf = (o[0] + o[1] + o[2] + o[3]) / 4.0;        // face center
+            Vector3D in[4];
+            for (int e = 0; e < 4; ++e) in[e] = Cf + inset * (o[e] - Cf);
+            for (int e = 0; e < 4; ++e) {
+                int nxt = (e + 1) & 3;
+                fb.push(o[e], o[nxt], in[nxt]);
+                fb.push(o[e], in[nxt], in[e]);
+            }
+        }
+        // 8 corner hexagons: inner[i] = Ch + inset*(outer[i] - Ch), Ch = centroid of the 6.
+        for (int c = 0; c < 8; ++c) {
+            const int* h = to_hex_faces_[c];
+            Vector3D o[6] = { vert[h[0]], vert[h[1]], vert[h[2]], vert[h[3]], vert[h[4]], vert[h[5]] };
+            Vector3D Ch = (o[0] + o[1] + o[2] + o[3] + o[4] + o[5]) / 6.0;   // face center
+            Vector3D in[6];
+            for (int i = 0; i < 6; ++i) in[i] = Ch + inset * (o[i] - Ch);
+            for (int i = 0; i < 6; ++i) {
+                int nxt = (i + 1) % 6;
+                fb.push(o[i], o[nxt], in[nxt]);
+                fb.push(o[i], in[nxt], in[i]);
+            }
         }
     }
 
