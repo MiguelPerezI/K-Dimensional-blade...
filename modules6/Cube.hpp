@@ -2432,6 +2432,470 @@ public:
     }
 
 
+    /* === TRUNCATED-CUBOCTAHEDRON (6 OCTAGONS + 8 HEXAGONS + 12 SQUARES) MESH — public API ===
+     * Parallel to the truncated-octahedron family above, but each cube face becomes
+     * an octagon, each cube corner a hexagon and each cube edge a square (92 tris/cube
+     * solid, 288 hollow). No morph parameter: the truncated cuboctahedron is regular
+     * only at the fixed a/b encoded in tc_vert_norm_ (see the private tables below);
+     * the interactive knobs are hollow on/off and the inset ratio.
+     */
+
+    /**
+     * @brief Rebuild this cube's stored facets as a truncated-cuboctahedron mesh.
+     *
+     * Fourth surface method, parallel to buildFacetsTruncatedOctahedron():
+     * populates facets_ from the 8 main-cube vertices (verts_) using the
+     * truncated-cuboctahedron mesh (92 triangles). For a basic (non-subdivided)
+     * cube only; for subdivided cubes prefer the on-the-fly getters below.
+     */
+    void buildFacetsTruncatedCuboctahedron(bool hollow = false,
+                                            double inset = default_tc_inset_) {
+        facets_.clear();
+        std::array<Vector3D, 8> v;
+        for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();   // Quaternion -> Vector3D
+        pushTruncatedCuboctahedronFacets(facets_, v, hollow, inset);
+    }
+
+    /**
+     * @brief Build a fresh FacetBox of this cube as a truncated-cuboctahedron mesh.
+     *
+     * For a non-subdivided cube, builds from the 8 main vertices (verts_). For a
+     * subdivided cube, iterates all active subcells. Returns by value (freshly
+     * built), matching getFacetsTruncatedOctahedron's contract.
+     */
+    FacetBox getFacetsTruncatedCuboctahedron(bool hollow = false,
+                                             double inset = default_tc_inset_) const {
+        FacetBox fb;
+        if (!hasSubdivision()) {
+            std::array<Vector3D, 8> v;
+            for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();
+            pushTruncatedCuboctahedronFacets(fb, v, hollow, inset);
+        } else {
+            const int n = subdivision_levels_;
+            for (int i = 0; i < n; ++i)
+                for (int j = 0; j < n; ++j)
+                    for (int k = 0; k < n; ++k) {
+                        const SubCell& cell = subcells_[i][j][k];
+                        if (!cell.active) continue;
+                        pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset);
+                    }
+        }
+        return fb;
+    }
+
+    /**
+     * @brief Checkerboard subcells as a truncated-cuboctahedron mesh.
+     *
+     * Same subcell selection as getCheckerboardFacets(x,y,z) (unchanged
+     * predicate), but each selected active subcell is triangulated as a
+     * truncated cuboctahedron via pushTruncatedCuboctahedronFacets.
+     */
+    FacetBox getCheckerboardFacetsTruncatedCuboctahedron(int x, int y, int z,
+                                                         bool hollow = false,
+                                                         double inset = default_tc_inset_) const {
+        auto cells = getCheckerboardSubcells(x, y, z);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief A 2D plane of subcells as a truncated-cuboctahedron mesh.
+     *
+     * Same selection as getPlane(axis, layer); each active subcell is triangulated
+     * as a truncated cuboctahedron.
+     */
+    FacetBox getPlaneFacetsTruncatedCuboctahedron(int axis, int layer,
+                                                  bool hollow = false,
+                                                  double inset = default_tc_inset_) const {
+        auto cells = getPlane(axis, layer);
+        FacetBox fb;
+        for (const SubCell& cell : cells) {
+            if (!cell.active) continue;
+            pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset);
+        }
+        return fb;
+    }
+
+    /**
+     * @brief One subcell as a truncated-cuboctahedron mesh (92 triangles).
+     */
+    FacetBox getSubCellFacetsTruncatedCuboctahedron(int x, int y, int z,
+                                                    bool hollow = false,
+                                                    double inset = default_tc_inset_) const {
+        const SubCell& cell = getSubCell(x, y, z);
+        FacetBox fb;
+        if (!cell.active) return fb;
+        pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset);
+        return fb;
+    }
+
+    /**
+     * @brief Rebuild stored facets from subcells as a truncated-cuboctahedron mesh.
+     *
+     * WARNING: stores 92*n^3 Facets (large at high n). Provided only for API parity
+     * with refreshTriangulation / refreshTriangulationOctagonal /
+     * refreshTriangulationTruncatedOctahedron; not used by the on-the-fly demos.
+     */
+    void refreshTriangulationTruncatedCuboctahedron(bool hollow = false,
+                                                     double inset = default_tc_inset_) {
+        if (!hasSubdivision()) return;
+        facets_.clear();
+        const int n = subdivision_levels_;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    pushTruncatedCuboctahedronFacets(facets_, cell.vertices, hollow, inset);
+                }
+    }
+
+    /**
+     * @brief Write this cube's truncated-cuboctahedron mesh to an STL file.
+     *
+     * Parallel to writeSTL_s_truncated_octahedron: same modes and ASCII format.
+     * "checkerboard" -> getCheckerboardFacetsTruncatedCuboctahedron(x,y,z,hollow,inset)
+     * (or getFacetsTruncatedCuboctahedron if not subdivided); "full" ->
+     * getFacetsTruncatedCuboctahedron; "plane_xy/xz/yz" ->
+     * getPlaneFacetsTruncatedCuboctahedron. Only active subcells are included.
+     *
+     * @param filename Path to output STL file (created or overwritten).
+     * @param objectName Name to use in the STL header.
+     * @param mode Extraction mode: "full", "checkerboard", "plane_xy", "plane_xz", "plane_yz".
+     * @param x Checkerboard X modulo, or plane layer for plane modes.
+     * @param y Checkerboard Y modulo (default 9).
+     * @param z Checkerboard Z modulo (default 2).
+     * @param hollow If true, write the hollow frame mesh (288 tris/cube); false=solid (92).
+     * @param inset Hollow border inset ratio in (0,1) (default 0.5); only used when hollow=true.
+     * @throws std::runtime_error if the file cannot be created.
+     * @throws std::invalid_argument if mode is invalid or a plane mode is used without subdivision.
+     */
+    void writeSTL_s_truncated_cuboctahedron(const std::string& filename,
+                                            const std::string& objectName,
+                                            const std::string& mode,
+                                            int x,
+                                            int y = 9,
+                                            int z = 2,
+                                            bool hollow = false,
+                                            double inset = default_tc_inset_) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_truncated_cuboctahedron: Cannot create file " + filename);
+
+        stl << "solid " << objectName << "\n";
+
+        FacetBox facetsToWrite;
+        if (mode == "full") {
+            facetsToWrite = getFacetsTruncatedCuboctahedron(hollow, inset);
+        } else if (mode == "checkerboard") {
+            if (!hasSubdivision()) facetsToWrite = getFacetsTruncatedCuboctahedron(hollow, inset);
+            else                   facetsToWrite = getCheckerboardFacetsTruncatedCuboctahedron(x, y, z, hollow, inset);
+        } else if (mode == "plane_xy") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedCuboctahedron(2, x, hollow, inset);
+        } else if (mode == "plane_xz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedCuboctahedron(1, x, hollow, inset);
+        } else if (mode == "plane_yz") {
+            if (!hasSubdivision()) throw std::invalid_argument("Plane extraction requires subdivided cube");
+            facetsToWrite = getPlaneFacetsTruncatedCuboctahedron(0, x, hollow, inset);
+        } else {
+            throw std::invalid_argument("Invalid mode: " + mode +
+                ". Valid modes: full, checkerboard, plane_xy, plane_xz, plane_yz");
+        }
+
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+
+    /* === CANTITRUNCATED CUBIC HONEYCOMB — mixed-cell builder ===
+     * The cantitruncated cubic honeycomb (uniform space-filling tessellation,
+     * vertex figure mirrored sphenoid) is made of truncated cuboctahedra, truncated
+     * octahedra and cubes in the ratio 1 : 1 : 3.
+     *
+     * Arrangement (from the omnitruncation t_{0,1,2}{4,3,4}): in the half-integer
+     * grid, a point is a cell center iff it has 0, 1 or 3 half-integer coordinates
+     * (2 = an edge center, no cell). Mapping that onto this Cube's simple-cubic
+     * subcell grid by index parity, in each 2x2x2 block `odd = #(i,j,k odd)` gives
+     *   odd == 0 -> 1 truncated cuboctahedron  (orig. cube centers)
+     *   odd == 1 -> 3 cubes                     (orig. face centers, 3 orientations)
+     *   odd == 3 -> 1 truncated octahedron      (orig. vertices)
+     *   odd == 2 -> 3 gaps (skip)               (orig. edge centers, no cell)
+     * which is exactly 1 : 1 : 3 per fundamental block, tiling periodically.
+     *
+     * This is the framework's stylized per-subcell version (each cell is built at
+     * subcell scale from that subcell's 8 corners, like the existing truncated-cube
+     * and truncated-octahedron honeycombs); the odd==2 gaps are the analog of the
+     * checkerboard gaps those demos leave. Because every cell is rebuilt from its
+     * (possibly deformed) subcell corners, the existing sphere-inversion machinery
+     * (sigmaCenter / composeSigmaBlended deforming subcell vertices before this
+     * call) deforms all three cell types together with no special handling.
+     */
+
+    /**
+     * @brief Build the cantitruncated cubic honeycomb (1:1:3) over all active
+     *        subcells and return it as one merged FacetBox.
+     *
+     * @param hollow If true, the truncated-cuboctahedron and truncated-octahedron
+     *               cells are emitted as hollow frames (288 / 144 tris); cubes stay
+     *               solid 12 tris (a cube has no face to inset meaningfully here).
+     * @param inset  Hollow border inset ratio for the two truncated cell types.
+     * @param toS    Morph parameter for the truncated-octahedron cells (default
+     *               regular truncated octahedron, 0.5).
+     * @throws std::runtime_error if this cube has no subdivision.
+     */
+    FacetBox getCantitruncatedHoneycombFacets(bool hollow = false,
+                                              double inset = default_tc_inset_,
+                                              double toS = default_to_scale_) const {
+        FacetBox fb;
+        if (!hasSubdivision())
+            throw std::runtime_error("Cube::getCantitruncatedHoneycombFacets: no subdivision available");
+        const int n = subdivision_levels_;
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const int odd = (i & 1) + (j & 1) + (k & 1);
+                    if      (odd == 0) pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset);
+                    else if (odd == 3) pushTruncatedOctahedronFacets(fb, cell.vertices, toS, hollow, inset);
+                    else if (odd == 1) pushCubeFacets(fb, cell.vertices);
+                    // odd == 2: edge-center gap -> skip (analog of checkerboard gaps)
+                }
+        return fb;
+    }
+
+    /**
+     * @brief Write the cantitruncated cubic honeycomb to an ASCII STL file.
+     *
+     * @param filename Path to output STL file (created or overwritten).
+     * @param objectName Name to use in the STL header.
+     * @param hollow If true, the truncated cells are hollow frames; cubes stay solid.
+     * @param inset  Hollow border inset ratio (only used when hollow=true).
+     * @param toS    Morph parameter for the truncated-octahedron cells (default 0.5).
+     * @throws std::runtime_error if the file cannot be created or there is no subdivision.
+     */
+    void writeSTL_s_cantitruncated_honeycomb(const std::string& filename,
+                                             const std::string& objectName,
+                                             bool hollow = false,
+                                             double inset = default_tc_inset_,
+                                             double toS = default_to_scale_) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_cantitruncated_honeycomb: Cannot create file " + filename);
+
+        FacetBox facetsToWrite = getCantitruncatedHoneycombFacets(hollow, inset, toS);
+
+        stl << "solid " << objectName << "\n";
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+
+    /* === OCTAGON-CONNECTED CUBOCTAHEDRON LATTICE ===
+     * A truncated cuboctahedron at EVERY active subcell. Each cell's 6 octagons
+     * sit on the 6 subcell faces, so two face-adjacent cuboctahedra share a
+     * coincident octagon on the shared face — the octagons become the "windows"
+     * that connect the lattice. The hexagon + square frames bound the octahedral
+     * voids (at lattice vertices) and cubic voids (at lattice edges) left open
+     * between the cells. This is the cantitruncated honeycomb skeleton with the
+     * filler cells (truncated octahedra + cubes) removed.
+     *
+     * To avoid z-fighting and wasted triangles on the coincident shared octagons,
+     * each shared octagon is drawn ONCE: a cell emits its +x,+y,+z octagons
+     * always and skips its -x,-y,-z octagon when the neighbour on that side
+     * exists (that neighbour draws it via its + face). Hexagons and squares are
+     * never coincident (distinct void-boundary planes), so they are always
+     * emitted. Inversion works unchanged (deforms subcell corners before rebuild).
+     */
+
+    /**
+     * @brief Build the octagon-connected cuboctahedron lattice (one hollow
+     *        cuboctahedron per active subcell) and return it as one FacetBox.
+     *
+     * @param hollow If true (default) each cell is a hollow frame -> the octagons
+     *               read as windows connecting neighbours and you see through the
+     *               lattice; false -> solid cuboctahedra stuck face-to-face.
+     * @param inset  Hollow border inset ratio (only used when hollow=true).
+     * @throws std::runtime_error if this cube has no subdivision.
+     */
+    FacetBox getCuboctahedronLatticeFacets(bool hollow = true,
+                                           double inset = default_tc_inset_) const {
+        FacetBox fb;
+        if (!hasSubdivision())
+            throw std::runtime_error("Cube::getCuboctahedronLatticeFacets: no subdivision available");
+        const int n = subdivision_levels_;
+        // Octagon face indices: 0=Front z+, 1=Back z-, 2=Right x+, 3=Left x-,
+        // 4=Top y+, 5=Bottom y-. Skip the negative faces when the neighbour on
+        // that side exists (i>0/j>0/k>0) -> that neighbour's + face draws it.
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active) continue;
+                    const int mask = (i > 0 ? (1 << 3) : 0)   // Left  x-
+                                   | (j > 0 ? (1 << 5) : 0)   // Bottom y-
+                                   | (k > 0 ? (1 << 1) : 0);  // Back  z-
+                    pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset, mask);
+                }
+        return fb;
+    }
+
+    /**
+     * @brief Octagon-connected cuboctahedron lattice on a modular sublattice.
+     *
+     * Same selection predicate as getCheckerboardSubcells(x,y,z)
+     * ((i%x==0 && k%z==0) || j%y==0): only the matching active subcells are
+     * triangulated as (hollow) truncated cuboctahedra, and the lattice is
+     * "stuck together" through the octagonal faces. To avoid drawing each shared
+     * octagon twice, a cell skips its -x/-y/-z octagon ONLY when the neighbour on
+     * that side is ALSO selected+active (that neighbour draws the shared octagon
+     * via its + face); octagons facing a non-selected neighbour are kept as the
+     * cell's outer shell. Hexagons/squares are never coincident and are always
+     * emitted. Selection of a sparse modulus therefore yields a set of cuboctahedra
+     * (possibly disconnected) whose shared octagons are still drawn once.
+     *
+     * @param x,y,z Modular periods (>=1) for the i, j, k axes respectively.
+     * @param hollow If true, hollow frames (octagons read as windows); false solid.
+     * @param inset  Hollow border inset ratio (only used when hollow=true).
+     * @throws std::runtime_error if no subdivision; std::invalid_argument if x/y/z < 1.
+     */
+    FacetBox getCheckerboardFacetsCuboctahedronLattice(int x, int y, int z,
+                                                       bool hollow = true,
+                                                       double inset = default_tc_inset_) const {
+        FacetBox fb;
+        if (!hasSubdivision())
+            throw std::runtime_error("Cube::getCheckerboardFacetsCuboctahedronLattice: no subdivision available");
+        if (x < 1 || y < 1 || z < 1)
+            throw std::invalid_argument("Cube::getCheckerboardFacetsCuboctahedronLattice: x, y, z must be >= 1");
+        const int n = subdivision_levels_;
+        // Same predicate as getCheckerboardSubcells.
+        auto selected = [=](int i, int j, int k) {
+            return ((i % x == 0 && k % z == 0) || (j % y == 0));
+        };
+        // Octagon face indices: 0=Front z+, 1=Back z-, 2=Right x+, 3=Left x-,
+        // 4=Top y+, 5=Bottom y-. Cull a negative octagon only when the neighbour
+        // on that side is also selected+active (it draws the shared octagon).
+        for (int i = 0; i < n; ++i)
+            for (int j = 0; j < n; ++j)
+                for (int k = 0; k < n; ++k) {
+                    const SubCell& cell = subcells_[i][j][k];
+                    if (!cell.active || !selected(i, j, k)) continue;
+                    const int mask = (i > 0 && subcells_[i-1][j][k].active   && selected(i-1, j, k) ? (1 << 3) : 0)  // Left  x-
+                                   | (j > 0 && subcells_[i][j-1][k].active   && selected(i, j-1, k) ? (1 << 5) : 0)  // Bottom y-
+                                   | (k > 0 && subcells_[i][j][k-1].active   && selected(i, j, k-1) ? (1 << 1) : 0); // Back  z-
+                    pushTruncatedCuboctahedronFacets(fb, cell.vertices, hollow, inset, mask);
+                }
+        return fb;
+    }
+
+    /**
+     * @brief Write the octagon-connected cuboctahedron lattice to an ASCII STL.
+     *
+     * @param filename Path to output STL file (created or overwritten).
+     * @param objectName Name to use in the STL header.
+     * @param hollow If true (default) hollow frames; false solid cuboctahedra.
+     * @param inset  Hollow border inset ratio (only used when hollow=true).
+     * @throws std::runtime_error if the file cannot be created or there is no subdivision.
+     */
+    void writeSTL_s_cuboctahedron_lattice(const std::string& filename,
+                                          const std::string& objectName,
+                                          bool hollow = true,
+                                          double inset = default_tc_inset_) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_cuboctahedron_lattice: Cannot create file " + filename);
+
+        FacetBox facetsToWrite = getCuboctahedronLatticeFacets(hollow, inset);
+
+        stl << "solid " << objectName << "\n";
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+    /**
+     * @brief Write the modular (checkerboard) cuboctahedron lattice to ASCII STL.
+     *
+     * Same selection as getCheckerboardFacetsCuboctahedronLattice(x,y,z,hollow,inset);
+     * the STL therefore matches what the render shows for the current <ii,jj,kk>.
+     *
+     * @throws std::runtime_error if the file cannot be created or there is no subdivision.
+     */
+    void writeSTL_s_cuboctahedron_lattice_checkerboard(const std::string& filename,
+                                                       const std::string& objectName,
+                                                       int x, int y, int z,
+                                                       bool hollow = true,
+                                                       double inset = default_tc_inset_) const {
+        std::ofstream stl(filename);
+        if (!stl.is_open())
+            throw std::runtime_error("Cube::writeSTL_s_cuboctahedron_lattice_checkerboard: Cannot create file " + filename);
+
+        FacetBox facetsToWrite = getCheckerboardFacetsCuboctahedronLattice(x, y, z, hollow, inset);
+
+        stl << "solid " << objectName << "\n";
+        for (size_t i = 0; i < facetsToWrite.size(); ++i) {
+            const Facet& face = facetsToWrite[i];
+            Vector3D v1 = face[0], v2 = face[1], v3 = face[2];
+            Vector3D normal = face.getNormal();
+            stl << "facet normal " << std::scientific
+                << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
+            stl << "\touter loop\n";
+            stl << "\t\tvertex " << v1.x() << " " << v1.y() << " " << v1.z() << "\n";
+            stl << "\t\tvertex " << v2.x() << " " << v2.y() << " " << v2.z() << "\n";
+            stl << "\t\tvertex " << v3.x() << " " << v3.y() << " " << v3.z() << "\n";
+            stl << "\tendloop\n";
+            stl << "endfacet\n";
+        }
+        stl << "endsolid " << objectName << "\n";
+        stl.close();
+    }
+
+
 private:
     // === CORE DATA MEMBERS ===
     std::vector<Quaternion> verts_;  // 8 corner vertices of the main cube (using quaternions for storage)
@@ -2718,6 +3182,245 @@ private:
                 fb.push(o[i], o[nxt], in[nxt]);
                 fb.push(o[i], in[nxt], in[i]);
             }
+        }
+    }
+
+    /* === TRUNCATED-CUBOCTAHEDRON MESH — a fourth method for building a cube ===
+     * The truncated cuboctahedron (great rhombicuboctahedron) is the Archimedean
+     * solid with vertex configuration 4.6.8: 6 octagons (one per cube FACE),
+     * 8 hexagons (one per cube CORNER) and 12 squares (one per cube EDGE) = 26
+     * faces, 48 vertices, 72 edges => 92 triangles/cube (solid). It is the
+     * cantitruncated (omnitruncated) cube, t_{0,1,2}{4,3}.
+     *
+     * Construction (inversion-compatible, like the other three methods): the 48
+     * surface vertices are the canonical positions (permutations of (±a, ±b, ±1)
+     * in normalized cube space, a = 1/(1+2√2) the corner-cut coord, b = (1+√2)/(1+2√2)
+     * the edge-cut coord, ±1 selects the cube face). Each vertex is computed ONCE
+     * by trilinear interpolation of the SAME 8 cube corners the other methods use,
+     * so it is a fixed affine combination of the 8 corners -> it deforms with the
+     * lattice under inversion exactly like them and needs no extra storage.
+     * Because every vertex is computed once and referenced from all three of its
+     * faces (octagon+hexagon+square), the mesh is watertight under deformation.
+     *
+     * The four tables below were generated AND verified by
+     * truncated_cuboctahedron_verify.py (48 verts, 92 tris, V−E+F=2, every mesh
+     * edge shared by 2, all 72 polyhedron edges length 2, every face regular, all
+     * normals outward). Winding is CCW-outward, fixed by the tables, so no runtime
+     * dot-check is needed and the result does not depend on cell.center (which
+     * goes stale under inversion). FacetBox results are returned by value.
+     *
+     * Hollow (mirrors the truncated-octahedron hollow convention): each face is
+     * inset toward its own centroid by `inset` (a homothety, which preserves
+     * winding and planarity) and the inner face is skipped as a hole -> 288 tris
+     * (6 octagons*16 + 8 hexagons*12 + 12 squares*8).
+     */
+
+    // tc_corner_sign_: sign pattern (sx,sy,sz) of each cube corner in the
+    // standard initVertices/SubCell order 0..7. Used by the trilinear interp.
+    static constexpr int tc_corner_sign_[8][3] = {
+        {-1, -1, +1},  // 0: (-,-,+)
+        {+1, -1, +1},  // 1: (+,-,+)
+        {+1, +1, +1},  // 2: (+,+,+)
+        {-1, +1, +1},  // 3: (-,+,+)
+        {-1, -1, -1},  // 4: (-,-,-)
+        {+1, -1, -1},  // 5: (+,-,-)
+        {+1, +1, -1},  // 6: (+,+,-)
+        {-1, +1, -1}   // 7: (-,+,-)
+    };
+
+    // tc_vert_norm_: the 48 surface-vertex normalized positions (perms of
+    // (±a, ±b, ±1) with a≈0.2612038750 = 1/(1+2√2), b≈0.6306019375 = (1+√2)/(1+2√2)).
+    // Vertex g = Σ_i w_i * corner_i, w_i = (1/8)·∏_axis (1 + s_i·coord) — trilinear
+    // interpolation of the 8 corners at tc_vert_norm_[g] (cube half-side = 1 here).
+    static constexpr double tc_vert_norm_[48][3] = {
+        { 0.2612038750, 0.6306019375, 1.0000000000 },  // 0
+        { 0.2612038750, 0.6306019375, -1.0000000000 },  // 1
+        { 0.2612038750, -0.6306019375, 1.0000000000 },  // 2
+        { 0.2612038750, -0.6306019375, -1.0000000000 },  // 3
+        { -0.2612038750, 0.6306019375, 1.0000000000 },  // 4
+        { -0.2612038750, 0.6306019375, -1.0000000000 },  // 5
+        { -0.2612038750, -0.6306019375, 1.0000000000 },  // 6
+        { -0.2612038750, -0.6306019375, -1.0000000000 },  // 7
+        { 0.2612038750, 1.0000000000, 0.6306019375 },  // 8
+        { 0.2612038750, 1.0000000000, -0.6306019375 },  // 9
+        { 0.2612038750, -1.0000000000, 0.6306019375 },  // 10
+        { 0.2612038750, -1.0000000000, -0.6306019375 },  // 11
+        { -0.2612038750, 1.0000000000, 0.6306019375 },  // 12
+        { -0.2612038750, 1.0000000000, -0.6306019375 },  // 13
+        { -0.2612038750, -1.0000000000, 0.6306019375 },  // 14
+        { -0.2612038750, -1.0000000000, -0.6306019375 },  // 15
+        { 0.6306019375, 0.2612038750, 1.0000000000 },  // 16
+        { 0.6306019375, 0.2612038750, -1.0000000000 },  // 17
+        { 0.6306019375, -0.2612038750, 1.0000000000 },  // 18
+        { 0.6306019375, -0.2612038750, -1.0000000000 },  // 19
+        { -0.6306019375, 0.2612038750, 1.0000000000 },  // 20
+        { -0.6306019375, 0.2612038750, -1.0000000000 },  // 21
+        { -0.6306019375, -0.2612038750, 1.0000000000 },  // 22
+        { -0.6306019375, -0.2612038750, -1.0000000000 },  // 23
+        { 0.6306019375, 1.0000000000, 0.2612038750 },  // 24
+        { 0.6306019375, 1.0000000000, -0.2612038750 },  // 25
+        { 0.6306019375, -1.0000000000, 0.2612038750 },  // 26
+        { 0.6306019375, -1.0000000000, -0.2612038750 },  // 27
+        { -0.6306019375, 1.0000000000, 0.2612038750 },  // 28
+        { -0.6306019375, 1.0000000000, -0.2612038750 },  // 29
+        { -0.6306019375, -1.0000000000, 0.2612038750 },  // 30
+        { -0.6306019375, -1.0000000000, -0.2612038750 },  // 31
+        { 1.0000000000, 0.2612038750, 0.6306019375 },  // 32
+        { 1.0000000000, 0.2612038750, -0.6306019375 },  // 33
+        { 1.0000000000, -0.2612038750, 0.6306019375 },  // 34
+        { 1.0000000000, -0.2612038750, -0.6306019375 },  // 35
+        { -1.0000000000, 0.2612038750, 0.6306019375 },  // 36
+        { -1.0000000000, 0.2612038750, -0.6306019375 },  // 37
+        { -1.0000000000, -0.2612038750, 0.6306019375 },  // 38
+        { -1.0000000000, -0.2612038750, -0.6306019375 },  // 39
+        { 1.0000000000, 0.6306019375, 0.2612038750 },  // 40
+        { 1.0000000000, 0.6306019375, -0.2612038750 },  // 41
+        { 1.0000000000, -0.6306019375, 0.2612038750 },  // 42
+        { 1.0000000000, -0.6306019375, -0.2612038750 },  // 43
+        { -1.0000000000, 0.6306019375, 0.2612038750 },  // 44
+        { -1.0000000000, 0.6306019375, -0.2612038750 },  // 45
+        { -1.0000000000, -0.6306019375, 0.2612038750 },  // 46
+        { -1.0000000000, -0.6306019375, -0.2612038750 }  // 47
+    };
+
+    // tc_oct_faces_ / tc_hex_faces_ / tc_sq_faces_: global vertex indices (into
+    // the 48 above) of each face, in CCW-OUTWARD order (verified by the script).
+    // Octagon order matches octagonal_faces_ [Front z+, Back z-, Right x+, Left x-, Top y+, Bottom y-].
+    static constexpr int tc_oct_faces_[6][8] = {
+        { 22,  6,  2, 18, 16,  0,  4, 20 },  // octagon 0  Front  (z = +radius)
+        { 21,  5,  1, 17, 19,  3,  7, 23 },  // octagon 1  Back   (z = -radius)
+        { 43, 35, 33, 41, 40, 32, 34, 42 },  // octagon 2  Right  (x = +radius)
+        { 46, 38, 36, 44, 45, 37, 39, 47 },  // octagon 3  Left   (x = -radius)
+        { 28, 12,  8, 24, 25,  9, 13, 29 },  // octagon 4  Top    (y = +radius)
+        { 31, 15, 11, 27, 26, 10, 14, 30 }   // octagon 5  Bottom (y = -radius)
+    };
+    static constexpr int tc_hex_faces_[8][6] = {
+        {  0, 16, 32, 40, 24,  8 },  // hexagon 0  corner 0 (-,-,+)
+        {  9, 25, 41, 33, 17,  1 },  // hexagon 1  corner 1 (+,-,+)
+        { 10, 26, 42, 34, 18,  2 },  // hexagon 2  corner 2 (+,+,+)
+        {  3, 19, 35, 43, 27, 11 },  // hexagon 3  corner 3 (-,+,+)
+        { 36, 20,  4, 12, 28, 44 },  // hexagon 4  corner 4 (-,-,-)
+        { 45, 29, 13,  5, 21, 37 },  // hexagon 5  corner 5 (+,-,-)
+        { 46, 30, 14,  6, 22, 38 },  // hexagon 6  corner 6 (+,+,-)
+        { 39, 23,  7, 15, 31, 47 }   // hexagon 7  corner 7 (-,+,-)
+    };
+    static constexpr int tc_sq_faces_[12][4] = {
+        { 24, 40, 41, 25 },  // square 0   edge +x,+y
+        { 27, 43, 42, 26 },  // square 1   edge +x,-y
+        { 44, 28, 29, 45 },  // square 2   edge -x,+y
+        { 47, 31, 30, 46 },  // square 3   edge -x,-y
+        { 18, 34, 32, 16 },  // square 4   edge +x,+z
+        { 17, 33, 35, 19 },  // square 5   edge +x,-z
+        { 38, 22, 20, 36 },  // square 6   edge -x,+z
+        { 37, 21, 23, 39 },  // square 7   edge -x,-z
+        {  4,  0,  8, 12 },  // square 8   edge +y,+z
+        { 13,  9,  1,  5 },  // square 9   edge +y,-z
+        { 14, 10,  2,  6 },  // square 10  edge -y,+z
+        {  7,  3, 11, 15 }   // square 11  edge -y,-z
+    };
+
+    // Hollow border inset ratio in (0,1) (used only when hollow=true): each face
+    // is inset toward its own centroid by this ratio and the inner face is skipped.
+    // inner = centroid + inset*(outer - centroid). Larger inset = bigger hole.
+    static constexpr double default_tc_inset_ = 0.5;
+
+    /**
+     * @brief Push the triangles of one truncated cuboctahedron into a FacetBox.
+     *
+     * Given the 8 corner vertices of a (possibly deformed) cube, emits 6 octagons
+     * (6 fan tris each) + 8 hexagons (4 each) + 12 squares (2 each) = 92 solid
+     * triangles, or — when hollow=true — 288 frame triangles (each face inset
+     * toward its own centroid, inner face skipped). The 48 surface vertices are
+     * derived by trilinear interpolation of the 8 corners at tc_vert_norm_[g].
+     * Winding is CCW-outward, fixed by tc_oct_faces_/tc_hex_faces_/tc_sq_faces_;
+     * the hollow homothety toward each face centroid preserves that winding.
+     *
+     * @param fb Destination FacetBox (appended to).
+     * @param v  The 8 cube corners in standard order (same as initVertices/SubCell).
+     * @param hollow If true, emit the 288-tri hollow frame; false, the 92-tri solid mesh.
+     * @param inset Hollow border inset ratio in (0,1) (only used when hollow=true).
+     */
+    static void pushTruncatedCuboctahedronFacets(FacetBox& fb,
+                                                  const std::array<Vector3D, 8>& v,
+                                                  bool hollow,
+                                                  double inset,
+                                                  int cullOctMask = 0) {
+        if (hollow) {
+            if (!(inset > 0.0)) inset = 0.0001;   // guard: border vanishes at inset=0
+            if (inset >= 1.0)  inset = 0.9999;   // clamp: hole vanishes at inset>=1
+        }
+
+        // 48 surface vertices via trilinear interpolation of the 8 cube corners
+        // at the normalized positions tc_vert_norm_[g] (perms of (±a, ±b, ±1)).
+        Vector3D vert[48];
+        for (int g = 0; g < 48; ++g) {
+            const double x = tc_vert_norm_[g][0];
+            const double y = tc_vert_norm_[g][1];
+            const double z = tc_vert_norm_[g][2];
+            Vector3D p;                                   // zero
+            for (int i = 0; i < 8; ++i) {
+                const double w = (1.0 / 8.0)
+                    * (1.0 + tc_corner_sign_[i][0] * x)
+                    * (1.0 + tc_corner_sign_[i][1] * y)
+                    * (1.0 + tc_corner_sign_[i][2] * z);
+                p += w * v[i];
+            }
+            vert[g] = p;
+        }
+
+        if (!hollow) {
+            // SOLID: fan each face CCW-outward. 6*6 + 8*4 + 12*2 = 92 tris.
+            // cullOctMask bit i skips octagon face i (used by the cuboctahedron
+            // lattice to draw each shared octagon once; 0 = all 6, the default).
+            for (int i = 0; i < 6; ++i) {
+                if (cullOctMask & (1 << i)) continue;
+                const int* f = tc_oct_faces_[i];
+                for (int t = 1; t < 7; ++t)
+                    fb.push(vert[f[0]], vert[f[t]], vert[f[t + 1]]);
+            }
+            for (int i = 0; i < 8; ++i) {
+                const int* f = tc_hex_faces_[i];
+                for (int t = 1; t < 5; ++t)
+                    fb.push(vert[f[0]], vert[f[t]], vert[f[t + 1]]);
+            }
+            for (int i = 0; i < 12; ++i) {
+                const int* f = tc_sq_faces_[i];
+                fb.push(vert[f[0]], vert[f[1]], vert[f[2]]);
+                fb.push(vert[f[0]], vert[f[2]], vert[f[3]]);
+            }
+            return;
+        }
+
+        // HOLLOW: each face inset toward its own centroid by `inset`; inner face
+        // skipped. Homothety preserves CCW-outward winding. 288 tris total.
+        auto hollowFace = [&](const int* f, int n) {
+            Vector3D o[8];
+            Vector3D C;                                   // zero -> centroid
+            for (int i = 0; i < n; ++i) { o[i] = vert[f[i]]; C += o[i]; }
+            C = C / static_cast<double>(n);
+            Vector3D in[8];
+            for (int i = 0; i < n; ++i) in[i] = C + inset * (o[i] - C);
+            for (int i = 0; i < n; ++i) {
+                int j = (i + 1) % n;
+                fb.push(o[i], o[j], in[j]);
+                fb.push(o[i], in[j], in[i]);
+            }
+        };
+        for (int i = 0; i < 6; ++i)  { if (cullOctMask & (1 << i)) continue; hollowFace(tc_oct_faces_[i], 8); }
+        for (int i = 0; i < 8; ++i)  hollowFace(tc_hex_faces_[i], 6);
+        for (int i = 0; i < 12; ++i) hollowFace(tc_sq_faces_[i], 4);
+    }
+
+    /**
+     * @brief Push the 12 plain-cube triangles into a FacetBox (cube_triangles_ walk).
+     *
+     * Used by the cantitruncated honeycomb builder for the cube cells (3 per 2x2x2
+     * block), so the per-cell loop allocates no temporary FacetBox.
+     */
+    static void pushCubeFacets(FacetBox& fb, const std::array<Vector3D, 8>& v) {
+        for (int i = 0; i < 12; ++i) {
+            const int* t = cube_triangles_[i];
+            fb.push(v[t[0]], v[t[1]], v[t[2]]);
         }
     }
 

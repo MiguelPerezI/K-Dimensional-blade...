@@ -2,6 +2,12 @@
 #include <iostream>
 #include <stdio.h>
 #include <math.h>
+#include <cstring>      // strlen() for the GLSL shader info-log paths
+// Enable GL extension function prototypes (glCreateShader, glShaderSource,
+// glCompileShader, glUseProgram, glUniform*, ...) from <GL/glext.h> so we can
+// compile/use GLSL shaders without a loader like GLEW. Must be defined before
+// <GL/gl.h> is included (it is, transitively, via <GL/glut.h>).
+#define GL_GLEXT_PROTOTYPES 1
 #include <GL/glut.h>
 #include "Vector3D.cpp"
 #include "Vector4D.cpp"
@@ -40,10 +46,10 @@ bool g_glassMode = false;
 
 // Fisheye camera parameters
 static bool g_fisheyeMode = false;
-static float g_fisheyeStrength = 1.0f;  // 0.0 = normal, 2.0 = extreme fisheye
+static float g_fisheyeStrength = 0.5f;  // 0.0 = normal, 2.0 = extreme fisheye
 
 // Surface proximity and collision detection
-static float g_minDistanceToSurface = 0.1f;
+static float g_minDistanceToSurface = 0.00000001f;
 static float g_surfaceZoomFactor = 1.0f;
 static bool g_enableSurfaceZoom = true;
 
@@ -151,7 +157,7 @@ void applyFisheyeProjection(int w, int h) {
 Global setup parameters 
 -----------------------------------------*/
 int cube_dim = 2.0;
-int N = 37 ;
+int N = 12 ;                                   // cuboctahedron lattice: one cell per subcell (keep modest)
 Cube cube(cube_dim, Vector3D{0,0.0001,0}, N);
 FacetBox plane_subcells;
 
@@ -235,7 +241,7 @@ struct InvBlend { double a1, a2, a3; };
 // --capture-cycle: write one STL per animation frame for a full 6-phase cycle,
 // then exit. --outdir <dir>: where to write frame_XXXXXX.stl (default
 // ~/Downloads/cycle_<timestamp>/). Captures the SAME checkerboard selection the
-// render shows (cube.getCheckerboardFacets(ii,kk,jj)), matching the 'c' key.
+// render shows (cube.getCheckerboardFacetsCuboctahedronLattice(ii,kk,jj, g_hollow, g_inset)), matching the 'c' key.
 static bool        g_captureCycle = false;  // --capture-cycle flag
 static std::string g_captureDir;           // --outdir target directory
 static bool        g_capturing    = false; // active capture state (true while capturing)
@@ -317,15 +323,24 @@ static inline Vector3D composeSigma(const Vector3D& p, const SigmaParams& s) {
     return composeSigmaBlended(p, s, {1.0, 1.0, 1.0});
 }
 
-// Single sphere inversion at the mouse-driven g_invCenter, with a singular-center
-// guard (leave the point untouched if it sits on the center) so the app never
-// crashes. This replaces the 3-pass composeSigmaBlended: the lattice now carries
-// ONE full-strength inversion at the center, recomputed when the mouse moves it.
+// Single sphere inversion at the mouse-driven g_invCenter, regularized so a vertex
+// almost on the center cannot "explode" to infinity (a subcell vertex ~1e-4 from
+// the center would otherwise jump ~1e4 units and drag its facets into a spike).
+// Clamp the effective squared distance to minDist^2 = (r^2 / g_maxInvDist)^2 so NO
+// deformed point lands farther than g_maxInvDist from the center. Points beyond
+// minDist invert exactly as before; only the near-singular core is tamed (it
+// stays near the center). Continuous with the normal inversion at the boundary.
+static double g_maxInvDist = 2.0;   // deformed points stay within this of the center (set in Setup to cube_dim)
+
 static inline Vector3D sigmaCenter(const Vector3D& p) {
     Vector3D d = p - g_invCenter;
     double ds = d * d;
     if (ds < 1e-12) return p;
-    return g_invCenter + (g_invRadius * g_invRadius / ds) * d;
+    const double minDist = (g_invRadius * g_invRadius) / g_maxInvDist;   // saturate closer than this
+    const double minDs2  = minDist * minDist;
+    const double effDs   = (ds > minDs2) ? ds : minDs2;
+    const double f = (g_invRadius * g_invRadius) / effDs;
+    return g_invCenter + f * d;
 }
 
 // Capture the pristine identity lattice ONCE, before any deformation.
@@ -408,13 +423,225 @@ void Setup() {
         // The animation (animTimer advances g_animTime; display() deforms each frame)
         // recomputes this every frame; at t=0 it equals the two baked reflections
         // main15 used to apply here.
+        // Bound the deformed lattice to within the cube radius of the inversion
+        // center so a vertex almost on the center can't explode (see sigmaCenter).
+        g_maxInvDist = cube_dim;
+
         captureIdentityLattice();
         updateAnimatedGeometry();
-        cube.writeSTL_s_truncated_octahedron("/home/mike666/Downloads/mesh_output_truncated_octahedron_module.stl", "MyTruncatedOctahedron", "checkerboard", ii, kk, jj, g_morphS, g_hollow, g_inset);
+        cube.writeSTL_s_cuboctahedron_lattice_checkerboard("/home/mike666/Downloads/mesh_output_cuboctahedron_lattice_module.stl", "CuboctahedronLattice", ii, kk, jj, g_hollow, g_inset);
     }
 }
 
 ///////////////////     DRAW       ///////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// Gouraud shader (per-vertex ambient + diffuse + specular). Ported from
+// matthewachan/opengl-shaders (gouraud_vertex.vs / gouraud_fragment.fs), retargeted
+// to GLSL #version 130 so it runs on any GL 3.0+ compatibility context (Mesa's
+// default) without requesting a specific context version. Scoped to the lattice
+// FILLS only -- outlines / sphere / glass / axes / HUD stay fixed-function under
+// glUseProgram(0). Toggle with [L]; if the context can't compile the GLSL the toggle
+// is inert and a warning is printed (fixed-function stays usable). No perf gain on
+// llvmpipe -- this is a visual/quality change.
+//
+// Why this slots in with almost no plumbing:
+//  * The module already draws fills via glVertexPointer (conventional attrib 0) +
+//    glNormalPointer (conventional attrib 2). We glBindAttribLocation position->0 and
+//    vertexNormal->2, so the existing client arrays feed the shader unchanged.
+//  * g_modelview / g_projection are already cached each frame (see display()); we
+//    feed them straight to the modelViewMatrix / projectionMatrix uniforms.
+//  * The modelview is rotation+translation only, so the shader's
+//    normalize(modelViewMatrix * normal) is correct (matches GL_NORMALIZE).
+//  * GL_LIGHT0 is directional with a constant eye-space direction (set at identity in
+//    initGL), which maps 1:1 to directionalLight.
+///////////////////////////////////////////////////////////////////////////////
+static bool   g_useShader    = false;   // [L] toggle: Gouraud shading on the lattice fills
+static GLuint g_gouraudProg  = 0;
+static bool   g_shaderOK     = false;   // compiled+linked successfully?
+
+// Uniform locations (queried once at link time; -1 = not found / optimized out).
+static GLint g_u_mv = -1, g_u_proj = -1, g_u_ambient = -1, g_u_specPow = -1;
+static GLint g_u_matColour = -1, g_u_matUseColour = -1, g_u_matReflect = -1;
+static GLint g_u_dirColour = -1, g_u_dirDir = -1, g_u_dirIntensity = -1;
+static GLint g_u_ptColour = -1, g_u_ptPos = -1, g_u_ptIntensity = -1;
+static GLint g_u_ptAttC = -1, g_u_ptAttL = -1, g_u_ptAttE = -1;
+
+// GLSL #version 130: no layout(location=) (bound via glBindAttribLocation before
+// link), in/out (not attribute/varying), custom fragment output. Works on GL 3.0+.
+static const char* kGouraudVS =
+"#version 130\n"
+"in vec3 position;\n"
+"in vec3 vertexNormal;\n"
+"out vec4 color;\n"
+"uniform mat4 modelViewMatrix;\n"
+"uniform mat4 projectionMatrix;\n"
+"uniform vec3 ambientLight;\n"
+"uniform float specularPower;\n"
+"struct Material { vec3 colour; int useColour; float reflectance; };\n"
+"struct Attenuation { float constant; float linear; float exponent; };\n"
+"struct PointLight { vec3 colour; vec3 position; float intensity; Attenuation att; };\n"
+"struct DirectionalLight { vec3 colour; vec3 direction; float intensity; };\n"
+"uniform Material material;\n"
+"uniform PointLight pointLight;\n"
+"uniform DirectionalLight directionalLight;\n"
+"vec4 calcLightColour(vec3 lc, float li, vec3 p, vec3 toLight, vec3 n){\n"
+"  float diff = max(dot(n, toLight), 0.0);\n"
+"  vec4 dc = vec4(lc, 1.0) * li * diff;\n"
+"  vec3 cd = normalize(-p);\n"
+"  vec3 refl = normalize(reflect(-toLight, n));\n"
+"  float sf = pow(max(dot(cd, refl), 0.0), specularPower);\n"
+"  vec4 sc = li * sf * material.reflectance * vec4(lc, 1.0);\n"
+"  return dc + sc;\n"
+"}\n"
+"vec4 calcPointLight(PointLight L, vec3 p, vec3 n){\n"
+"  vec3 d = L.position - p;\n"
+"  vec4 c = calcLightColour(L.colour, L.intensity, p, normalize(d), n);\n"
+"  float dist = length(d);\n"
+"  float attInv = L.att.constant + L.att.linear * dist + L.att.exponent * dist * dist;\n"
+"  return c / attInv;\n"
+"}\n"
+"void main(){\n"
+"  vec4 mv = modelViewMatrix * vec4(position, 1.0);\n"
+"  gl_Position = projectionMatrix * mv;\n"
+"  vec3 mn = normalize(modelViewMatrix * vec4(vertexNormal, 0.0)).xyz;\n"
+"  color = vec4(ambientLight, 1.0);\n"
+"  color += calcLightColour(directionalLight.colour, directionalLight.intensity, mv.xyz, normalize(directionalLight.direction), mn);\n"
+"  color += calcPointLight(pointLight, mv.xyz, mn);\n"
+"}\n";
+
+static const char* kGouraudFS =
+"#version 130\n"
+"struct Material { vec3 colour; int useColour; float reflectance; };\n"
+"in vec4 color;\n"
+"out vec4 fragColor;\n"
+"uniform Material material;\n"
+"void main(){ fragColor = color * vec4(material.colour, 1.0); }\n";
+
+static GLuint gouraudCompileShader(GLenum type, const char* src) {
+    GLuint s = glCreateShader(type);
+    GLint len = (GLint)strlen(src);
+    glShaderSource(s, 1, &src, &len);
+    glCompileShader(s);
+    GLint ok = GL_FALSE;
+    glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    if (ok != GL_TRUE) {
+        GLint n = 0; glGetShaderiv(s, GL_INFO_LOG_LENGTH, &n);
+        std::vector<char> log((size_t)(n > 1 ? n : 1));
+        glGetShaderInfoLog(s, (GLsizei)log.size(), nullptr, log.data());
+        printf("Gouraud %s shader compile failed:\n%s\n",
+               type == GL_VERTEX_SHADER ? "vertex" : "fragment", log.data());
+        glDeleteShader(s);
+        return 0;
+    }
+    return s;
+}
+
+static void initGouraudShader() {
+    GLuint vs = gouraudCompileShader(GL_VERTEX_SHADER, kGouraudVS);
+    if (!vs) { g_shaderOK = false; return; }
+    GLuint fs = gouraudCompileShader(GL_FRAGMENT_SHADER, kGouraudFS);
+    if (!fs) { glDeleteShader(vs); g_shaderOK = false; return; }
+
+    GLuint prog = glCreateProgram();
+    // Bind the shader inputs to the conventional vertex/normal slots so the existing
+    // glVertexPointer (attrib 0) and glNormalPointer (attrib 2) client arrays feed
+    // the shader with no extra setup. Must be done before linking.
+    glBindAttribLocation(prog, 0, "position");
+    glBindAttribLocation(prog, 2, "vertexNormal");
+    glAttachShader(prog, vs);
+    glAttachShader(prog, fs);
+    glLinkProgram(prog);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+
+    GLint ok = GL_FALSE;
+    glGetProgramiv(prog, GL_LINK_STATUS, &ok);
+    if (ok != GL_TRUE) {
+        GLint n = 0; glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &n);
+        std::vector<char> log((size_t)(n > 1 ? n : 1));
+        glGetProgramInfoLog(prog, (GLsizei)log.size(), nullptr, log.data());
+        printf("Gouraud program link failed:\n%s\n", log.data());
+        glDeleteProgram(prog);
+        g_shaderOK = false;
+        return;
+    }
+    g_gouraudProg = prog;
+    g_shaderOK = true;
+
+    g_u_mv           = glGetUniformLocation(prog, "modelViewMatrix");
+    g_u_proj         = glGetUniformLocation(prog, "projectionMatrix");
+    g_u_ambient      = glGetUniformLocation(prog, "ambientLight");
+    g_u_specPow      = glGetUniformLocation(prog, "specularPower");
+    g_u_matColour    = glGetUniformLocation(prog, "material.colour");
+    g_u_matUseColour = glGetUniformLocation(prog, "material.useColour");
+    g_u_matReflect   = glGetUniformLocation(prog, "material.reflectance");
+    g_u_dirColour    = glGetUniformLocation(prog, "directionalLight.colour");
+    g_u_dirDir       = glGetUniformLocation(prog, "directionalLight.direction");
+    g_u_dirIntensity = glGetUniformLocation(prog, "directionalLight.intensity");
+    g_u_ptColour     = glGetUniformLocation(prog, "pointLight.colour");
+    g_u_ptPos        = glGetUniformLocation(prog, "pointLight.position");
+    g_u_ptIntensity  = glGetUniformLocation(prog, "pointLight.intensity");
+    g_u_ptAttC       = glGetUniformLocation(prog, "pointLight.att.constant");
+    g_u_ptAttL       = glGetUniformLocation(prog, "pointLight.att.linear");
+    g_u_ptAttE       = glGetUniformLocation(prog, "pointLight.att.exponent");
+    printf("Gouraud shader loaded (toggle with [L]).\n");
+}
+
+// Set the Gouraud uniforms for this frame from the cached camera matrices and the
+// fixed-function light/material values (matches initGL's GL_LIGHT0). Call with
+// g_gouraudProg already active (glUseProgram), after the camera transforms so
+// g_modelview / g_projection are fresh.
+static void setupGouraudUniforms() {
+    if (!g_shaderOK || g_gouraudProg == 0) return;
+
+    // GL stores matrices column-major; glUniformMatrix4fv(GL_FALSE) reads column-major.
+    GLfloat mv[16], pr[16];
+    for (int i = 0; i < 16; ++i) { mv[i] = (GLfloat)g_modelview[i]; pr[i] = (GLfloat)g_projection[i]; }
+    if (g_u_mv   != -1) glUniformMatrix4fv(g_u_mv,   1, GL_FALSE, mv);
+    if (g_u_proj != -1) glUniformMatrix4fv(g_u_proj, 1, GL_FALSE, pr);
+
+    // GL_LIGHT0 is directional: position {1,1,0.25,0} set at identity modelview in
+    // initGL, so its eye-space direction is the CONSTANT {1,1,0.25} (it tracks the
+    // camera). The shader lights in view space, so pass it directly (no per-frame
+    // transform) -- this matches the fixed-function look.
+    GLfloat dx = 1.0f, dy = 1.0f, dz = 0.25f;
+    GLfloat invlen = 1.0f / sqrtf(dx*dx + dy*dy + dz*dz);
+    dx *= invlen; dy *= invlen; dz *= invlen;
+    if (g_u_ambient      != -1) glUniform3f(g_u_ambient,      0.3f, 0.3f, 0.3f);  // GL_AMBIENT
+    if (g_u_specPow      != -1) glUniform1f(g_u_specPow,      128.0f);            // GL_SHININESS
+    if (g_u_dirColour    != -1) glUniform3f(g_u_dirColour,    0.7f, 0.7f, 0.7f);  // GL_DIFFUSE
+    if (g_u_dirDir       != -1) glUniform3f(g_u_dirDir,       dx, dy, dz);
+    if (g_u_dirIntensity != -1) glUniform1f(g_u_dirIntensity, 1.0f);
+
+    // Material: GL_COLOR_MATERIAL(AMBIENT_AND_DIFFUSE) + glColor3ub(200,200,200).
+    const GLfloat c = 200.0f / 255.0f;
+    if (g_u_matColour    != -1) glUniform3f(g_u_matColour,    c, c, c);
+    if (g_u_matUseColour != -1) glUniform1i(g_u_matUseColour, 1);
+    if (g_u_matReflect   != -1) glUniform1f(g_u_matReflect,   1.0f);              // GL_SPECULAR {1,1,1}
+
+    // No point light in the scene: intensity 0 -> its term is 0 (att.constant=1 avoids
+    // a divide-by-zero even though the result is 0).
+    if (g_u_ptColour     != -1) glUniform3f(g_u_ptColour,     0.0f, 0.0f, 0.0f);
+    if (g_u_ptPos        != -1) glUniform3f(g_u_ptPos,        0.0f, 0.0f, 0.0f);
+    if (g_u_ptIntensity  != -1) glUniform1f(g_u_ptIntensity,  0.0f);
+    if (g_u_ptAttC       != -1) glUniform1f(g_u_ptAttC, 1.0f);
+    if (g_u_ptAttL       != -1) glUniform1f(g_u_ptAttL, 0.0f);
+    if (g_u_ptAttE       != -1) glUniform1f(g_u_ptAttE, 0.0f);
+}
+
+// Background palette ([B] cycles). Light entries keep the black facet outlines
+// visible; the dark ones give a dramatic lit look with the Gouraud shader on
+// (outlines will be near-invisible on dark -- switch back to a light one for structure).
+static const GLfloat g_bgPalette[][3] = {
+    {0.86f, 0.89f, 0.93f},   // 0: light steel blue (default)
+    {0.95f, 0.93f, 0.88f},   // 1: warm off-white
+    {0.82f, 0.83f, 0.85f},   // 2: pale neutral gray
+    {0.10f, 0.12f, 0.18f},   // 3: deep navy
+    {0.18f, 0.20f, 0.23f},   // 4: charcoal
+};
+static const int g_bgPaletteCount = (int)(sizeof(g_bgPalette) / sizeof(g_bgPalette[0]));
+static int g_bgIndex = 0;
+
 void Draw() {
     
     extern void Setup(); // assume you define this elsewhere
@@ -422,20 +649,19 @@ void Draw() {
 	if (ciclo > 0) {
         /*Draw here with OpenGL*/
         // In your draw‐all loop:
-        // Batched render: cache vertex/normal arrays, rebuild only when the
-        // selection (ii/jj/kk/morph/inset/hollow) or geometry (g_geomVersion)
-        // changes — camera-only frames reuse them. One glDrawArrays for the
-        // fills + one for the outlines replaces ~827k glBegin/glEnd calls/frame.
+        // Batched render: cache vertex/normal arrays, rebuild only when the lattice
+        // knobs (inset/hollow) or geometry (g_geomVersion) change — camera-only
+        // frames reuse them. One glDrawArrays for the fills + one for the outlines.
         static std::vector<float> s_verts, s_norms;
         static size_t   s_N = 0;
         static unsigned s_geom = 0xFFFFFFFFu;
-        static int      s_ii = -1, s_jj = -1, s_kk = -1;
-        static double   s_morph = -1.0, s_inset = -1.0;
+        static double   s_inset = -1.0;
         static bool     s_hollow = false;
-        if (s_ii != ii || s_jj != jj || s_kk != kk ||
-            s_morph != g_morphS || s_inset != g_inset || s_hollow != g_hollow ||
-            s_geom != g_geomVersion) {
-            FacetBox fb = cube.getCheckerboardFacetsTruncatedOctahedron(ii, kk, jj, g_morphS, g_hollow, g_inset);
+        static int      s_ii = -1, s_jj = -1, s_kk = -1;   // modular sublattice selection (i/j/k keys)
+        if (s_inset != g_inset || s_hollow != g_hollow ||
+            s_geom != g_geomVersion ||
+            s_ii != ii || s_jj != jj || s_kk != kk) {
+            FacetBox fb = cube.getCheckerboardFacetsCuboctahedronLattice(ii, kk, jj, g_hollow, g_inset);
             s_N = fb.size();
             s_verts.resize(s_N * 9);
             s_norms.resize(s_N * 9);
@@ -454,7 +680,7 @@ void Draw() {
                     nv[k*3+2] = (float)n.z();
                 }
             }
-            s_ii=ii; s_jj=jj; s_kk=kk; s_morph=g_morphS; s_inset=g_inset; s_hollow=g_hollow; s_geom=g_geomVersion;
+            s_inset=g_inset; s_hollow=g_hollow; s_geom=g_geomVersion; s_ii=ii; s_jj=jj; s_kk=kk;
             plane_subcells = fb;  // keep the global in sync for any other consumer
         }
         if (s_N > 0) {
@@ -463,11 +689,22 @@ void Draw() {
             glEnableClientState(GL_NORMAL_ARRAY);
             glVertexPointer(3, GL_FLOAT, 0, s_verts.data());
             glNormalPointer(GL_FLOAT, 0, s_norms.data());
-            // Filled gray triangles (polygon offset so outlines don't z-fight).
+            // Filled triangles (polygon offset so outlines don't z-fight). With the
+            // Gouraud shader ON, lighting is per-vertex in the shader (it reads attrib0=
+            // position and attrib2=normal from the client arrays already enabled above),
+            // so glColor3ub is skipped. With the shader OFF, fixed-function GL_LIGHTING +
+            // GL_COLOR_MATERIAL uses glColor3ub as the ambient+diffuse material colour.
             glEnable(GL_POLYGON_OFFSET_FILL);
             glPolygonOffset(1.0f, 1.0f);
-            glColor3ub(200, 200, 200);
+            const bool useShader = (g_useShader && g_shaderOK && g_gouraudProg != 0);
+            if (useShader) {
+                glUseProgram(g_gouraudProg);
+                setupGouraudUniforms();
+            } else {
+                glColor3ub(200, 200, 200);
+            }
             glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(s_N * 3));
+            if (useShader) glUseProgram(0);   // outlines + the rest stay fixed-function
             glDisable(GL_POLYGON_OFFSET_FILL);
             // Black outlines: every facet edge, one draw call via line polygon mode.
             glColor3ub(0, 0, 0);
@@ -802,7 +1039,7 @@ int main(int argc, char** argv)
     parseArgs(argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(720, 720);
-    glutCreateWindow(" JAZ 4D Enhanced Camera U.U  (Truncated Octahedron Module)");
+    glutCreateWindow(" JAZ 4D Enhanced Camera U.U  (Cuboctahedron Lattice Module)");
 
     // Enable smoothing & blending by default
     ProcessMenu(1);
@@ -838,7 +1075,7 @@ void initGL()
     GLfloat ambient[]  = {0.3f, 0.3f, 0.3f, 1.0f};
     GLfloat diffuse[]  = {0.7f, 0.7f, 0.7f, 1.0f};
     GLfloat specular[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    GLfloat position[] = {1.0f, 1.0f, 0.25f, 0.0f};  // Match Main.c light position
+    GLfloat position[] = {5.0f, 5.0f, 5.0f, 0.0f};  // Match Main.c light position
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -862,13 +1099,19 @@ void initGL()
     // Normalize normals for scaled geometry
     glEnable(GL_NORMALIZE);
 
-    // Clear color - match Main.c white background
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    // Clear color - default light steel-blue (softer than pure white; the black facet
+    // outlines stay visible). [B] cycles a runtime palette (see g_bgPalette / display()).
+    glClearColor(0.86f, 0.89f, 0.93f, 1.0f);
 
     // Report the GL renderer so it's clear whether we're on hardware or software
     // (llvmpipe) GL — software rasterization of ~414k triangles is the remaining
     // cost once the immediate-mode overhead is gone.
     printf("GL renderer: %s\n", (const char*)glGetString(GL_RENDERER));
+    printf("GL version:  %s\n", (const char*)glGetString(GL_VERSION));
+
+    // Load the Gouraud shader. If the GL context can't compile it, g_shaderOK stays
+    // false and the [L] toggle is inert (fixed-function stays fully usable).
+    initGouraudShader();
 }
 
 //-----------------------------------------------------------------------------
@@ -897,11 +1140,13 @@ void drawHUD() {
         "R-drag/Wheel: Zoom",
         "[H]: Toggle Help",
         "[G]: Toggle Glass Mode",
+        "[L]: Toggle Gouraud Shader (lattice shading)",
+        "[B]: Cycle Background Colour",
         "[C]: Save STL Snapshot (~/Downloads)",
         "[Space]: Pause/Resume Anim",
         "[M]: Toggle Slow/Original Inversion",
         "[s/S]: Inversion speed +/-",
-        "[-/=]: Morph s -/+ (0.5=regular TO, 1.0=cuboctahedron)",
+        "[-/=]: Inset -/+ (hollow border thickness; same as ,/.)",
         "[,/.]: Inset -/+ (hollow border thickness)",
         "[O]: Toggle Hollow (hex/square hole per face)",
         "[F]: Toggle Fisheye Mode",
@@ -983,18 +1228,28 @@ void drawHUD() {
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
 
-    // Truncated-octahedron morph + inset + hollow status
+    // Cuboctahedron lattice (octagon-connected) inset + hollow status
     {
         y -= 0.05f;
-        const char* sLabel = (g_morphS >= 0.95) ? "cuboctahedron"
-                           : (fabs(g_morphS - 0.5) < 0.02) ? "regular TO"
-                           : (g_morphS < 0.5) ? "stretched" : "cube-like";
         char toStatus[160];
-        sprintf(toStatus, "Morph s=%.2f (%s)  Inset=%.2f  Hollow: %s",
-                g_morphS, sLabel, g_inset, g_hollow ? "ON (frame holes)" : "OFF (solid)");
+        sprintf(toStatus, "Cuboctahedron lattice (octagon-connected)  Inset=%.2f  Hollow: %s",
+                g_inset, g_hollow ? "ON (octagon windows)" : "OFF (solid)");
         glColor3f(0.2f, 0.6f, 0.6f);  // teal
         glRasterPos2f(0.02f, y);
         for(const char* c=toStatus; *c; ++c)
+            glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+    }
+
+    // Gouraud shader + background status
+    {
+        y -= 0.05f;
+        char sh[120];
+        sprintf(sh, "Gouraud: %s  |  Background: %d/%d",
+                g_shaderOK ? (g_useShader ? "ON" : "OFF") : "unavailable",
+                g_bgIndex + 1, g_bgPaletteCount);
+        glColor3f(0.5f, 0.3f, 0.7f);  // purple
+        glRasterPos2f(0.02f, y);
+        for(const char* c=sh; *c; ++c)
             glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
     }
     
@@ -1012,6 +1267,10 @@ static void maybeCaptureFrame();
 void display()
 {
     int frameT0 = glutGet(GLUT_ELAPSED_TIME);   // measure this frame's draw work
+    // Background from the current palette entry ([B] cycles); light entries keep the
+    // black facet outlines visible.
+    glClearColor(g_bgPalette[g_bgIndex][0], g_bgPalette[g_bgIndex][1],
+                 g_bgPalette[g_bgIndex][2], 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
@@ -1198,8 +1457,8 @@ static void captureFrameSTL(int frameIndex) {
     snprintf(fname, sizeof(fname), "frame_%06d.stl", frameIndex);
     std::string path = g_captureDir + "/" + fname;
     try {
-        FacetBox sel = cube.getCheckerboardFacetsTruncatedOctahedron(ii, kk, jj, g_morphS, g_hollow, g_inset);  // matches Draw()/captureSTLSnapshot()
-        writeFacetBox(sel, path, "MyTruncatedOctahedron");
+        FacetBox sel = cube.getCheckerboardFacetsCuboctahedronLattice(ii, kk, jj, g_hollow, g_inset);  // matches Draw()/captureSTLSnapshot()
+        writeFacetBox(sel, path, "CuboctahedronLattice");
     } catch (const std::exception& e) {
         fprintf(stderr, "[capture] FAILED frame %d -> %s: %s -- aborting capture.\n",
                 frameIndex, path.c_str(), e.what());
@@ -1242,7 +1501,7 @@ static void maybeCaptureFrame() {
 //-----------------------------------------------------------------------------
 // Capture an STL snapshot of EXACTLY what is on screen to ~/Downloads.
 // Bound to the 'c' key. The render (Draw()) shows the checkerboard selection
-// cube.getCheckerboardFacets(ii, kk, jj) — predicate (i%ii==0 && k%jj==0) || j%kk==0,
+// cube.getCheckerboardFacetsCuboctahedronLattice(ii, kk, jj, g_hollow, g_inset) — predicate (i%ii==0 && k%jj==0) || j%kk==0,
 // i.e. the cells selected by the current <ii,jj,kk> modular-algebra values. The
 // snapshot builds that SAME FacetBox (same call, same current animated subcell
 // vertices) and writes it, so the STL matches the OpenGL render triangle-for-
@@ -1271,15 +1530,14 @@ void captureSTLSnapshot()
     std::string path = dir + "/" + fname;
 
     try {
-        // EXACTLY the render's selection: Draw() does getCheckerboardFacets(ii, kk, jj).
-        // getCheckerboardFacets() reads the current (animated) subcell vertices
-        // directly, so this matches the last rendered frame — no refreshTriangulation
-        // needed, and the STL matches what OpenGL shows triangle-for-triangle.
-        FacetBox sel = cube.getCheckerboardFacetsTruncatedOctahedron(ii, kk, jj, g_morphS, g_hollow, g_inset);
-        writeFacetBox(sel, path, "MyTruncatedOctahedron");
+        // EXACTLY the render's selection: Draw() does getCheckerboardFacetsCuboctahedronLattice(ii, kk, jj, ...).
+        // It reads the current (animated) subcell vertices directly, so this matches
+        // the last rendered frame — no refreshTriangulation needed, and the STL
+        // matches what OpenGL shows triangle-for-triangle.
+        FacetBox sel = cube.getCheckerboardFacetsCuboctahedronLattice(ii, kk, jj, g_hollow, g_inset);
+        writeFacetBox(sel, path, "CuboctahedronLattice");
         cout << "[snapshot] rendered selection saved -> " << path
-             << "  (facets: " << sel.size()
-             << ", ii/jj/kk=" << ii << "/" << jj << "/" << kk << ")"
+             << "  (facets: " << sel.size() << ")"
              << "  (t=" << g_animTime << ", " << (g_animPaused ? "PAUSED" : "running") << ")\n";
     } catch (const std::exception& e) {
         cerr << "[snapshot] FAILED: " << e.what() << "\n";
@@ -1291,6 +1549,28 @@ void captureSTLSnapshot()
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int x, int y) {
     switch (key) {
+        // Gouraud shader on the lattice fills ([L]). Scoped to the fills; outlines and
+        // the rest stay fixed-function. Inert (with a hint) if the shader failed to
+        // compile/link for this GL context.
+        case 'l':
+        case 'L':
+            if (!g_shaderOK) {
+                printf("Gouraud shader unavailable on this GL context (using fixed-function).\n");
+            } else {
+                g_useShader = !g_useShader;
+                printf("Gouraud shading: %s\n", g_useShader ? "ON" : "OFF");
+            }
+            glutPostRedisplay();
+            break;
+
+        // Cycle the background colour ([B]). Light entries keep the black outlines visible.
+        case 'b':
+        case 'B':
+            g_bgIndex = (g_bgIndex + 1) % g_bgPaletteCount;
+            printf("Background: %d/%d\n", g_bgIndex + 1, g_bgPaletteCount);
+            glutPostRedisplay();
+            break;
+
         case 'g':
         case 'G':
             g_glassMode = !g_glassMode;
@@ -1351,7 +1631,7 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
         case 'K':
-            kk -= 1;
+            kk -= 1; if (kk < 1) kk = 1;
             cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
@@ -1363,7 +1643,7 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
         case 'I':
-            ii -= 1;
+            ii -= 1; if (ii < 1) ii = 1;
             cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
@@ -1375,7 +1655,7 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
         case 'J':
-            jj -= 1;
+            jj -= 1; if (jj < 1) jj = 1;
             cout << "modules <ii, jj, kk> = <" << ii << ", " << jj << ", " << kk << ">\n";
             glutPostRedisplay();
             break;
@@ -1406,17 +1686,18 @@ void keyboard(unsigned char key, int x, int y) {
             glutPostRedisplay();
             break;
 
-        // Morph s scrub: '-' decrease, '='/'+' increase (0.05 step, clamp [0.05, 1.0]).
-        // 0.5 = regular truncated octahedron, 1.0 = cuboctahedron, <0.5 stretched.
+        // Inset scrub (live): '-' decrease (thicker border / smaller hole),
+        // '='/'+' increase (bigger hole / thinner border). Same step/clamp as
+        // ','/'.'. (The lattice has no TO morph, so these keys scrub inset here.)
         case '-':
-            g_morphS = fmax(0.05, g_morphS - 0.05);
-            printf("Morph s = %.2f\n", g_morphS);
+            g_inset = fmax(0.05, g_inset - 0.05);
+            printf("Inset = %.2f\n", g_inset);
             glutPostRedisplay();
             break;
         case '=':
         case '+':
-            g_morphS = fmin(1.0, g_morphS + 0.05);
-            printf("Morph s = %.2f\n", g_morphS);
+            g_inset = fmin(0.95, g_inset + 0.05);
+            printf("Inset = %.2f\n", g_inset);
             glutPostRedisplay();
             break;
 
