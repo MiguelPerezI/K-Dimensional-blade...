@@ -65,14 +65,12 @@ Vector3D e_ui(0.0, 1.0, 0.0);
 Vector3D f_ui(0.0, 0.0, 1.0);
 Facet f_1(d_ui, e_ui, f_ui);
 
-// Loaded STL mesh, centered+scaled into the open unit ball (Klein disk model).
+// Loaded STL mesh, centered, scaled, and remeshed.
 FacetBox g_boxKlein;
-// Same mesh after applyHyperboloid() — projected to the Poincaré disk.
-FacetBox g_boxHyper;
-// Round-trip: inverse map applied to g_boxHyper, back to the Klein disk.
-FacetBox g_boxBack;
-// Active view: 0 = Original (Klein), 1 = Hyperbolic (Poincaré), 2 = Round-trip.
-int g_view = 0;
+// Animated spherical inversion of g_boxKlein — recomputed each frame.
+FacetBox g_boxInv;
+// Active view: 0 = Original, 1 = Spherical Inversion (animated).
+int g_view = 1;
 
 
 // Helper: convert HSV→RGB (all in [0,1])                                                  
@@ -180,36 +178,12 @@ FacetBox centerAndScale(const FacetBox& src, double target = 0.9) {
     return out;
 }
 
-//-----------------------------------------------------------------------------
-// Inverse of Facet::applyHyperboloid() (Poincaré disk → Klein disk).
-// toHyperboloid() maps x ↦ y = x / (1 + √(1−‖x‖²)); its inverse is
-// x = 2y / (1 + ‖y‖²). For ‖y‖ < 1 the result stays ‖x‖ < 1, so the round-trip
-// never leaves the unit ball.
-//-----------------------------------------------------------------------------
-Vector3D invHyperVertex(const Vector3D& y) {
-    double n2 = y * y;                  // dot product = ‖y‖² — Vector3D.hpp:50
-    double f = 2.0 / (1.0 + n2);
-    return f * y;                       // double * Vector3D — Vector3D.hpp:48
-}
-
-FacetBox inverseHyperboloid(const FacetBox& p) {
-    FacetBox out;
-    for (size_t i = 0; i < p.size(); ++i) {
-        const Facet& f = p[i];
-        out.push(invHyperVertex(f[0]),
-                 invHyperVertex(f[1]),
-                 invHyperVertex(f[2]));
-    }
-    return out;
-}
-
-
 void Setup() {
 
 	if (ciclo == 0) {
 
         cout << "\n———————————————————————————————————————————————————————————————————————\n";
-        cout <<   "|- Hyperbolic STL Mesh (cubo.stl)———————————————————————————————————————————\n";
+        cout <<   "|- Spherical Inversion (cubo.stl)———————————————————————————————————————————\n";
         cout <<   "———————————————————————————————————————————————————————————————————————\n\n";
 
         cout << "      _----------_,\n";
@@ -223,35 +197,18 @@ void Setup() {
         cout << " \\   \\             /;;;. \n";
         cout << "  \\   \\           /;;;. \n";
         cout << "   '.  \\         /;;;' \n";
-        cout << "     \"-_\\_______/;;'        ~[Hyperbolic STL Mesh]\n\n";
+        cout << "     \"-_\\_______/;;'        ~[Spherical Inversion]\n\n";
 
-        // 1) Load the external mesh and fit it inside the open unit ball.
-        //    toHyperboloid() throws when ‖x‖ ≥ 1, so we center + scale first.
+        // Load, center, scale, and remesh the STL into g_boxKlein.
+        // The spherical inversion is applied each frame in Draw().
         try {
             g_boxKlein = centerAndScale(
                 loadSTL_ascii("/home/mike666/Downloads/cubo.stl"), 0.9);
-
-            // Remesh before projecting: one Midpoint4 pass (×4 triangles) then
-            // one Centroid3 pass (×3). Finer triangles make the Poincaré disk
-            // curve the edges smoothly instead of bending a few large chords.
-            // New vertices are convex combos of vertices already inside the
-            // unit ball, so the mesh stays inside it (still safe to project).
             g_boxKlein = g_boxKlein.refine(1, FacetBox::SubdivisionMode::Midpoint4);
             g_boxKlein = g_boxKlein.refine(1, FacetBox::SubdivisionMode::Centroid3);
-
-            // 2) Send it into hyperbolic space: Klein disk → Poincaré disk.
-            g_boxHyper = g_boxKlein.hyperboloid();   // FacetBox.hpp:257
-
-            // 3) Bring it back: apply the inverse map (Poincaré → Klein).
-            g_boxBack = inverseHyperboloid(g_boxHyper);
-
-            std::cout << "Loaded cubo.stl: "
-                      << g_boxKlein.size() << " facets (Klein), "
-                      << g_boxHyper.size() << " (Poincare), "
-                      << g_boxBack.size()  << " (round-trip)\n";
+            std::cout << "Loaded cubo.stl: " << g_boxKlein.size() << " facets\n";
         } catch (const std::exception& e) {
             std::cerr << "Setup error: " << e.what() << "\n";
-            // leave boxes empty → Draw() renders nothing (size()==0 loops are no-ops)
         }
 
     }
@@ -260,32 +217,28 @@ void Setup() {
 
 ///////////////////     DRAW       ///////////////////////
 void Draw() {
-    
-    extern void Setup(); // assume you define this elsewhere
-    static int ciclo = 1;  // or however you manage visibility
-	if (ciclo > 0) {
-        /*Draw here with OpenGL*/	
-        //drawFacet(f_1, 200, 10, 40, 0.75f);
-        //drawSphere(f_1[0], 0.1f, 6, 6);
-        //drawSphere(f_1[1], 0.1f, 6, 6);
-        //drawSphere(f_1[2], 0.1f, 6, 6);
+    // Advance the animation cycle each frame.
+    ++ciclo;
 
+    // Compute the animated inversion sphere center: {0, sin(count3*ciclo), 0}.
+    Vector3D invCenter(0.0, sin(ciclo * count3), 0.0);
 
-        const FacetBox& active = (g_view == 0) ? g_boxKlein
-                              : (g_view == 1) ? g_boxHyper
-                                             : g_boxBack;
-        size_t total = active.size();
-        for(size_t i = 0; i < total; ++i) {
-            // pick hue from 0°→360° across the range
-            float hue = float(i) / float(total) * 360.0f;
-            Color c = hsv2rgb(hue, 0.8f, 1.0f);   // 80% saturation, full value
-            // convert to 0–255 ints
-            int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
-            drawFacet(active[i], R, G, B, 1.0f);
-        }
+    // Apply spherical inversion (sigma) with radius 0.5 and the moving center.
+    try {
+        g_boxInv = g_boxKlein.sigma(invCenter, 0.5);
+    } catch (const std::exception& e) {
+        // Inversion center landed on a vertex — skip this frame.
+        return;
+    }
 
-
-	}
+    const FacetBox& active = (g_view == 0) ? g_boxKlein : g_boxInv;
+    size_t total = active.size();
+    for (size_t i = 0; i < total; ++i) {
+        float hue = float(i) / float(total) * 360.0f;
+        Color c = hsv2rgb(hue, 0.8f, 1.0f);
+        int R = int(c.r * 255), G = int(c.g * 255), B = int(c.b * 255);
+        drawFacet(active[i], R, G, B, 1.0f);
+    }
 }
 
 
@@ -583,7 +536,7 @@ void reshape(int w, int h)
     glViewport(0,0,w,h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(50.0, (double)w/h, 0.001, 100.0);
+    gluPerspective(100.0, (double)w/h, 0.001, 1000.0);
     glMatrixMode(GL_MODELVIEW);
 }
 
@@ -596,9 +549,8 @@ void drawHUD() {
         "L-drag: Rotate",
         "M-drag: Pan",
         "R-drag/Wheel: Zoom",
-        "[1]: View: Original (Klein)",
-        "[2]: View: Hyperbolic (Poincare)",
-        "[3]: View: Round-trip Back",
+        "[1]: View: Original Mesh",
+        "[2]: View: Spherical Inversion",
         "[H]: Toggle Help",
         "Right-click: UI Menu"
     };
@@ -616,9 +568,8 @@ void drawHUD() {
     }
 
     // Current view mode label
-    const char* modeName = (g_view == 0) ? "Mode: Original (Klein)"
-                         : (g_view == 1) ? "Mode: Hyperbolic (Poincare)"
-                                         : "Mode: Round-trip Back";
+    const char* modeName = (g_view == 0) ? "Mode: Original Mesh"
+                         : "Mode: Spherical Inversion";
     glRasterPos2f(0.02f, y);
     for(const char* c=modeName; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
@@ -710,13 +661,12 @@ void mouseMotion(int x, int y)
 }
 
 //-----------------------------------------------------------------------------
-// Keyboard handler: switch view (Klein / Poincaré / round-trip), help, quit
+// Keyboard handler: switch view (Original / Spherical Inversion), help, quit
 //-----------------------------------------------------------------------------
 void keyboard(unsigned char key, int /*x*/, int /*y*/) {
     switch (key) {
-        case '1': g_view = 0; std::cout << "View: Original (Klein)\n";      break;
-        case '2': g_view = 1; std::cout << "View: Hyperbolic (Poincare)\n"; break;
-        case '3': g_view = 2; std::cout << "View: Round-trip Back\n";       break;
+        case '1': g_view = 0; std::cout << "View: Original\n";      break;
+        case '2': g_view = 1; std::cout << "View: Spherical Inversion\n"; break;
         case 'h': case 'H': g_showHelp = !g_showHelp; break;
         case 'q': case 'Q': case 27: exit(0); break;   // 27 = ESC
     }
@@ -731,9 +681,8 @@ void MenuHandler(int choice) {
         case 1: g_showHelp = !g_showHelp; break;       // toggle HUD
         case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; break; // reset
         case 3: exit(0); break;                      // quit
-        case 4: g_view = 0; break;                   // view: Original (Klein)
-        case 5: g_view = 1; break;                   // view: Hyperbolic (Poincare)
-        case 6: g_view = 2; break;                   // view: Round-trip Back
+        case 4: g_view = 0; break;                   // view: Original
+        case 5: g_view = 1; break;                   // view: Spherical Inversion
     }
     glutPostRedisplay();
 }
@@ -746,9 +695,8 @@ void createUI() {
     glutAddMenuEntry("Toggle Help", 1);
     glutAddMenuEntry("Reset View",   2);
     glutAddMenuEntry("Quit",         3);
-    glutAddMenuEntry("View: Original (Klein)",      4);
-    glutAddMenuEntry("View: Hyperbolic (Poincare)", 5);
-    glutAddMenuEntry("View: Round-trip Back",       6);
+    glutAddMenuEntry("View: Original",              4);
+    glutAddMenuEntry("View: Spherical Inversion",  5);
     glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 
