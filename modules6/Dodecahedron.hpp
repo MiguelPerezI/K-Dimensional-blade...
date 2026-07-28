@@ -209,6 +209,38 @@ public:
         return facets_;
     }
 
+    /**
+     * @brief Build a fresh FacetBox as the solid dodecahedron OR a hollow frame.
+     *
+     * When hollow=false this returns the existing facets_ (the 36-triangle solid
+     * mesh). When hollow=true each of the 12 pentagonal faces (penta_) becomes an
+     * inset border ring (120 triangles): inner[e] = C + inset*(o[e]-C) about the
+     * face centroid C, 2 triangles per edge, inner face skipped. `inset` is the
+     * border-thickness ratio in (0,1); only used when hollow. Same homothety +
+     * 2-tris/edge pattern as Cube's frame pushers, so the winding is outward under
+     * GL_CCW (penta_ is the same CCW-outward order buildFacetsPenta renders).
+     */
+    FacetBox getFacetsFrame(bool hollow = false, double inset = 0.5) const {
+        if (!hollow) return facets_;                 // solid: existing 36 tris
+        if (!(inset > 0.0)) inset = 0.0001;
+        if (inset >= 1.0)   inset = 0.9999;
+        FacetBox fb;
+        for (auto const& idxs : penta_) {
+            auto [i0, i1, i2, i3, i4] = idxs;
+            Vector3D o[5] = { verts_[i0].V(), verts_[i1].V(), verts_[i2].V(),
+                             verts_[i3].V(), verts_[i4].V() };
+            Vector3D C = (o[0] + o[1] + o[2] + o[3] + o[4]) / 5.0;   // face centroid
+            Vector3D in[5];
+            for (int e = 0; e < 5; ++e) in[e] = C + inset * (o[e] - C);
+            for (int e = 0; e < 5; ++e) {
+                int j = (e + 1) % 5;
+                fb.push(o[e], o[j], in[j]);
+                fb.push(o[e], in[j], in[e]);
+            }
+        }   // 12 pentagons * 5 edges * 2 = 120 tris
+        return fb;
+    }
+
 /**
  * @brief Apply sigma (sphere inversion) transformation to all components of the dodecahedron.
  * Transforms all vertices and pentagon centers, then rebuilds the entire structure.

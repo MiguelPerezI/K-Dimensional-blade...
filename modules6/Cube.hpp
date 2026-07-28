@@ -402,6 +402,36 @@ public:
     }
 
     /**
+     * @brief Build a fresh FacetBox of this cube as a plain cube OR a hollow frame.
+     *
+     * When hollow=false this is identical to getFacets() (the 12-triangle solid
+     * cube). When hollow=true each of the 6 square faces becomes an inset
+     * picture-frame border (48 triangles): an outer square edge plus an inner
+     * square edge inset toward the face centroid by the ratio `inset`, with the
+     * inner face left open. `inset` is the border-thickness ratio in (0,1); only
+     * used when hollow. Built on the fly from the same 8 corners, like
+     * getFacetsOctagonal. Returns by value.
+     */
+    FacetBox getFacetsFrame(bool hollow = false, double inset = default_inner_scale_) const {
+        FacetBox fb;
+        if (!hasSubdivision()) {
+            std::array<Vector3D, 8> v;
+            for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();
+            pushCubeFrameFacets(fb, v, hollow, inset);
+        } else {
+            const int n = subdivision_levels_;
+            for (int i = 0; i < n; ++i)
+                for (int j = 0; j < n; ++j)
+                    for (int k = 0; k < n; ++k) {
+                        const SubCell& cell = subcells_[i][j][k];
+                        if (!cell.active) continue;
+                        pushCubeFrameFacets(fb, cell.vertices, hollow, inset);
+                    }
+        }
+        return fb;
+    }
+
+    /**
      * @brief Write cube geometry to STL file format for 3D printing or CAD applications.
      *
      * Exports all triangular faces of the cube (basic or subdivided) to an STL file.
@@ -2062,13 +2092,15 @@ public:
      * For a non-subdivided cube, builds from the 8 main vertices (verts_). For a
      * subdivided cube, iterates all active subcells. Returns by value (freshly
      * built), matching getCheckerboardFacets' contract (not the const-ref of getFacets).
+     * `inset` is the inner-ring homothety ratio (the border thickness when hollow);
+     * defaults to default_inner_scale_ (0.5), preserving prior behavior.
      */
-    FacetBox getFacetsOctagonal(bool hollow = false) const {
+    FacetBox getFacetsOctagonal(bool hollow = false, double inset = default_inner_scale_) const {
         FacetBox fb;
         if (!hasSubdivision()) {
             std::array<Vector3D, 8> v;
             for (int i = 0; i < 8; ++i) v[i] = verts_[i].V();
-            pushOctagonalCubeFacets(fb, v, default_trunc_, default_inner_scale_, hollow);
+            pushOctagonalCubeFacets(fb, v, default_trunc_, inset, hollow);
         } else {
             const int n = subdivision_levels_;
             for (int i = 0; i < n; ++i)
@@ -2076,7 +2108,7 @@ public:
                     for (int k = 0; k < n; ++k) {
                         const SubCell& cell = subcells_[i][j][k];
                         if (!cell.active) continue;
-                        pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, default_inner_scale_, hollow);
+                        pushOctagonalCubeFacets(fb, cell.vertices, default_trunc_, inset, hollow);
                     }
         }
         return fb;
@@ -3422,6 +3454,35 @@ private:
             const int* t = cube_triangles_[i];
             fb.push(v[t[0]], v[t[1]], v[t[2]]);
         }
+    }
+
+    /**
+     * @brief Push a plain-cube OR hollow-frame triangulation into a FacetBox.
+     *
+     * When hollow=false, delegates to pushCubeFacets (the 12 cube_triangles_ tris).
+     * When hollow=true, each of the 6 square faces (octagonal_faces_, CCW-outward)
+     * becomes an inset border ring: inner[e] = C + inset*(o[e]-C) about the face
+     * centroid C, 2 triangles per edge, inner face skipped => 48 triangles. Same
+     * homothety+2-tris/edge pattern as pushTruncatedOctahedronFacets /
+     * pushTruncatedCuboctahedronFacets, so the winding is outward under GL_CCW.
+     */
+    static void pushCubeFrameFacets(FacetBox& fb, const std::array<Vector3D, 8>& v,
+                                    bool hollow, double inset) {
+        if (!hollow) { pushCubeFacets(fb, v); return; }   // solid: 12 tris, unchanged
+        if (!(inset > 0.0)) inset = 0.0001;
+        if (inset >= 1.0)   inset = 0.9999;
+        for (int f = 0; f < 6; ++f) {
+            const int* fc = octagonal_faces_[f];
+            Vector3D o[4] = { v[fc[0]], v[fc[1]], v[fc[2]], v[fc[3]] };
+            Vector3D C = (o[0] + o[1] + o[2] + o[3]) / 4.0;     // face centroid
+            Vector3D in[4];
+            for (int e = 0; e < 4; ++e) in[e] = C + inset * (o[e] - C);
+            for (int e = 0; e < 4; ++e) {
+                int j = (e + 1) & 3;
+                fb.push(o[e], o[j], in[j]);
+                fb.push(o[e], in[j], in[e]);
+            }
+        }   // 6 faces * 4 edges * 2 = 48 tris
     }
 
     /* === PRIVATE HELPER METHODS === */
