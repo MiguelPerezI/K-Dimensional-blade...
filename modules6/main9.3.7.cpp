@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <math.h>
 #include <charconv>               // std::to_chars — shortest round-trip decimal (greyBucket)
+#include <filesystem>             // std::filesystem::directory_iterator — scan g_stlDir for the Load STL submenu
+#include <algorithm>              // std::sort — keep the .stl list ordered across rescans
+#include <cctype>                 // tolower — case-insensitive .stl extension match
 #include <GL/glut.h>
 #include "Vector3D.cpp"
 #include "Vector4D.cpp"
@@ -120,6 +123,15 @@ FacetBox g_boxKlein;
 FacetBox g_boxHyper;
 // Round-trip: inverse map applied to g_boxHyper, back to the Klein disk.
 FacetBox g_boxBack;
+
+// Externally-loaded ASCII STL mesh (the raw, un-centered source for Shape::STL).
+// rebuildMesh() centers+scales it into the unit ball exactly like the procedural
+// shapes, so arbitrary STL geometry drops in with no special-case handling.
+FacetBox g_stlMesh;
+std::string g_stlPath;                 // last loaded STL path (L key reloads it; menu marks it active)
+std::vector<std::string> g_stlFiles;   // .stl filenames found in g_stlDir (drives the Load STL submenu)
+std::string g_stlDir = "/home/mike666/Downloads";   // folder scanned for the Load STL submenu
+
 // Active view: 0 = Original (Klein), 1 = Hyperbolic (Poincaré), 2 = Round-trip.
 int g_view = 0;
 // Jet-palette phase, advanced by every remesh() press so each refinement pass
@@ -142,7 +154,8 @@ enum class Shape {
     Dodecahedron,
     TruncatedCube,
     TruncatedOctahedron,
-    TruncatedCuboctahedron
+    TruncatedCuboctahedron,
+    STL                  // an externally-loaded ASCII STL mesh (g_stlMesh); ignores hollow/inset
 };
 
 const char* shapeName(Shape s) {
@@ -152,6 +165,7 @@ const char* shapeName(Shape s) {
         case Shape::TruncatedCube:          return "Truncated Cube";
         case Shape::TruncatedOctahedron:    return "Truncated Octahedron";
         case Shape::TruncatedCuboctahedron: return "Truncated Cuboctahedron";
+        case Shape::STL:                     return "STL";
     }
     return "Unknown";
 }
@@ -439,6 +453,9 @@ void rebuildMesh() {
         case Shape::TruncatedCuboctahedron:
             raw = g_cube.getFacetsTruncatedCuboctahedron(g_hollow, g_inset);
             break;
+        case Shape::STL:
+            raw = g_stlMesh;                 // externally-loaded STL; hollow/inset do not apply
+            break;
     }
     g_boxKlein = centerAndScale(raw, 0.9);          // fit inside the open unit ball
     g_boxHyper = g_boxKlein.hyperboloid();          // Klein → Poincaré
@@ -447,10 +464,16 @@ void rebuildMesh() {
     g_selectedVerts.clear();                         // prior selection no longer valid
     g_spawned.clear();                               // spawned children referenced the
     g_undone.clear();                                //   old geometry — drop them too
-    std::cout << "Rebuilt " << shapeName(g_shape) << ": "
-              << (g_hollow ? "hollow" : "solid") << ", inset=" << g_inset
-              << " -> " << g_boxKlein.size() << " tris, "
-              << g_uniqueVerts.size() << " unique verts (view " << g_view << ")\n";
+    if (g_shape == Shape::STL) {
+        std::cout << "Loaded STL " << g_stlPath << ": "
+                  << g_boxKlein.size() << " tris, "
+                  << g_uniqueVerts.size() << " unique verts (view " << g_view << ")\n";
+    } else {
+        std::cout << "Rebuilt " << shapeName(g_shape) << ": "
+                  << (g_hollow ? "hollow" : "solid") << ", inset=" << g_inset
+                  << " -> " << g_boxKlein.size() << " tris, "
+                  << g_uniqueVerts.size() << " unique verts (view " << g_view << ")\n";
+    }
 }
 
 // Switch the active polyhedron source and rebuild. Called from the middle-click
@@ -469,6 +492,7 @@ void nextShape() {
         case Shape::TruncatedCube:          g_shape = Shape::TruncatedOctahedron;    break;
         case Shape::TruncatedOctahedron:    g_shape = Shape::TruncatedCuboctahedron; break;
         case Shape::TruncatedCuboctahedron: g_shape = Shape::Cube;                   break;
+        case Shape::STL:                     g_shape = Shape::Cube;                   break;  // S exits a loaded STL back to Cube
     }
     rebuildMesh();
     std::cout << "Shape: " << shapeName(g_shape) << "\n";
@@ -477,6 +501,7 @@ void nextShape() {
 // Scrub the hollow border inset by `delta` (clamped to [0.05, 0.95]). A solid
 // mesh ignores inset, so we only rebuild (and reindex vertices) when hollow.
 void scrubInset(double delta) {
+    if (g_shape == Shape::STL) { std::cout << "STL mesh: hollow/inset do not apply\n"; return; }
     g_inset += delta;
     if (g_inset > 0.95) g_inset = 0.95;
     if (g_inset < 0.05) g_inset = 0.05;
@@ -487,6 +512,7 @@ void scrubInset(double delta) {
 
 // Toggle solid (92-tri) <-> hollow (288-tri frame) and rebuild the mesh.
 void toggleHollowShape() {
+    if (g_shape == Shape::STL) { std::cout << "STL mesh: hollow/inset do not apply\n"; return; }
     g_hollow = !g_hollow;
     std::cout << "hollow " << (g_hollow ? "ON (frame)" : "OFF (solid)") << "\n";
     rebuildMesh();
@@ -859,7 +885,7 @@ static int g_insertAfter = -1;
 // GLUT menu identifiers so createUI() can destroy + rebuild the menus at runtime
 // (the "Go To Keyframe" submenu must list one entry per keyframe, and keyframes are
 // added/removed while the app runs). Zero until createUI() first runs.
-static int g_menuPoly = 0, g_menuGoto = 0, g_menuMain = 0;
+static int g_menuPoly = 0, g_menuGoto = 0, g_menuMain = 0, g_menuStl = 0;
 
 // Set by any timeline mutation (save/insert/drop/clear/load) to request a menu
 // rebuild. Serviced by backgroundTimer(), NOT synchronously — destroying a GLUT
@@ -879,6 +905,8 @@ void ProcessMenu(int value);
 void reshape(int w, int h);
 void MenuHandler(int choice);
 void createUI();
+void scanSTLFolder();                         // refresh g_stlFiles from g_stlDir (Load STL submenu)
+void loadSTLFile(const std::string& path);     // load an ASCII STL as the active mesh
 void drawHUD();
 void keyboard(unsigned char key, int x, int y);
 
@@ -1074,6 +1102,51 @@ static void insertKeyframeHere() {
     g_menuDirty = true;                                // rebuild the "Go To Keyframe" submenu
     std::cout << "Inserted keyframe at position " << (pos + 1)
               << "  (" << g_timeline.size() << " total)\n";
+}
+
+//-----------------------------------------------------------------------------
+// STL loading — pick any ASCII .stl in g_stlDir from the "Load STL..." submenu
+// (nested in the Polyhedron submenu), or via the -stl CLI flag / L key. The loader
+// itself (loadSTL_ascii) already existed but was unused; this wires it in.
+//-----------------------------------------------------------------------------
+
+// Refresh g_stlFiles with every .stl in g_stlDir (case-insensitive extension), sorted
+// so the "Load STL..." submenu is stable across rescans. Called from createUI() on
+// every (re)build, so newly-added files show up after a rebuild or "Rescan STL folder".
+// A missing/unreadable folder just leaves the list empty (the submenu shows a
+// placeholder) — no throw.
+void scanSTLFolder() {
+    g_stlFiles.clear();
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_directory(g_stlDir, ec)) return;          // missing folder -> empty list
+    std::vector<std::string> names;
+    for (auto& entry : fs::directory_iterator(g_stlDir, ec)) {
+        std::string ext = entry.path().extension().string();
+        for (auto& c : ext) c = (char)std::tolower((unsigned char)c);
+        if (ext == ".stl") names.push_back(entry.path().filename().string());
+    }
+    std::sort(names.begin(), names.end());
+    g_stlFiles = std::move(names);
+}
+
+// Load an ASCII STL as the active mesh. Parses via loadSTL_ascii (throws on a bad
+// file); assigns g_stlMesh only on success so a failure leaves all state intact,
+// switches g_shape to STL, rebuilds the three views, and flags a menu rebuild so
+// the "Load STL..." submenu marks the active file. Called from the submenu, the
+// L key, and the -stl CLI flag.
+void loadSTLFile(const std::string& path) {
+    try {
+        FacetBox m = loadSTL_ascii(path);   // throws std::runtime_error on open/parse failure
+        g_stlMesh = std::move(m);
+        g_stlPath = path;
+        g_shape = Shape::STL;
+        rebuildMesh();                      // centers+scales, re-derives hyper/back, reindexes, clears spawns/selection
+        g_menuDirty = true;                 // refresh the Load STL submenu's active marker (deferred to the timer)
+        std::cout << "Loaded STL: " << path << "\n";
+    } catch (const std::exception& e) {
+        std::cerr << "STL load failed: " << e.what() << "\n";
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -1887,14 +1960,15 @@ int main(int argc, char** argv)
     // Objects setup
     Setup();
 
-    // Optional: load a saved session (.h3geo) at startup.
+    // Optional: load a saved session (.h3geo) and/or an ASCII STL at startup.
     //   ./main9.3.7 -load session.h3geo
+    //   ./main9.3.7 -stl path.stl
     // A missing/invalid file prints an error and continues with the default scene.
+    // Both flags may be given; the later one determines the active mesh.
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "-load" && i + 1 < argc) {
-            loadSession(argv[i + 1]);
-            break;
-        }
+        std::string a = argv[i];
+        if (a == "-load" && i + 1 < argc)      loadSession(argv[++i]);
+        else if (a == "-stl"  && i + 1 < argc) loadSTLFile(argv[++i]);
     }
 
     // Register callbacks
@@ -1989,6 +2063,7 @@ void drawHUD() {
         "[,]/[.]: Decrease/Increase inset",
         "[O]: Toggle hollow (solid/frame)",
         "[W]: Write STL of current shape",
+        "[L]: Reload last STL",
         "[S]: Next polyhedron",
         "[K]: Save camera keyframe",
         "[I]: Insert keyframe (after Go-To)",
@@ -1996,6 +2071,7 @@ void drawHUD() {
         "[T]: Clear camera timeline",
         "[Backspace]: Remove last keyframe",
         "Menu: Go To/Insert keyframe, Save/Load .h3geo",
+        "Menu: Polyhedron > Load STL (from ~/Downloads)",
         "[H]: Toggle Help",
         "Menu (M-click): Reset LookAt to Origin"
     };
@@ -2332,6 +2408,10 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/) {
         case ',': case '<': scrubInset(-0.05); break;   // decrease hollow inset
         case 'o': case 'O': toggleHollowShape(); break; // solid <-> hollow frame
         case 'w': case 'W': writeShapeSTL();   break;   // write STL of current shape
+        case 'l': case 'L':                            // reload the most recently loaded STL
+            if (!g_stlPath.empty()) loadSTLFile(g_stlPath);
+            else std::cout << "No STL loaded yet -- use Polyhedron > Load STL menu\n";
+            break;
         case 'r': case 'R': remesh(FacetBox::SubdivisionMode::Centroid3); break; // remesh centroid3
         case 'm': case 'M': remesh(FacetBox::SubdivisionMode::Midpoint4);   break; // remesh midpoint4
         case 'g': case 'G': {                                              // toggle per-facet coloring
@@ -2356,9 +2436,25 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/) {
 // UI menu callback
 //-----------------------------------------------------------------------------
 void MenuHandler(int choice) {
+    // "Load STL..." submenu: ids 2000+i map to g_stlFiles[i]; id 3500 = Rescan STL
+    // folder; id 3999 = "(no .stl)" placeholder (falls through every range below,
+    // so it is ignored). Must be checked BEFORE the keyframe range, since the old
+    // `choice >= 1000` guard would otherwise swallow STL ids (2000+) as keyframes.
+    if (choice == 3500) {                       // Rescan STL folder
+        g_menuDirty = true;                      // deferred rebuild re-scans g_stlDir
+        glutPostRedisplay();
+        return;
+    }
+    if (choice >= 2000 && choice < 3000) {       // STL submenu
+        int idx = choice - 2000;
+        if (idx >= 0 && idx < (int)g_stlFiles.size())
+            loadSTLFile(g_stlDir + "/" + g_stlFiles[idx]);
+        glutPostRedisplay();
+        return;
+    }
     // Dynamic "Go To Keyframe" submenu: one entry per keyframe, ids 1000+i. The
     // "(no keyframes)" placeholder uses id 9999 (idx huge -> ignored here).
-    if (choice >= 1000) {
+    if (choice >= 1000 && choice < 2000) {
         int idx = choice - 1000;
         if (idx >= 0 && idx < (int)g_timeline.size()) goToKeyframe(idx);
         glutPostRedisplay();
@@ -2419,14 +2515,33 @@ void createUI() {
     if (g_menuMain) glutDestroyMenu(g_menuMain);
     if (g_menuGoto) glutDestroyMenu(g_menuGoto);
     if (g_menuPoly) glutDestroyMenu(g_menuPoly);
+    if (g_menuStl) glutDestroyMenu(g_menuStl);
 
-    // --- Polyhedron submenu (direct shape selection; IDs 20-24) ---
+    // --- Load STL submenu (built first so it can nest inside g_menuPoly) ---
+    // IDs 2000+i map to g_stlFiles[i] in MenuHandler; 3500 = Rescan, 3999 = the
+    // "(no .stl)" placeholder. The active file is prefixed "* ".
+    scanSTLFolder();
+    g_menuStl = glutCreateMenu(MenuHandler);
+    if (g_stlFiles.empty()) {
+        glutAddMenuEntry("(no .stl in ~/Downloads)", 3999);
+    } else {
+        glutAddMenuEntry("Rescan STL folder", 3500);
+        for (int i = 0; i < (int)g_stlFiles.size(); ++i) {
+            const std::string& fn = g_stlFiles[i];
+            bool active = (g_shape == Shape::STL) && (g_stlPath == g_stlDir + "/" + fn);
+            std::string lbl = active ? ("* " + fn) : fn;
+            glutAddMenuEntry(lbl.c_str(), 2000 + i);
+        }
+    }
+
+    // --- Polyhedron submenu (direct shape selection; IDs 20-24) + nested Load STL ---
     g_menuPoly = glutCreateMenu(MenuHandler);
     glutAddMenuEntry("Cube",                     20);
     glutAddMenuEntry("Dodecahedron",             21);
     glutAddMenuEntry("Truncated Cube",           22);
     glutAddMenuEntry("Truncated Octahedron",     23);
     glutAddMenuEntry("Truncated Cuboctahedron",  24);
+    glutAddSubMenu("Load STL...", g_menuStl);    // pick any .stl found in ~/Downloads
 
     // --- Go To Keyframe submenu (dynamic; one entry per saved keyframe) ---
     // IDs 1000+i map to keyframe i in MenuHandler. Empty -> a placeholder entry
