@@ -828,8 +828,48 @@ static bool  g_rightDown  = false;               // zooming
 static bool  g_showHelp  = true;                    // HUD toggle
 
 //-----------------------------------------------------------------------------
+// Camera keyframe timeline (Blender-style)
+//-----------------------------------------------------------------------------
+// Snapshot the live orbit camera into ordered keyframes (K); during playback (P)
+// the idle timer tweens between consecutive keyframes and writes the result back
+// into the live globals, so any manual orbit/zoom/pan done BETWEEN saves is
+// ignored: the path A->B depends only on A, B, and the easing — not on how you
+// wandered. Loops forever. Euler + shortest-yaw rotation, smoothstep easing, lerp
+// on the linear channels and the world-space pivot point.
+struct CamKey {
+    float    angleX, angleY;        // orbit pitch/yaw (degrees)
+    float    zoom;                  // dolly distance factor
+    float    panX, panY;            // screen-space pan
+    Vector3D target;                // focusTarget() resolved at save (world space)
+    int      focusVert;             // g_focusVert at save (restored on stop)
+};
+static std::vector<CamKey> g_timeline;       // ordered keyframes = the timeline
+static bool     g_playing      = false;       // playback active (clock advances)?
+static double   g_playSegmentT = 0.0;         // seconds into the current segment
+static int      g_playSeg      = 0;           // tweens key[seg] -> key[(seg+1)%n]
+static Vector3D g_playTarget;                // tweened pivot (world space)
+static double   g_keyDur       = 2.0;         // seconds per segment (tune here)
+
+// In-between keyframing: a cursor set by "Go To Keyframe" / "Go To Last Keyframe".
+// -1 = append mode (K adds at the end, as before); >=0 = "Insert Keyframe Here" (I)
+// drops a new keyframe right after keyframe g_insertAfter, i.e. between it and the
+// next one — so you can refine any transition, not just add at the tail.
+static int g_insertAfter = -1;
+
+// GLUT menu identifiers so createUI() can destroy + rebuild the menus at runtime
+// (the "Go To Keyframe" submenu must list one entry per keyframe, and keyframes are
+// added/removed while the app runs). Zero until createUI() first runs.
+static int g_menuPoly = 0, g_menuGoto = 0, g_menuMain = 0;
+
+// Set by any timeline mutation (save/insert/drop/clear/load) to request a menu
+// rebuild. Serviced by backgroundTimer(), NOT synchronously — destroying a GLUT
+// menu from inside its own callback can be use-after-free, so the rebuild is
+// deferred to the next timer tick (a safe context). ~30ms latency, imperceptible.
+static bool g_menuDirty = false;
+
+//-----------------------------------------------------------------------------
 // Forward declarations
-//----------------------------------------------------------------------------- 
+//-----------------------------------------------------------------------------
 void initGL();
 void reshape(int w, int h);
 void display();
@@ -871,6 +911,365 @@ Vector3D focusTarget() {
     return Vector3D();   // (0,0,0) — Vector3D defaults to origin
 }
 
+//-----------------------------------------------------------------------------
+// Camera keyframe timeline helpers (Blender-style key framing)
+//-----------------------------------------------------------------------------
+
+// smoothstep easing: 0->1 with zero derivative at both ends — the ease-in/ease-out
+// "Bezier feel" without needing actual Bezier handle math.
+static double smoothstepD(double x) {
+    if (x < 0.0) x = 0.0; if (x > 1.0) x = 1.0;
+    return x * x * (3.0 - 2.0 * x);
+}
+
+// Advance the playback clock by dt seconds and write the tweened camera into the
+// live globals (g_angleX/Y, g_zoom, g_panX/Y) plus g_playTarget. Called every timer
+// tick. Loops: when a segment ends, g_playSeg wraps modulo n so a 2-key timeline
+// plays A->B->A->B... and the last segment tweens back to keyframe 0.
+static void advancePlayback(double dt) {
+    const int n = (int)g_timeline.size();
+    if (n == 0) { g_playing = false; return; }      // nothing to play
+    if (n == 1) {                                   // single keyframe: hold it (no motion)
+        const CamKey& k = g_timeline[0];
+        g_angleX = k.angleX; g_angleY = k.angleY; g_zoom = k.zoom;
+        g_panX = k.panX;   g_panY = k.panY;   g_playTarget = k.target;
+        return;
+    }
+    g_playSegmentT += dt;
+    while (g_playSegmentT >= g_keyDur) {
+        g_playSegmentT -= g_keyDur;
+        g_playSeg = (g_playSeg + 1) % n;             // loop wraparound
+    }
+    const CamKey& a = g_timeline[g_playSeg];
+    const CamKey& b = g_timeline[(g_playSeg + 1) % n];
+    const double p = g_playSegmentT / g_keyDur;       // 0..1 within this segment
+    const double e = smoothstepD(p);
+    // linear channels
+    g_zoom   = (float)(a.zoom   + e * (b.zoom   - a.zoom));
+    g_panX   = (float)(a.panX   + e * (b.panX   - a.panX));
+    g_panY   = (float)(a.panY   + e * (b.panY   - a.panY));
+    g_angleX = (float)(a.angleX + e * (b.angleX - a.angleX));
+    // yaw: take the SHORTER angular path so the camera never spins the long way
+    double dy = b.angleY - a.angleY;
+    while (dy >  180.0) dy -= 360.0;
+    while (dy < -180.0) dy += 360.0;
+    g_angleY = (float)(a.angleY + e * dy);
+    // pivot: lerp world-space target points (smooth focus handoff between keys)
+    g_playTarget = a.target + (e * (b.target - a.target));
+}
+
+// Snapshot the current live camera into the timeline (K).
+static void saveKeyframe() {
+    CamKey k;
+    k.angleX = g_angleX; k.angleY = g_angleY; k.zoom = g_zoom;
+    k.panX = g_panX;     k.panY = g_panY;
+    k.target = focusTarget();
+    k.focusVert = g_focusVert;
+    g_timeline.push_back(k);
+    std::cout << "Keyframe " << g_timeline.size() << " saved"
+              << " (yaw=" << k.angleY << " pitch=" << k.angleX
+              << " zoom=" << k.zoom << ")\n";
+    g_menuDirty = true;                // rebuild "Go To Keyframe" submenu (count changed)
+}
+
+// Play/Pause (P). On start, jump to keyframe 0; on stop, snap to the nearest
+// keyframe so focusTarget() matches the stored target (no pivot jump back to
+// manual control).
+static void togglePlayback() {
+    if (g_timeline.empty()) {
+        std::cout << "Timeline empty — press K to add keyframes\n";
+        return;
+    }
+    if (!g_playing) {
+        g_playing = true;
+        g_playSeg = 0; g_playSegmentT = 0.0;
+        const CamKey& k0 = g_timeline[0];            // init to key 0 so the first
+        g_angleX = k0.angleX; g_angleY = k0.angleY; // rendered frame is correct
+        g_zoom = k0.zoom; g_panX = k0.panX; g_panY = k0.panY; g_playTarget = k0.target;
+        std::cout << "Playback: PLAY (" << g_timeline.size() << " keyframes, loop, "
+                  << g_keyDur << "s/seg)\n";
+    } else {
+        g_playing = false;
+        int n = (int)g_timeline.size();
+        int snap = (n >= 2 && (g_playSegmentT / g_keyDur) > 0.5)
+                 ? (g_playSeg + 1) % n : g_playSeg;
+        const CamKey& k = g_timeline[snap];
+        g_angleX = k.angleX; g_angleY = k.angleY; g_zoom = k.zoom;
+        g_panX = k.panX; g_panY = k.panY; g_focusVert = k.focusVert;
+        std::cout << "Playback: PAUSED — snapped to keyframe " << snap << "\n";
+    }
+}
+
+// Clear the whole timeline (T).
+static void clearTimeline() {
+    if (g_playing) { g_playing = false; std::cout << "Playback stopped\n"; }
+    size_t had = g_timeline.size();
+    g_timeline.clear();
+    g_playSeg = 0; g_playSegmentT = 0.0;
+    g_insertAfter = -1;                // cursor invalid once the timeline is empty
+    std::cout << "Timeline cleared (" << had << " keyframes removed)\n";
+    g_menuDirty = true;                // rebuild "Go To Keyframe" submenu
+}
+
+// Remove the most recent keyframe (Backspace).
+static void dropLastKeyframe() {
+    if (g_timeline.empty()) { std::cout << "Timeline empty\n"; return; }
+    g_timeline.pop_back();
+    if ((int)g_timeline.size() <= g_playSeg) { g_playSeg = 0; g_playSegmentT = 0.0; }
+    if (g_insertAfter >= (int)g_timeline.size()) g_insertAfter = -1;
+    std::cout << "Removed last keyframe; " << g_timeline.size() << " remain\n";
+    g_menuDirty = true;                // rebuild "Go To Keyframe" submenu (count changed)
+}
+
+// Jump the live camera to keyframe i (1-based in the menu, 0-based here): load its
+// pose into the live globals, restore the focus vertex it was saved with, stop
+// playback so the jumped pose holds (else the timer would clobber it next tick),
+// and set the insert cursor to i so a subsequent "Insert Here" drops a new keyframe
+// right after it (i.e. between keyframe i and the next). Called from the dynamic
+// "Go To Keyframe" submenu (ids 1000+i) and from jumpToLastKeyframe().
+static void goToKeyframe(int i) {
+    const int n = (int)g_timeline.size();
+    if (n == 0) { std::cout << "Timeline empty — press K to add keyframes\n"; return; }
+    if (i < 0) i = 0; if (i >= n) i = n - 1;
+    const CamKey& k = g_timeline[i];
+    g_playing = false;                       // hold the jumped pose; don't let the timer tween over it
+    g_angleX = k.angleX; g_angleY = k.angleY; g_zoom = k.zoom;
+    g_panX = k.panX;     g_panY = k.panY;
+    g_focusVert = k.focusVert;               // so focusTarget() == k.target (no pivot jump)
+    g_playTarget = k.target;
+    g_insertAfter = i;                        // next "Insert Here" goes right after this keyframe
+    std::cout << "Jumped to keyframe " << (i + 1) << "/" << n
+              << "  (insert-after cursor = " << (i + 1) << ")\n";
+}
+
+// Convenience: jump to the last keyframe so you can keep appending/inserting from
+// the end of the timeline (menu "Go To Last Keyframe").
+static void jumpToLastKeyframe() {
+    goToKeyframe((int)g_timeline.size() - 1);
+}
+
+// Insert the current live camera as a NEW keyframe right after the insert cursor
+// (set by the last "Go To Keyframe"), shifting the rest right — i.e. drop it
+// BETWEEN that keyframe and the next. With no cursor (g_insertAfter < 0) or a cursor
+// past the end, this is just an append (same as K). The cursor advances to the new
+// keyframe so repeated inserts stack in order. Rebuilds the "Go To Keyframe"
+// submenu so the new entry appears. (Keyboard 'I' / menu.)
+static void insertKeyframeHere() {
+    CamKey k;
+    k.angleX = g_angleX; k.angleY = g_angleY; k.zoom = g_zoom;
+    k.panX = g_panX;     k.panY = g_panY;
+    k.target = focusTarget();
+    k.focusVert = g_focusVert;
+    const int n = (int)g_timeline.size();
+    int pos;
+    if (g_insertAfter < 0 || g_insertAfter >= n) {     // no cursor / past end -> append
+        g_timeline.push_back(k);
+        pos = n;
+    } else {
+        pos = g_insertAfter + 1;                       // insert right after the cursor
+        g_timeline.insert(g_timeline.begin() + pos, k);
+    }
+    g_insertAfter = pos;                               // stack further inserts in order
+    g_playing = false;
+    g_menuDirty = true;                                // rebuild the "Go To Keyframe" submenu
+    std::cout << "Inserted keyframe at position " << (pos + 1)
+              << "  (" << g_timeline.size() << " total)\n";
+}
+
+//-----------------------------------------------------------------------------
+// Session save/load (.h3geo) — snapshot the whole working scene to disk and back.
+// Text format, parsed with >>; doubles at precision 17 so coordinates round-trip.
+// Saves: the loaded mesh (Klein view — the canonical; hyper/round-trip re-derived
+// on load, exactly as rebuildMesh()/remesh() do), every spawned inversion (its
+// mesh + center/radius/view/batch), the camera keyframes, the selection, and the
+// scalar prefs (shape/hollow/inset/view/color/bg/focus/keyDur). Load via CLI
+// "-load <path>" or the menu "Load Session" (which loads ./session.h3geo).
+//-----------------------------------------------------------------------------
+static void saveSession() {
+    const std::string path = "session.h3geo";
+    std::ofstream out(path);
+    if (!out) { std::cout << "Save failed: cannot open " << path << " for writing\n"; return; }
+    out.precision(17);                 // round-trip doubles exactly
+
+    out << "H3GEO 1\n";
+    out << (int)g_shape << ' ' << (g_hollow ? 1 : 0) << ' ' << g_inset << ' '
+        << g_view << ' ' << g_colorMode << ' ' << g_colorPhase << ' '
+        << g_bgLightness << ' ' << (g_showInvSpheres ? 1 : 0) << ' '
+        << g_focusVert << ' ' << g_keyDur << "\n";
+
+    // Loaded mesh (Klein) — the canonical view. Normals are NOT saved: Facet(A,B,C)
+    // recomputes them from the cross product on construction.
+    out << "klein " << g_boxKlein.size() << "\n";
+    for (size_t i = 0; i < g_boxKlein.size(); ++i) {
+        const Facet& f = g_boxKlein[i];
+        Vector3D a = f[0], b = f[1], c = f[2];
+        out << a.x() << ' ' << a.y() << ' ' << a.z() << ' '
+            << b.x() << ' ' << b.y() << ' ' << b.z() << ' '
+            << c.x() << ' ' << c.y() << ' ' << c.z() << "\n";
+    }
+
+    // Spawned inversions: each child lives in its spawn view's space and is rendered
+    // as-is, so store its FacetBox directly (no re-projection on load).
+    out << "spawns " << g_spawned.size() << "\n";
+    for (auto const& s : g_spawned) {
+        out << s.center.x() << ' ' << s.center.y() << ' ' << s.center.z() << ' '
+            << s.radius << ' ' << s.view << ' ' << s.batch << ' '
+            << s.mesh.size() << "\n";
+        for (size_t i = 0; i < s.mesh.size(); ++i) {
+            const Facet& f = s.mesh[i];
+            Vector3D a = f[0], b = f[1], c = f[2];
+            out << a.x() << ' ' << a.y() << ' ' << a.z() << ' '
+                << b.x() << ' ' << b.y() << ' ' << b.z() << ' '
+                << c.x() << ' ' << c.y() << ' ' << c.z() << "\n";
+        }
+    }
+
+    // Camera keyframes.
+    out << "keyframes " << g_timeline.size() << "\n";
+    for (auto const& k : g_timeline) {
+        out << k.angleX << ' ' << k.angleY << ' ' << k.zoom << ' '
+            << k.panX << ' ' << k.panY << ' '
+            << k.target.x() << ' ' << k.target.y() << ' ' << k.target.z() << ' '
+            << k.focusVert << "\n";
+    }
+
+    // Selection (indices into g_uniqueVerts; valid again after buildUniqueVertexList()
+    // restores the same vertex order).
+    out << "selected " << g_selectedVerts.size() << "\n";
+    for (int idx : g_selectedVerts) out << idx << ' ';
+    out << "\n";
+
+    out.close();
+    std::cout << "Saved session: " << path
+              << "  (shape " << shapeName(g_shape)
+              << ", klein " << g_boxKlein.size() << " tris, "
+              << g_spawned.size() << " spawns, "
+              << g_timeline.size() << " keyframes)\n";
+    std::cout << "  Load with: ./main9.3.7 -load " << path
+              << "   (or menu: Load Session)\n";
+}
+
+// Load a .h3geo session. Parses into locals first; on ANY parse failure it prints an
+// error and returns false WITHOUT touching live state. Only on full success does it
+// commit. Selection/focus are restored AFTER buildUniqueVertexList (which clears
+// both, since old indices are invalid until the vertex list is rebuilt).
+static bool loadSession(const std::string& path) {
+    std::ifstream in(path);
+    if (!in) { std::cout << "Load failed: cannot open " << path << "\n"; return false; }
+    std::string magic; int ver;
+    in >> magic >> ver;
+    if (magic != "H3GEO") {
+        std::cout << "Load failed: not an H3GEO file (" << path << ")\n"; return false;
+    }
+
+    int shape, hollow, view, colorMode, showInvSpheres, focusVert;
+    double inset, colorPhase, bgLightness, keyDur;
+    in >> shape >> hollow >> inset >> view >> colorMode >> colorPhase
+       >> bgLightness >> showInvSpheres >> focusVert >> keyDur;
+    if (!in) { std::cout << "Load failed: truncated header\n"; return false; }
+
+    // Loaded mesh (Klein)
+    std::string tag; size_t nKlein;
+    in >> tag >> nKlein;
+    if (!in || tag != "klein") { std::cout << "Load failed: expected 'klein' section\n"; return false; }
+    FacetBox klein;
+    for (size_t i = 0; i < nKlein; ++i) {
+        double ax,ay,az,bx,by,bz,cx,cy,cz;
+        in >> ax >> ay >> az >> bx >> by >> bz >> cx >> cy >> cz;
+        if (!in) { std::cout << "Load failed: truncated klein tris\n"; return false; }
+        klein.push(Vector3D(ax,ay,az), Vector3D(bx,by,bz), Vector3D(cx,cy,cz));
+    }
+
+    // Spawns
+    size_t nSpawns;
+    in >> tag >> nSpawns;
+    if (!in || tag != "spawns") { std::cout << "Load failed: expected 'spawns' section\n"; return false; }
+    std::vector<SpawnRecord> spawned;
+    for (size_t s = 0; s < nSpawns; ++s) {
+        double ccx,ccy,ccz, radius; int sv, batch; size_t tk;
+        in >> ccx >> ccy >> ccz >> radius >> sv >> batch >> tk;
+        if (!in) { std::cout << "Load failed: truncated spawn header\n"; return false; }
+        SpawnRecord rec;
+        rec.center = Vector3D(ccx,ccy,ccz);
+        rec.radius = radius; rec.view = sv; rec.batch = batch;
+        for (size_t i = 0; i < tk; ++i) {
+            double ax,ay,az,bx,by,bz,cx,cy,cz;
+            in >> ax >> ay >> az >> bx >> by >> bz >> cx >> cy >> cz;
+            if (!in) { std::cout << "Load failed: truncated spawn tris\n"; return false; }
+            rec.mesh.push(Vector3D(ax,ay,az), Vector3D(bx,by,bz), Vector3D(cx,cy,cz));
+        }
+        spawned.push_back(std::move(rec));
+    }
+
+    // Keyframes
+    size_t nKeys;
+    in >> tag >> nKeys;
+    if (!in || tag != "keyframes") { std::cout << "Load failed: expected 'keyframes' section\n"; return false; }
+    std::vector<CamKey> timeline;
+    for (size_t i = 0; i < nKeys; ++i) {
+        CamKey k; double tx,ty,tz;
+        in >> k.angleX >> k.angleY >> k.zoom >> k.panX >> k.panY
+           >> tx >> ty >> tz >> k.focusVert;
+        if (!in) { std::cout << "Load failed: truncated keyframes\n"; return false; }
+        k.target = Vector3D(tx,ty,tz);
+        timeline.push_back(k);
+    }
+
+    // Selection (best-effort: out-of-range indices are filtered out after the index
+    // rebuild, since the file may have been saved under a different mesh).
+    size_t nSel;
+    in >> tag >> nSel;
+    if (!in || tag != "selected") { std::cout << "Load failed: expected 'selected' section\n"; return false; }
+    std::set<int> sel;
+    for (size_t i = 0; i < nSel; ++i) {
+        int idx; in >> idx;
+        if (!in) break;
+        sel.insert(idx);
+    }
+
+    // ── commit (all parsing succeeded) ──
+    g_shape        = (Shape)shape;
+    g_hollow       = (hollow != 0);
+    g_inset        = inset;
+    g_view         = view;
+    g_colorMode    = colorMode;
+    g_colorPhase   = (float)colorPhase;
+    g_bgLightness  = bgLightness;
+    g_showInvSpheres = (showInvSpheres != 0);
+    g_keyDur       = keyDur;
+
+    g_boxKlein = std::move(klein);
+    g_boxHyper = g_boxKlein.hyperboloid();          // re-derive Poincaré view
+    g_boxBack  = inverseHyperboloid(g_boxHyper);    // re-derive round-trip view
+    g_spawned  = std::move(spawned);
+    g_undone.clear();                               // redo stack not persisted
+
+    g_timeline  = std::move(timeline);
+    g_playing   = false;
+    g_playSeg   = 0;
+    g_playSegmentT = 0.0;
+    g_insertAfter = -1;
+
+    buildUniqueVertexList();                         // reindex base + spawns (identical
+                                                     // content -> saved indices stay valid)
+
+    g_selectedVerts.clear();
+    for (int idx : sel)
+        if (idx >= 0 && idx < (int)g_uniqueVerts.size())
+            g_selectedVerts.insert(idx);
+    g_focusVert = (focusVert >= 0 && focusVert < (int)g_uniqueVerts.size()) ? focusVert : -1;
+
+    g_menuDirty = true;                              // rebuild "Go To Keyframe" submenu
+
+    std::cout << "Loaded session: " << path
+              << "  (shape " << shapeName(g_shape)
+              << ", klein " << g_boxKlein.size() << " tris, "
+              << g_spawned.size() << " spawns, "
+              << g_timeline.size() << " keyframes)\n";
+    glutPostRedisplay();
+    return true;
+}
+
 // The exact camera modelview used by display() AND pickVertex(). Same as the old
 // orbit-at-origin camera (push back, rotate X, rotate Y) with one added innermost
 // translate of -focusTarget(): the focused vertex maps to the origin, so the scene
@@ -878,10 +1277,16 @@ Vector3D focusTarget() {
 // (target = 0) the translate is a no-op and behavior is identical to main9.3.5.
 void applyCameraModelview() {
     glLoadIdentity();
-    glTranslatef(0.0f, 0.0f, -5.0f * g_zoom);
+    // Camera-space translate (leftmost op): screen-space pan (g_panX/g_panY) plus
+    // the fixed dolly push-back along -Z (5*g_zoom). g_panX/g_panY were updated on
+    // middle-drag but never applied before — now they pan the view on screen.
+    glTranslatef(g_panX, g_panY, -5.0f * g_zoom);
     glRotatef(g_angleX, 1.0f, 0.0f, 0.0f);
     glRotatef(g_angleY, 0.0f, 1.0f, 0.0f);
-    Vector3D t = focusTarget();
+    // During playback, orbit about the tweened world-space target; otherwise about
+    // the live focus vertex (or origin). With no focus and not playing, the
+    // translate is a no-op and behavior is identical to before.
+    Vector3D t = g_playing ? g_playTarget : focusTarget();
     glTranslatef(-(float)t.x(), -(float)t.y(), -(float)t.z());
 }
 
@@ -1482,6 +1887,16 @@ int main(int argc, char** argv)
     // Objects setup
     Setup();
 
+    // Optional: load a saved session (.h3geo) at startup.
+    //   ./main9.3.7 -load session.h3geo
+    // A missing/invalid file prints an error and continues with the default scene.
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "-load" && i + 1 < argc) {
+            loadSession(argv[i + 1]);
+            break;
+        }
+    }
+
     // Register callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -1575,6 +1990,12 @@ void drawHUD() {
         "[O]: Toggle hollow (solid/frame)",
         "[W]: Write STL of current shape",
         "[S]: Next polyhedron",
+        "[K]: Save camera keyframe",
+        "[I]: Insert keyframe (after Go-To)",
+        "[P]: Play/Pause camera timeline (loop)",
+        "[T]: Clear camera timeline",
+        "[Backspace]: Remove last keyframe",
+        "Menu: Go To/Insert keyframe, Save/Load .h3geo",
         "[H]: Toggle Help",
         "Menu (M-click): Reset LookAt to Origin"
     };
@@ -1633,6 +2054,25 @@ void drawHUD() {
                                               : "Color: grayscale 5-bucket (black->white)";
     glRasterPos2f(0.02f, y);
     for(const char* c=colorName; *c; ++c)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+
+    // Camera keyframe timeline status (with the in-between insert cursor)
+    y -= 0.05f;
+    char camBuf[128];
+    char insBuf[24];
+    if (g_insertAfter < 0)
+        snprintf(insBuf, sizeof(insBuf), "insert@end");
+    else
+        snprintf(insBuf, sizeof(insBuf), "insert@after %d", g_insertAfter + 1);
+    if (g_timeline.empty())
+        snprintf(camBuf, sizeof(camBuf), "Cam timeline: empty  %s", insBuf);
+    else
+        snprintf(camBuf, sizeof(camBuf), "Cam timeline: %lu keyframes  %s  seg %d/%lu  %s",
+                 (unsigned long)g_timeline.size(),
+                 g_playing ? "PLAY (loop)" : "idle",
+                 g_playSeg, (unsigned long)g_timeline.size(), insBuf);
+    glRasterPos2f(0.02f, y);
+    for(const char* c=camBuf; *c; ++c)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
     glMatrixMode(GL_MODELVIEW); glPopMatrix();
@@ -1716,6 +2156,21 @@ void drawBackgroundGradient() {
 // gradient quad, so this is cheap.
 //-----------------------------------------------------------------------------
 void backgroundTimer(int /*value*/) {
+    // Wall-clock delta since the last tick, so the breathing background AND the
+    // camera keyframe playback advance in real seconds regardless of frame rate.
+    static double lastMs = (double)glutGet(GLUT_ELAPSED_TIME);
+    double nowMs = (double)glutGet(GLUT_ELAPSED_TIME);
+    double dt = (nowMs - lastMs) * 0.001;            // seconds
+    if (dt < 0.0) dt = 0.0;                           // clock-oddity guard
+    if (dt > 0.1) dt = 0.1;                            // clamp stalls -> no teleport
+    lastMs = nowMs;
+
+    if (g_playing) advancePlayback(dt);              // tween the camera timeline
+
+    // Deferred menu rebuild (set by a timeline mutation inside a menu callback —
+    // rebuilding there could be use-after-free, so it happens here, safely).
+    if (g_menuDirty) { g_menuDirty = false; createUI(); }
+
     glutPostRedisplay();
     glutTimerFunc(30, backgroundTimer, 0);
 }
@@ -1886,6 +2341,11 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/) {
                       << "\n";
             break;
         }
+        case 'k': case 'K': saveKeyframe(); break;      // save camera keyframe (timeline)
+        case 'i': case 'I': insertKeyframeHere(); break; // insert keyframe after the Go-To cursor
+        case 'p': case 'P': togglePlayback(); break;     // play/pause camera timeline (loop)
+        case 't': case 'T': clearTimeline(); break;      // clear camera timeline
+        case 8:           dropLastKeyframe(); break;     // BACKSPACE: remove last keyframe
         case 's': case 'S': nextShape(); break;   // cycle polyhedron (Cube/Dodec/TruncCube/TruncOct/TruncCuboct)
         case 'q': case 'Q': case 27: exit(0); break;   // 27 = ESC
     }
@@ -1896,6 +2356,14 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/) {
 // UI menu callback
 //-----------------------------------------------------------------------------
 void MenuHandler(int choice) {
+    // Dynamic "Go To Keyframe" submenu: one entry per keyframe, ids 1000+i. The
+    // "(no keyframes)" placeholder uses id 9999 (idx huge -> ignored here).
+    if (choice >= 1000) {
+        int idx = choice - 1000;
+        if (idx >= 0 && idx < (int)g_timeline.size()) goToKeyframe(idx);
+        glutPostRedisplay();
+        return;
+    }
     switch(choice) {
         case 1: g_showHelp = !g_showHelp; break;       // toggle HUD
         case 2: g_angleX=20; g_angleY=-30; g_zoom=1; g_panX=g_panY=0; g_focusVert=-1; break; // reset (also clear focus)
@@ -1928,6 +2396,14 @@ void MenuHandler(int choice) {
         case 23: setShape(Shape::TruncatedOctahedron);    break;
         case 24: setShape(Shape::TruncatedCuboctahedron); break;
         case 25: nextShape(); break;                      // Next Polyhedron (S)
+        case 26: saveKeyframe();      break;               // Save camera keyframe (K)
+        case 27: togglePlayback();    break;               // Play/Pause camera timeline (P)
+        case 28: clearTimeline();     break;               // Clear camera timeline (T)
+        case 29: dropLastKeyframe();  break;               // Remove last keyframe (Backspace)
+        case 30: insertKeyframeHere(); break;             // Insert keyframe after Go-To cursor (I)
+        case 31: jumpToLastKeyframe();   break;           // Go to last keyframe (continue adding)
+        case 32: saveSession();          break;           // Save session (.h3geo)
+        case 33: loadSession("session.h3geo"); break;     // Load session (.h3geo)
     }
     glutPostRedisplay();
 }
@@ -1936,16 +2412,41 @@ void MenuHandler(int choice) {
 // Create popup menu (middle-click; right-click is used to focus a vertex)
 //-----------------------------------------------------------------------------
 void createUI() {
+    // Re-callable: destroy any previously-built menus first. The "Go To Keyframe"
+    // submenu must reflect the live keyframe count, so createUI() is re-invoked
+    // after every timeline mutation (save/insert/drop/clear/load). On the first call
+    // from main() all ids are 0, so the destroy calls are skipped.
+    if (g_menuMain) glutDestroyMenu(g_menuMain);
+    if (g_menuGoto) glutDestroyMenu(g_menuGoto);
+    if (g_menuPoly) glutDestroyMenu(g_menuPoly);
+
     // --- Polyhedron submenu (direct shape selection; IDs 20-24) ---
-    int polyMenu = glutCreateMenu(MenuHandler);
+    g_menuPoly = glutCreateMenu(MenuHandler);
     glutAddMenuEntry("Cube",                     20);
     glutAddMenuEntry("Dodecahedron",             21);
     glutAddMenuEntry("Truncated Cube",           22);
     glutAddMenuEntry("Truncated Octahedron",     23);
     glutAddMenuEntry("Truncated Cuboctahedron",  24);
 
-    // --- Main menu (switch the current menu back to the parent) ---
-    int menu = glutCreateMenu(MenuHandler);
+    // --- Go To Keyframe submenu (dynamic; one entry per saved keyframe) ---
+    // IDs 1000+i map to keyframe i in MenuHandler. Empty -> a placeholder entry
+    // (id 9999) so the submenu is never blank.
+    g_menuGoto = glutCreateMenu(MenuHandler);
+    if (g_timeline.empty()) {
+        glutAddMenuEntry("(no keyframes - press K)", 9999);
+    } else {
+        for (int i = 0; i < (int)g_timeline.size(); ++i) {
+            const CamKey& k = g_timeline[i];
+            char lbl[96];
+            snprintf(lbl, sizeof(lbl),
+                     "Keyframe %d   (yaw %.0f  pitch %.0f  zoom %.2f)",
+                     i + 1, (double)k.angleY, (double)k.angleX, (double)k.zoom);
+            glutAddMenuEntry(lbl, 1000 + i);
+        }
+    }
+
+    // --- Main menu ---
+    g_menuMain = glutCreateMenu(MenuHandler);
     glutAddMenuEntry("Toggle Help", 1);
     glutAddMenuEntry("Reset View",   2);
     glutAddMenuEntry("Quit",         3);
@@ -1966,7 +2467,16 @@ void createUI() {
     glutAddMenuEntry("Toggle Coloring: Jet / Grey (G)", 18);
     glutAddMenuEntry("Reset Camera LookAt to Origin", 19);
     glutAddMenuEntry("Next Polyhedron (S)", 25);     // mirrors the S keyboard shortcut
-    glutAddSubMenu("Polyhedron", polyMenu);          // direct-selection submenu
+    glutAddMenuEntry("Save Camera Keyframe (K)", 26);
+    glutAddMenuEntry("Insert Keyframe Here (I)", 30);
+    glutAddMenuEntry("Go To Last Keyframe", 31);
+    glutAddMenuEntry("Play/Pause Camera Timeline (P)", 27);
+    glutAddMenuEntry("Clear Camera Timeline (T)", 28);
+    glutAddMenuEntry("Remove Last Keyframe (Backspace)", 29);
+    glutAddMenuEntry("Save Session (.h3geo)", 32);
+    glutAddMenuEntry("Load Session (.h3geo)", 33);
+    glutAddSubMenu("Polyhedron", g_menuPoly);        // direct-selection submenu
+    glutAddSubMenu("Go To Keyframe", g_menuGoto);   // one entry per saved keyframe
     glutAttachMenu(GLUT_MIDDLE_BUTTON);   // right button is reserved for vertex-focus
 }
 
